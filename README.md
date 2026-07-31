@@ -40,6 +40,10 @@ Preferences for "best time of the day" can be tweaked by changing the values via
 (Settings --> Devices & services --> Integrations --> Finnish Meteorological Institute --> \<weather location\> --> Configure).
 For tracking the weather and sensors of another location follow steps 6-7 of "Manual installation" with the latitude and longitude of the location.
 
+To move an existing entry, open **Settings > Devices & services**, select the FMI integration entry, and choose **Reconfigure**. Enter the new latitude and longitude. FMI validates the location before saving it, then Home Assistant reloads only that entry with the new place data. Existing entity IDs, including user-customized IDs used by automations and dashboards, are preserved. A location already used by another FMI entry cannot be selected.
+
+The integration intentionally does not track Home zone coordinate changes automatically. Run **Reconfigure** when the location should change.
+
 Based on the latitude and longitude, location name is derived by reverse geo-coding. Sensors are then grouped based on the derived location name.
 For example `weather.<place_name>`, `sensor.<place_name>_temperature`, `sensor.<place_name>_humidity`, etc.
 

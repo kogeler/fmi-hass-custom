@@ -21,7 +21,9 @@ The current test helper is `pytest-homeassistant-custom-component==0.13.348`, wh
 | Lint | `make lint` |
 | Type check | `make type-check` |
 | Fast offline tests | `make test-fast` |
+| Fast offline tests with two worker processes | `make test-fast PYTEST_WORKERS=2` |
 | Full offline tests with coverage | `make test-full` |
+| Full offline tests with two worker processes | `make test-full PYTEST_WORKERS=2` |
 | Prove unexpected network access fails | `make test-network-block` |
 | Local layout and hassfest validation | `make validate` |
 | Opt-in live tests | `make live` |
@@ -30,6 +32,8 @@ The current test helper is `pytest-homeassistant-custom-component==0.13.348`, wh
 | Report outdated packages | `make outdated` |
 
 Build and lock commands may access package registries. Formatting, linting, typing, ordinary tests, and local validation run with Podman's `--network=none`; pytest also uses `pytest-socket`. `make live` is the only test target with container networking and will have no selected tests until S12.
+
+Ordinary tests support isolated `pytest-xdist` worker processes through `PYTEST_WORKERS`, for example `2`, `4`, or `auto`; `0` keeps the single-process default. Processes are used instead of threads because Home Assistant tests create per-test event loops and exercise process-global integration state. On the S07 suite, warm-container measurements were 8.871 seconds for `-n 0`, 13.199 seconds for `-n 2`, and 13.586 seconds for `-n 4`, so forcing parallelism would currently slow the suite down. Keep workers opt-in and benchmark again as the suite grows. The live suite and deliberate network-block probe remain sequential.
 
 `make audit` checks the complete Home Assistant development/test graph and intentionally remains nonzero while the owner-approved Pillow/PyJWT exception in root `TODO.md` is open. Do not add audit ignores or override Home Assistant's exact package pins to make it green. The separately resolved integration-declared dependency closure had no known vulnerabilities in S03; details and evidence are in `docs/maintenance/DEPENDENCIES.md`.
 

@@ -1,22 +1,31 @@
 {
     "config": {
-        "abort": {
-            "already_configured": "Antamasi sijainti on jo määritelty"
+    "abort": {
+      "already_configured": "Antamasi sijainti on jo määritelty",
+      "reconfigure_successful": "Sijainti päivitettiin onnistuneesti"
         },
         "error": {
             "cannot_connect": "Yhteydenotto epäonnistui",
             "unknown": "Odottamaton virhe"
         },
         "step": {
-            "user": {
+      "user": {
                 "data": {
                     "latitude": "Leveysaste",
                     "longitude": "Pituusaste",
                     "name": "Nimi"
                 },
-                "description": "Ilmatieteen laitos määrittely parametrit",
-                "title": "Ilmatieteen laitos"
-            }
+        "description": "Ilmatieteen laitos määrittely parametrit",
+        "title": "Ilmatieteen laitos"
+      },
+      "reconfigure": {
+        "data": {
+          "latitude": "Leveysaste",
+          "longitude": "Pituusaste"
+        },
+        "description": "Päivitä tämän FMI-määrityksen koordinaatit. Olemassa olevat entiteetit ja mukautetut entiteettitunnukset säilyvät.",
+        "title": "Vaihda FMI-sijaintia"
+      }
         }
     },
     "entity": {

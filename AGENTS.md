@@ -31,6 +31,7 @@ Run all supported Python and Home Assistant commands through rootless Podman; do
 - Lint: `make lint`
 - Type check: `make type-check`
 - Fast offline tests: `make test-fast`
+- Opt-in process-parallel tests: `make test-fast PYTEST_WORKERS=2` (retain the default when workers benchmark slower)
 - Full offline tests and coverage: `make test-full`
 - Local layout and hassfest validation: `make validate`
 - Prove unexpected network access fails: `make test-network-block`

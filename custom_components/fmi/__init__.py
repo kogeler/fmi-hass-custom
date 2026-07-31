@@ -12,6 +12,7 @@ from dateutil import tz
 from geopy.distance import geodesic
 from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 from geopy.geocoders import Nominatim
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_OFFSET
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -31,6 +32,47 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(const.DOMAIN)  # pylint: disa
 def base_unique_id(latitude, longitude):
     """Return unique id for entries in configuration."""
     return f"{latitude}_{longitude}"
+
+
+def legacy_entity_identity(latitude: float, longitude: float) -> str:
+    """Return the exact v0.6.2 entity/device identity for coordinates."""
+    return f"{latitude}:{longitude}"
+
+
+def config_entry_unique_id(entry_id: str) -> str:
+    """Return a coordinate-independent config-entry unique ID."""
+    return f"fmi:{entry_id}"
+
+
+async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+    """Migrate coordinate identity while retaining all existing entity unique IDs."""
+    if config_entry.version > const.CONFIG_ENTRY_VERSION:
+        return False
+    if config_entry.version == const.CONFIG_ENTRY_VERSION:
+        return True
+
+    data = dict(config_entry.data)
+    data.setdefault(
+        const.CONF_ENTITY_IDENTITY,
+        legacy_entity_identity(data[CONF_LATITUDE], data[CONF_LONGITUDE]),
+    )
+    stable_unique_id = config_entry_unique_id(config_entry.entry_id)
+    collision = hass.config_entries.async_entry_for_domain_unique_id(
+        const.DOMAIN,
+        stable_unique_id,
+    )
+    unique_id = (
+        config_entry.unique_id
+        if collision is not None and collision.entry_id != config_entry.entry_id
+        else stable_unique_id
+    )
+    hass.config_entries.async_update_entry(
+        config_entry,
+        data=data,
+        unique_id=unique_id,
+        version=const.CONFIG_ENTRY_VERSION,
+    )
+    return True
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -170,7 +212,11 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         self._hass = hass
         self.latitude = latitude = config_entry.data[CONF_LATITUDE]
         self.longitude = longitude = config_entry.data[CONF_LONGITUDE]
-        self.unique_id = str(latitude) + ":" + str(longitude) + unique_id_add
+        identity = config_entry.data.get(
+            const.CONF_ENTITY_IDENTITY,
+            legacy_entity_identity(latitude, longitude),
+        )
+        self.unique_id = str(identity) + unique_id_add
 
         self.logger.debug(f"Using latitude: {latitude} and longitude: {longitude}")
 

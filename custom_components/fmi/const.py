@@ -9,6 +9,7 @@ logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.DEBUG)
 DOMAIN = "fmi"
 NAME = "FMI"
 MANUFACTURER = "Finnish Meteorological Institute"
+CONFIG_ENTRY_VERSION = 2
 TIMEOUT_FMI_INTEG_IN_SEC = 40
 TIMEOUT_LIGHTNING_PULL_IN_SECS = 5
 TIMEOUT_MAREO_PULL_IN_SECS = 5
@@ -33,6 +34,7 @@ CONF_DAILY_MODE = "daily_mode"
 CONF_LIGHTNING = "lightning_sensor"
 CONF_LIGHTNING_DISTANCE = "lightning_radius"
 CONF_OBSERVATION_STATION = "observation_station_id"
+CONF_ENTITY_IDENTITY = "entity_identity"
 
 HUMIDITY_RANGE = list(range(1, 101))
 HUMIDITY_MIN_DEFAULT = 30

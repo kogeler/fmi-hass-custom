@@ -1,22 +1,31 @@
 {
     "config": {
-        "abort": {
-            "already_configured": "The given location is already configured"
+    "abort": {
+      "already_configured": "The given location is already configured",
+      "reconfigure_successful": "Location updated successfully"
         },
         "error": {
             "cannot_connect": "Failed to connect",
             "unknown": "Unexpected error"
         },
         "step": {
-            "user": {
+      "user": {
                 "data": {
                     "latitude": "Latitude",
                     "longitude": "Longitude",
                     "name": "Name"
                 },
-                "description": "FMI Configuration Parameters",
-                "title": "Finnish Meteorological Institute"
-            }
+        "description": "FMI Configuration Parameters",
+        "title": "Finnish Meteorological Institute"
+      },
+      "reconfigure": {
+        "data": {
+          "latitude": "Latitude",
+          "longitude": "Longitude"
+        },
+        "description": "Update the coordinates used by this FMI entry. Existing entities and customized entity IDs are preserved.",
+        "title": "Move FMI location"
+      }
         }
     },
     "entity": {

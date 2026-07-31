@@ -6,6 +6,7 @@ LOCK_IMAGE := localhost/fmi-hass-custom-lock:2026.7.4
 DEV_IMAGE := localhost/fmi-hass-custom-dev:2026.7.4
 DEV_STAMP := .cache/podman-dev-2026.7.4.stamp
 HASSFEST_IMAGE := ghcr.io/home-assistant/hassfest@sha256:5284df007e5b53dada13b07db08a8980780239216bd92ba63b211c0e3d20ca73
+PYTEST_WORKERS ?= 0
 
 CONTAINER_BUILD = $(CONTAINER_ENGINE) build --build-arg PYTHON_IMAGE=$(PYTHON_IMAGE) -f Containerfile.dev
 CONTAINER_RUN = $(CONTAINER_ENGINE) run --rm --userns=keep-id -v "$(CURDIR):/workspace:Z" -w /workspace
@@ -52,10 +53,10 @@ type-check: dev-build
 	$(CONTAINER_RUN_OFFLINE) $(DEV_IMAGE) python -m mypy
 
 test-fast: dev-build
-	$(CONTAINER_RUN_OFFLINE) $(DEV_IMAGE) python -m pytest -q
+	$(CONTAINER_RUN_OFFLINE) $(DEV_IMAGE) python -m pytest -n $(PYTEST_WORKERS) -q
 
 test-full: dev-build
-	$(CONTAINER_RUN_OFFLINE) $(DEV_IMAGE) python -m pytest --cov=custom_components.fmi --cov-report=term-missing
+	$(CONTAINER_RUN_OFFLINE) $(DEV_IMAGE) python -m pytest -n $(PYTEST_WORKERS) --cov=custom_components.fmi --cov-report=term-missing
 
 test-network-block: dev-build
 	@output="$$( $(CONTAINER_RUN_OFFLINE) $(DEV_IMAGE) python -m pytest -q tests/network_probe.py 2>&1 )"; \

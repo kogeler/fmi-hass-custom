@@ -10,6 +10,7 @@ All notable changes to this project are documented in this file.
 - Fixed issue #114 with timezone-aware daily aggregation: hourly precipitation is summed, temperatures use daily highs/lows, and condition, wind, pressure, humidity, cloud, and dew-point values follow documented deterministic policies.
 - Fixed issue #111 by requesting FMI's available hourly maximum gust for forecast-backed current and forecast data while preserving observation gusts, valid zero values, and missing-data availability.
 - Fixed issue #112 for fresh entries by grouping sensors under location devices and generating location-aware entity IDs; exact legacy defaults migrate conservatively without changing customized IDs or overwriting collisions.
+- Fixed issue #115 by adding a validated location reconfigure flow that reloads the moved entry while preserving config, device, and entity identity, including customized entity IDs.
 
 ### Added
 
@@ -27,6 +28,7 @@ All notable changes to this project are documented in this file.
 - Split reviewed direct dependencies from the complete 173-package `pip freeze` lock generated in a clean container.
 - Updated weather forecasts to Home Assistant's separate hourly/daily API with UTC timestamps and complete one-hour FMI source data; the deprecated forecast property was removed.
 - Updated sensors to Home Assistant's current `SensorEntity`, entity-description, device-class, state-class, translated-name, and native-unit conventions while retaining existing unique IDs.
+- Migrated config entries from coordinate-based identifiers to stable internal identities so coordinates and resolved place names can change safely.
 
 ### Security
 

@@ -9,6 +9,14 @@
           "latitude": "[%key:common::config_flow::data::latitude%]",
           "longitude": "[%key:common::config_flow::data::longitude%]"
         }
+      },
+      "reconfigure": {
+        "description": "Update the coordinates used by this FMI entry. Existing entities and customized entity IDs are preserved.",
+        "title": "Move FMI location",
+        "data": {
+          "latitude": "[%key:common::config_flow::data::latitude%]",
+          "longitude": "[%key:common::config_flow::data::longitude%]"
+        }
       }
     },
     "error": {
@@ -16,7 +24,8 @@
       "unknown": "[%key:common::config_flow::error::unknown%]"
     },
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_location%]"
+      "already_configured": "[%key:common::config_flow::abort::already_configured_location%]",
+      "reconfigure_successful": "Location updated successfully"
     }
   },
   "entity": {
