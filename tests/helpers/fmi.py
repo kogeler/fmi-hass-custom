@@ -150,16 +150,20 @@ class FakeFMIClient:
         weather: models.Weather | None = None,
         forecast: models.Forecast | None = None,
         observation: models.Weather | None = None,
+        place_observation: models.Weather | None = None,
         weather_error: Exception | None = None,
         forecast_error: Exception | None = None,
         observation_error: Exception | None = None,
+        place_observation_error: Exception | None = None,
     ) -> None:
         self.weather = weather
         self.forecast = forecast
         self.observation = observation
+        self.place_observation = place_observation
         self.weather_error = weather_error
         self.forecast_error = forecast_error
         self.observation_error = observation_error
+        self.place_observation_error = place_observation_error
         self.calls: list[tuple[str, tuple[Any, ...]]] = []
 
     async def async_weather_by_coordinates(
@@ -187,3 +191,9 @@ class FakeFMIClient:
         if self.observation_error:
             raise self.observation_error
         return self.observation
+
+    async def async_observation_by_place(self, place: str) -> models.Weather | None:
+        self.calls.append(("observation_by_place", (place,)))
+        if self.place_observation_error:
+            raise self.place_observation_error
+        return self.place_observation

@@ -117,11 +117,10 @@ class _BaseSensorClass(CoordinatorEntity):
         self._attr_state = ha_const.STATE_UNAVAILABLE
         self.update()
 
-        coordinator.async_add_listener(self.update_callback)
-
     @ha_core.callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        self.update_callback()
         self.async_write_ha_state()
 
     def update_callback(self, *_, **__):

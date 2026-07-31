@@ -99,12 +99,11 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         self._attr_attribution = const.ATTRIBUTION
         # update initial values
         self.update_callback()
-        # register the update callback
-        coordinator.async_add_listener(self.update_callback)
 
     @ha_core.callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        self.update_callback()
         self.async_write_ha_state()
 
     def update_callback(self, *_, **__):
@@ -113,7 +112,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         _last_update_success = _fmi.last_update_success
         _weather = self._data_func()
         if _weather is None or not _last_update_success:
-            self.logger.warning(f"{self._attr_name}: No data available from FMI!")
+            self.logger.debug("%s: no data available from FMI", self._attr_name)
             return
         _time = _weather.data.time.astimezone(tz.tzlocal())
         self.logger.debug(f"{self._attr_name}: updated: {_last_update_success} time {_time}")

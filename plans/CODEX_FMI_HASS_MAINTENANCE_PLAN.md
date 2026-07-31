@@ -248,7 +248,7 @@ The status, test, and commit fields in this table are living project records and
 | [#112](https://github.com/anand-p-r/fmi-hass-custom/issues/112) Sensors not grouped/named by location | Regression | Restore location-aware grouping and appropriate generated names for new entities while preserving customized/existing IDs through safe migration | S06/S11 | TBD | TBD | NOT_STARTED | Include collision and customized-ID cases |
 | [#114](https://github.com/anand-p-r/fmi-hass-custom/issues/114) Incorrect daily forecast | Correctness | Replace first-sample-of-day behavior with documented, deterministic daily aggregation, including summing hourly precipitation amounts | S05 | `tests/test_forecast_characterization.py::test_daily_forecast_sums_hourly_precipitation_issue_114` (`strict xfail`) | TBD | REPRODUCED | S02 also added passing hourly, DST, month-boundary, and year-boundary characterization. Convert the strict xfail in S05. |
 | [#115](https://github.com/anand-p-r/fmi-hass-custom/issues/115) Location selection/editing | User-facing maintenance | Add a current Home Assistant reconfigure flow that updates an existing entry's coordinates without forcing users to rebuild automations | S07/S11 | TBD | TBD | NOT_STARTED | Dynamic tracking of the Home zone is optional; safe coordinate editing is mandatory |
-| [#117](https://github.com/anand-p-r/fmi-hass-custom/issues/117) Forecast failure disables observations | Availability | Degrade gracefully: observations/current conditions remain usable when forecast WFS fails; forecast entities/data show unavailable/empty appropriately and recover automatically | S04 | TBD | TBD | NOT_STARTED | Setup must fail only when no required data source can initialize according to the documented availability policy |
+| [#117](https://github.com/anand-p-r/fmi-hass-custom/issues/117) Forecast failure disables observations | Availability | Degrade gracefully: observations/current conditions remain usable when forecast WFS fails; forecast entities/data show unavailable/empty appropriately and recover automatically | S04 | `tests/test_availability.py` | `OWNER_TO_COMMIT` | IMPLEMENTED | Setup/retry, fallback, stale-data, recovery, lifecycle, listener, and log-transition policy is documented in `docs/maintenance/AVAILABILITY.md` and covered offline. Mark `DONE` after the owner commit and CI. |
 | [PR #116](https://github.com/anand-p-r/fmi-hass-custom/pull/116) `None` sunrise/sunset near poles | Correctness | Review, adopt or reimplement the guard; add deterministic polar-day and polar-night tests | S08 | `tests/test_forecast_characterization.py::test_clear_condition_handles_missing_polar_sun_events` (`strict xfail`) | TBD | REPRODUCED | Synthetic high-latitude fixture deterministically reproduces the `None.astimezone` failure. Convert the strict xfail in S08. |
 | New issues discovered after 2026-07-31 | Triage | Classify all new open issues; fix any critical/high correctness, availability, migration, security, or compatibility defect in this maintenance effort | S00/S13 | TBD | TBD | NOT_STARTED | Add rows rather than hiding new scope |
 
@@ -387,6 +387,20 @@ By final verification:
 
 Generated translations, fixture data, and deliberately unreachable defensive assertions may be excluded only with a documented reason. Do not game coverage with blanket pragmas or tests that merely execute lines without checking behavior.
 
+### 8.6 Type-check debt burn-down
+
+At the end of S04, `make type-check` reports the verified inherited baseline of 18 errors in four production files. This is temporary tracked debt, not an accepted final state. Resolve it alongside the sessions that already own the affected behavior so annotations follow the final implementation rather than code that will immediately be replaced:
+
+| Owning session | File/area | S04 baseline | Required result |
+|---|---|---:|---|
+| S05 | `custom_components/fmi/weather.py` and Home Assistant forecast/coordinator contracts | 4 | Zero errors in this file; repository total no greater than 14 |
+| S06 | `custom_components/fmi/sensor.py` and heterogeneous sensor/coordinator contracts | 7 | Zero errors in this file; repository total no greater than 7 |
+| S08 | `custom_components/fmi/utils.py`, including optional sun events and the `const` name collision | 3 | Zero errors in this file; repository total no greater than 4 |
+| S09 | `custom_components/fmi/__init__.py` lightning/sea-level parser structures | 4 | Zero repository errors; `make type-check` passes |
+| S14 | Full supported-environment compatibility audit | 0 expected | Confirm the zero baseline and fix any newly discovered real integration error without broad ignores |
+
+The counts are checkpoints, not permission to trade one error for another. If edits move a diagnostic to another line or module, ownership follows the behavior in this table. Every intervening session must run `make type-check`, must not increase either the repository total or the errors outside its owned area, and must not use broad ignores, exclude production files, or weaken mypy configuration to satisfy a checkpoint.
+
 ---
 
 ## 9. CI and repository quality target
@@ -449,8 +463,8 @@ A session is not `DONE` unless its acceptance criteria pass, its handoff exists,
 | S00 | Bootstrap, refresh baseline, and create initial `AGENTS.md` | None | DONE | 2026-07-31T06:44:16Z | 2026-07-31T06:55:14Z | `389c67901085efe6b53bee1474a2f89bfab20867` | `docs/agent-handoffs/S00.md` |
 | S01 | Reproducible development/test environment and validation skeleton | S00 | DONE | 2026-07-31T06:59:13Z | 2026-07-31T08:09:34Z | `b4fb80808884cdd746714829d1616c4160b94c91` | `docs/agent-handoffs/S01.md`; committed with S02 |
 | S02 | FMI fixture corpus, contract boundary, and characterization tests | S01 | DONE | 2026-07-31T08:10:37Z | 2026-07-31T08:34:20Z | `b4fb80808884cdd746714829d1616c4160b94c91` | `docs/agent-handoffs/S02.md`; committed with S01 |
-| S03 | Upgrade all dependencies and adapt to newest stable FMI client | S02 | DONE | 2026-07-31T09:41:16Z | 2026-07-31T10:24:24Z | `OWNER_TO_COMMIT` | `docs/agent-handoffs/S03.md`; suggested commit: `S03: upgrade dependencies and FMI client`; temporary HA-pinned vulnerability exception tracked in `TODO.md` |
-| S04 | Coordinator/setup resilience and issue #117 | S03 | NOT_STARTED | — | — | — | `docs/agent-handoffs/S04.md` |
+| S03 | Upgrade all dependencies and adapt to newest stable FMI client | S02 | DONE | 2026-07-31T09:41:16Z | 2026-07-31T10:24:24Z | `eb073830b03b80922d607c855f5b4e440d10e217` | `docs/agent-handoffs/S03.md`; temporary HA-pinned vulnerability exception tracked in `TODO.md` |
+| S04 | Coordinator/setup resilience and issue #117 | S03 | DONE | 2026-07-31T10:36:22Z | 2026-07-31T11:02:16Z | `OWNER_TO_COMMIT` | `docs/agent-handoffs/S04.md`; suggested commit: `S04: keep observations available during forecast outages` |
 | S05 | Correct hourly/daily forecast semantics and issue #114 | S04 | NOT_STARTED | — | — | — | `docs/agent-handoffs/S05.md` |
 | S06 | Sensor/entity correctness and issues #111/#112 | S05 | NOT_STARTED | — | — | — | `docs/agent-handoffs/S06.md` |
 | S07 | Location reconfigure flow and issue #115 | S06 | NOT_STARTED | — | — | — | `docs/agent-handoffs/S07.md` |
@@ -493,8 +507,10 @@ Every session must follow this protocol.
 - Prefer a failing regression test before the production change.
 - Keep each session's working-tree diff logically coherent for the owner's commit.
 - Correct this plan immediately when verified evidence reveals an inaccuracy, repository/code mismatch, or necessary scope expansion.
+- Update root `CHANGELOG.md` in every session that introduces a significant user-visible, release-level, compatibility, security, or major maintenance change. Record only notable outcomes; do not turn the changelog into a list of minor edits, internal mechanics, or every touched file.
 - Do not change public behavior without a test and documentation.
 - Do not silently suppress exceptions, linters, type errors, or test failures.
+- Follow the type-check burn-down in Section 8.6: run `make type-check` after production changes, do not increase the current checkpoint, and resolve the errors owned by the current session.
 - Do not weaken an assertion simply to make a test pass.
 - Do not make live network tests part of the ordinary suite.
 - When external documentation is needed, use authoritative sources and record the URL and access date in the relevant maintenance document.
@@ -789,7 +805,7 @@ Make forecast and observation availability independent enough that a forecast WF
 7. Ensure automatic recovery on a later successful refresh without requiring a restart/reload.
 8. Ensure expected repeated outages do not flood logs.
 9. Remove duplicate/manual coordinator listeners only if they are confirmed to cause lifecycle or update problems; cover listener registration/removal in tests.
-10. Convert #117's strict `xfail` into passing regression tests.
+10. Add a failing offline reproduction for #117, then make it a normal passing regression test. S02 did not add a #117 strict `xfail`; do not claim one exists.
 
 ### Required tests
 
@@ -840,6 +856,7 @@ Make hourly and daily forecasts semantically correct, deterministic, timezone-aw
 8. Remove or adapt legacy forecast properties only when current Home Assistant requires it.
 9. Handle missing values without exceptions or silently corrupting aggregates.
 10. Convert #114's strict `xfail` into passing tests.
+11. Resolve the four inherited `weather.py` mypy errors while establishing the final Home Assistant forecast/coordinator types; do not merely cast incorrect runtime shapes or add ignores.
 
 ### Required tests
 
@@ -860,6 +877,7 @@ Make hourly and daily forecasts semantically correct, deterministic, timezone-aw
 - #114 fixed.
 - Aggregation policy documented and reproducible.
 - No first-sample shortcut remains for fields requiring aggregation/selection.
+- `weather.py` is mypy-clean and the repository total is no greater than 14 errors.
 - Offline and coverage tests pass.
 
 ---
@@ -889,6 +907,7 @@ Restore correct sensor values and location-aware entity organization while respe
 7. Verify every sensor's device class, state class, native unit, native value type, availability, and extra attributes against current Home Assistant requirements.
 8. Use current `SensorEntity` patterns if required for correctness/compatibility. Do not perform unrelated sensor abstraction work.
 9. Convert #111 and the fresh-install portion of #112 from strict `xfail` to passing tests. Complete registry migration coverage in S11.
+10. Resolve the seven inherited `sensor.py` mypy errors using the final entity/coordinator types and an explicitly heterogeneous entity collection; do not add broad ignores.
 
 ### Required tests
 
@@ -906,6 +925,7 @@ Restore correct sensor values and location-aware entity organization while respe
 - #111 fixed.
 - #112 fixed for new entries and migration design implemented sufficiently for S11 verification.
 - No entity is recreated unnecessarily.
+- `sensor.py` is mypy-clean and the repository total is no greater than 7 errors.
 - Full offline suite passes.
 
 ---
@@ -981,6 +1001,7 @@ Eliminate crashes and incorrect date/time behavior around polar day/night, calen
 8. Ensure all datetimes exposed to Home Assistant are timezone-aware and use current Home Assistant helpers.
 9. Add tests for unknown FMI weather symbols/codes and a safe fallback.
 10. Convert the PR #116 regression tests to normal passing tests.
+11. Resolve the three inherited `utils.py` mypy errors as part of the optional-sun and time-helper fixes, including the `const` name collision; do not hide an unsafe `None` path with a cast.
 
 ### Required tests
 
@@ -1001,6 +1022,7 @@ Eliminate crashes and incorrect date/time behavior around polar day/night, calen
 - PR #116's failure mode is fixed with automated tests.
 - No confirmed day-of-month arithmetic bug remains.
 - Missing FMI data does not crash entity updates.
+- `utils.py` is mypy-clean and the repository total is no greater than 4 errors.
 - Full offline suite passes.
 
 ---
@@ -1034,6 +1056,7 @@ Make optional lightning and sea-level features safe, bounded, independently avai
 8. Define clear availability/freshness behavior for optional entities.
 9. Add malformed XML/error response fixtures and tests.
 10. Convert #110 acceptance tests to passing.
+11. Resolve the four inherited `__init__.py` mypy errors in the lightning/sea-level parsing structures using the validated final data shapes.
 
 ### Required tests
 
@@ -1052,6 +1075,7 @@ Make optional lightning and sea-level features safe, bounded, independently avai
 - #110 implemented and documented.
 - Optional source failures are isolated.
 - Network requests are bounded and validated.
+- `make type-check` passes with zero repository errors; later sessions preserve this zero baseline.
 - Full offline suite passes.
 
 ---
@@ -1269,7 +1293,7 @@ Validate the integration against current Home Assistant standards and identify s
    - unload/reload;
    - diagnostics and privacy;
    - polling interval and parallel updates.
-3. Run static/type analysis and resolve real integration errors. Do not perform cosmetic type-driven rewrites outside touched code.
+3. Run static/type analysis, verify the Section 8.6 zero-error baseline, and resolve any newly discovered real integration errors. Do not perform cosmetic type-driven rewrites outside touched code or hide failures with broad ignores.
 4. Run dependency vulnerability and license checks on the locked graph.
 5. Audit GitHub workflow dependencies and action sources.
 6. Audit logs/diagnostics for exact coordinates and external-service payloads.
@@ -1495,6 +1519,7 @@ Codex must add rows for material architecture, semantics, migration, support, or
 | D007 | S01 | 2026-07-31 | Use Ruff as the sole flake8-style linter and formatter with `E`, `F`, `I`, `UP`, `B`, and `ASYNC`; retain Pylint as a complementary check | Keep the former flake8 fatal subset; run Ruff alongside flake8; drop Pylint | The broader Ruff selection exposed import, modernization, and bugbear findings, supports both safe fixes and formatting, and now passes with no active legacy dependency, configuration, or command; Pylint continues to pass at 10.00/10 | `docs/maintenance/DEVELOPMENT.md`; `docs/agent-handoffs/S01.md`; OWNER_TO_COMMIT |
 | D008 | S02 | 2026-07-31 | Use compact synthetic fixture specifications that build the installed client's real models, plus a narrow async fake for the three consumed client methods | Store raw live FMI captures; use `SimpleNamespace` throughout tests; add a production wrapper before an upgrade requires it | Synthetic values avoid owner-coordinate/license risk, generated hourly series stay reviewable, real `NamedTuple` models expose dependency-shape changes, and the fake provides deterministic client/server failures without production refactoring | `tests/helpers/fmi.py`; `tests/fixtures/fmi/README.md`; `docs/agent-handoffs/S02.md`; OWNER_TO_COMMIT |
 | D009 | S03 | 2026-07-31 | Keep Home Assistant 2026.7.4's exact Pillow/PyJWT pins and track their current High-severity advisories as a temporary owner-approved exception | Override Home Assistant metadata with fixed packages; target a Home Assistant prerelease; stop all maintenance work | The integration neither imports nor declares these packages and its manifest closure audits cleanly; overriding exact Core pins makes the environment inconsistent, while the owner explicitly accepted the temporary risk for private testing until stable Home Assistant updates | `TODO.md`; `docs/maintenance/DEPENDENCIES.md`; `docs/agent-handoffs/S03.md`; OWNER_TO_COMMIT |
+| D010 | S04 | 2026-07-31 | Load an entry when either the primary current source (including place fallback) or a configured station succeeds, while keeping forecast and optional-source availability independent | Require the forecast-backed coordinator to succeed; treat any configured station failure as fatal; retain stale forecast data | Independent coordinators preserve usable observations during a WFS incident; explicit stale-data clearing and transition-only logging make outages and automatic recovery visible without presenting old data as current | `docs/maintenance/AVAILABILITY.md`; `tests/test_availability.py`; `docs/agent-handoffs/S04.md`; OWNER_TO_COMMIT |
 | D003 | TBD | — | Daily condition/wind/other-field aggregation semantics | TBD | Must follow FMI field meaning and current Home Assistant schema | TBD |
 | D004 | TBD | — | Immutable config-entry/entity identity and v0.6.2 migration | TBD | Coordinates/place names are mutable; user automations must survive | TBD |
 | D005 | TBD | — | Lightning max-age default and units | TBD | Backward compatibility, usefulness, and clear UI semantics | TBD |

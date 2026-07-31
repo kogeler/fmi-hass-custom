@@ -41,6 +41,7 @@ def test_consumed_async_method_signatures_match_installed_client() -> None:
         "forecast_points",
     )
     assert tuple(inspect.signature(fmi.async_observation_by_station_id).parameters) == ("fmi_sid",)
+    assert tuple(inspect.signature(fmi.async_observation_by_place).parameters) == ("place",)
 
 
 def test_current_client_maps_three_second_wind_gust_field() -> None:
