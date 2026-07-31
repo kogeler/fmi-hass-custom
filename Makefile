@@ -78,7 +78,7 @@ validate-hassfest:
 validate: validate-local validate-hassfest
 
 live: dev-build
-	$(CONTAINER_RUN) $(DEV_IMAGE) python -m pytest -o addopts= --strict-config --strict-markers -m live
+	$(CONTAINER_RUN) $(DEV_IMAGE) python -m pytest -o addopts= --strict-config --strict-markers -n 0 -m live
 
 audit: dev-build
 	$(CONTAINER_RUN) $(DEV_IMAGE) python -m pip_audit --strict

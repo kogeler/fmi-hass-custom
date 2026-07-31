@@ -31,6 +31,8 @@ jobs:
         run: python -m ruff check .
       - name: Offline smoke tests
         run: python -m pytest -q
+      - name: Live FMI probe
+        run: python -m pytest -o addopts= --strict-config --strict-markers -n 0 -m live -q
 
   hassfest:
     runs-on: ubuntu-24.04
