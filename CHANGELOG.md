@@ -18,6 +18,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- Added a translated lightning maximum-age option with a backward-compatible 24-hour default and exact inclusive age filtering.
 - Added a reproducible rootless Podman development and test environment targeting Home Assistant 2026.7.4 on Python 3.14.2.
 - Added deterministic offline FMI fixtures, dependency contract tests, Home Assistant setup coverage, entity characterization tests, and explicit regression cases for the known maintenance issues.
 - Added Ruff formatting/linting, coverage, type checking, network-blocking tests, hassfest/HACS validation, and pinned GitHub Actions checks.
@@ -25,6 +26,7 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Moved lightning and sea-level HTTP to Home Assistant's shared async session with bounded connect/read/total timeouts, response-size limits, validated aware timestamps, isolated availability, and cached rate-limited address enrichment.
 - Moved the integration to the standard `custom_components/fmi/` layout required by current Home Assistant validation.
 - Upgraded `fmi-weather-client` from 0.7.0 to 1.0.0 and `geopy` to 2.5.0.
 - Replaced direct `python-dateutil` use with Home Assistant timezone helpers and removed it from the integration's runtime requirements.

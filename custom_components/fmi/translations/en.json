@@ -62,6 +62,7 @@
                     "daily_mode": "Activate Daily forecast entity",
                     "lightning_sensor": "Activate Lightning sensor",
                     "lightning_radius": "Lightning sensor radius km",
+                    "lightning_max_age_minutes": "Lightning maximum age in minutes",
                     "observation_station_id": "FMI's Observation Station ID"
                 },
                 "description": "Maximum and minimum parameters are used to determine the Best Time Of The Day",

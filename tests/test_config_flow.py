@@ -9,6 +9,7 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+import voluptuous as vol
 from fmi_weather_client.errors import ClientError
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
@@ -21,7 +22,14 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.fmi import FMIDataUpdateCoordinator, async_migrate_entry
 from custom_components.fmi import fmi as fmi_client
-from custom_components.fmi.const import CONF_ENTITY_IDENTITY, COORDINATOR, DOMAIN
+from custom_components.fmi.const import (
+    CONF_ENTITY_IDENTITY,
+    CONF_LIGHTNING_MAX_AGE,
+    COORDINATOR,
+    DOMAIN,
+    LIGHTNING_MAX_AGE_DEFAULT_MINUTES,
+    LIGHTNING_MAX_AGE_MAX_MINUTES,
+)
 from tests.helpers.fmi import forecast_from_fixture, weather_from_fixture
 
 
@@ -64,6 +72,34 @@ def _locations():
     return helsinki, helsinki_forecast, tampere, tampere_forecast
 
 
+async def test_options_flow_defaults_and_stores_lightning_max_age(
+    hass: HomeAssistant,
+) -> None:
+    """Give existing entries a lazy-compatible 24-hour default and validate the range."""
+    entry = _entry(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    schema = result["data_schema"]
+    assert schema is not None
+    defaults = schema({})
+    assert defaults[CONF_LIGHTNING_MAX_AGE] == LIGHTNING_MAX_AGE_DEFAULT_MINUTES
+
+    with pytest.raises(vol.Invalid):
+        schema(
+            {
+                **defaults,
+                CONF_LIGHTNING_MAX_AGE: LIGHTNING_MAX_AGE_MAX_MINUTES + 1,
+            }
+        )
+
+    defaults[CONF_LIGHTNING_MAX_AGE] = 60
+    result = await hass.config_entries.options.async_configure(result["flow_id"], defaults)
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_LIGHTNING_MAX_AGE] == 60
+
+
 def _patch_location_sources(monkeypatch) -> dict[str, AsyncMock]:
     helsinki, helsinki_forecast, tampere, tampere_forecast = _locations()
     weather_by_coordinates = {
@@ -102,8 +138,8 @@ def _patch_location_sources(monkeypatch) -> dict[str, AsyncMock]:
     )
     monkeypatch.setattr(
         FMIDataUpdateCoordinator,
-        "_FMIDataUpdateCoordinator__update_mareo_data",
-        lambda self: None,
+        "_FMIDataUpdateCoordinator__async_update_mareo_data",
+        AsyncMock(return_value=None),
     )
     return mocks
 

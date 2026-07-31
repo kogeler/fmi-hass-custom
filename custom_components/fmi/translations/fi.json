@@ -62,6 +62,7 @@
                     "daily_mode": "Aktivoi vuorokausiennuste-entiteetti",
                     "lightning_sensor": "Aktivoi ukkostutka",
                     "lightning_radius": "Ukkostutkan säde km",
+                    "lightning_max_age_minutes": "Salamaniskun enimmäisikä minuutteina",
                     "observation_station_id": "FMI:n havaintoaseman ID"
                 },
                 "description": "Maksimin ja minimin sisältävät parametrit käytetään määrittämään päivän parhaan ajan",

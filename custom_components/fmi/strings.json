@@ -60,7 +60,8 @@
           "max_wind_speed": "Max Wind Speed",
           "min_precipitation": "Min Precipitation",
           "max_precipitation": "Max Precipitation",
-          "daily_mode": "Daily mode"
+          "daily_mode": "Daily mode",
+          "lightning_max_age_minutes": "Lightning maximum age in minutes"
         }
       }
     }

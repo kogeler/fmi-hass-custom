@@ -284,6 +284,19 @@ class FMIOptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                     ): cv.positive_int,
                     vol.Optional(
+                        const.CONF_LIGHTNING_MAX_AGE,
+                        default=options.get(
+                            const.CONF_LIGHTNING_MAX_AGE,
+                            const.LIGHTNING_MAX_AGE_DEFAULT_MINUTES,
+                        ),
+                    ): vol.All(
+                        cv.positive_int,
+                        vol.Range(
+                            min=const.LIGHTNING_MAX_AGE_MIN_MINUTES,
+                            max=const.LIGHTNING_MAX_AGE_MAX_MINUTES,
+                        ),
+                    ),
+                    vol.Optional(
                         const.CONF_OBSERVATION_STATION,
                         default=options.get(const.CONF_OBSERVATION_STATION, 0),
                     ): cv.positive_int,

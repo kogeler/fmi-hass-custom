@@ -4,11 +4,11 @@
 
 ## Purpose and scope
 
-This repository contains the `fmi` Home Assistant custom integration. It exposes Finnish Meteorological Institute forecast, observation, lightning, and sea-level data. Preserve existing user configuration and entity identity while executing the bounded maintenance sessions in `plans/CODEX_FMI_HASS_MAINTENANCE_PLAN.md`.
+This repository contains the `fmi` Home Assistant custom integration. It exposes Finnish Meteorological Institute forecast, observation, lightning, and sea-level data. Preserve existing user configuration and entity identity while executing the bounded maintenance sessions in `plans/P01.md`.
 
 ## Before work
 
-- Read `plans/CODEX_FMI_HASS_MAINTENANCE_PLAN.md` in full, inspect its session tracker, and read the latest file in `docs/agent-handoffs/`.
+- Read `plans/P01.md` in full, inspect its session tracker, and read the latest file in `docs/P01/`.
 - Execute exactly one eligible session. Do not start a later session or absorb unrelated cleanup.
 - Correct the plan immediately when verified code or source evidence reveals an inaccuracy, mismatch, or necessary scope expansion. Record the correction in the current handoff.
 
@@ -44,4 +44,4 @@ The build and lock commands may use package registries. Formatting, linting, typ
 
 ## Session handoff
 
-Follow Sections 10, 11, and 13 of the plan. Update the tracker as work changes state, keep `docs/agent-handoffs/SXX.md` current, run the session's required verification, review `git diff --check` and `git status --short`, and stop when that session is complete.
+Follow Sections 10, 11, and 13 of the plan. Update the tracker as work changes state, keep `docs/P01/SXX.md` current, run the session's required verification, review `git diff --check` and `git status --short`, and stop when that session is complete.

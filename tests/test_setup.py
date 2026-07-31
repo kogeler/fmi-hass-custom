@@ -65,8 +65,8 @@ async def test_mocked_config_entry_loads(
     monkeypatch.setattr(FMIDataUpdateCoordinator, "_fetch_forecast", mock_fetch_forecast)
     monkeypatch.setattr(
         FMIDataUpdateCoordinator,
-        "_FMIDataUpdateCoordinator__update_mareo_data",
-        lambda self: None,
+        "_FMIDataUpdateCoordinator__async_update_mareo_data",
+        AsyncMock(return_value=None),
     )
 
     entry = MockConfigEntry(

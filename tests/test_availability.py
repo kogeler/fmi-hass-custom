@@ -22,6 +22,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.fmi import FMIDataUpdateCoordinator
 from custom_components.fmi import fmi as fmi_client
 from custom_components.fmi.const import (
+    CONF_LIGHTNING,
     CONF_OBSERVATION_STATION,
     COORDINATOR,
     COORDINATOR_OBSERVATION,
@@ -64,10 +65,14 @@ def _patch_fmi_sources(
 
 
 def _patch_sea_level(monkeypatch, update=None) -> None:
+    async def async_update(self) -> None:
+        if update is not None:
+            update(self)
+
     monkeypatch.setattr(
         FMIDataUpdateCoordinator,
-        "_FMIDataUpdateCoordinator__update_mareo_data",
-        update or (lambda self: None),
+        "_FMIDataUpdateCoordinator__async_update_mareo_data",
+        async_update,
     )
 
 
@@ -76,10 +81,13 @@ def _entry(
     *,
     station_id: int = 0,
     forecast_interval: int | None = None,
+    lightning: bool = False,
 ) -> MockConfigEntry:
     options = {CONF_OBSERVATION_STATION: station_id} if station_id else {}
     if forecast_interval is not None:
         options[CONF_OFFSET] = forecast_interval
+    if lightning:
+        options[CONF_LIGHTNING] = True
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Synthetic Helsinki",
@@ -378,6 +386,36 @@ async def test_optional_source_failure_does_not_disable_current_weather(
     assert coordinator.last_update_success
     assert coordinator.get_weather() is weather
     assert coordinator.mareo_data is None
+
+
+async def test_lightning_failure_does_not_disable_current_weather(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Keep an enabled lightning transport failure outside core availability."""
+    weather = weather_from_fixture("forecast_normal.json")
+    forecast = forecast_from_fixture("forecast_normal.json")
+    _patch_fmi_sources(monkeypatch, weather=weather, forecast=forecast)
+    _patch_sea_level(monkeypatch)
+
+    async def fail_lightning(self) -> None:
+        raise TimeoutError("Synthetic lightning timeout")
+
+    monkeypatch.setattr(
+        FMIDataUpdateCoordinator,
+        "_FMIDataUpdateCoordinator__async_update_lightning_strikes",
+        fail_lightning,
+    )
+    entry = _entry(hass, lightning=True)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    assert entry.state is ConfigEntryState.LOADED
+    assert coordinator.last_update_success
+    assert coordinator.get_weather() is weather
+    assert coordinator.lightning_data is None
 
 
 async def test_partial_outage_unload_reload_cleans_coordinator_listeners(

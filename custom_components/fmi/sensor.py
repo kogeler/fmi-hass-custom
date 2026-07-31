@@ -456,6 +456,16 @@ class FMIBestConditionSensor(_BaseSensorClass):
 class FMILightningStrikesSensor(_BaseSensorClass):
     """Expose the latest FMI lightning strike group."""
 
+    def __init__(
+        self,
+        name: str,
+        coordinator: FMIDataUpdateCoordinator,
+        description: FMISensorEntityDescription,
+    ) -> None:
+        """Initialize lightning state with FMI and OpenStreetMap attribution."""
+        super().__init__(name, coordinator, description)
+        self._attr_attribution = f"{const.ATTRIBUTION}; {const.OPENSTREETMAP_ATTRIBUTION}"
+
     def update(self) -> None:
         """Update the lightning sensor state."""
         data = self.coordinator.lightning_data

@@ -70,8 +70,8 @@ def _patch_sources(monkeypatch, weather) -> dict[str, AsyncMock]:
     monkeypatch.setattr(fmi_client, "async_observation_by_place", mocks["place_observation"])
     monkeypatch.setattr(
         FMIDataUpdateCoordinator,
-        "_FMIDataUpdateCoordinator__update_mareo_data",
-        lambda self: None,
+        "_FMIDataUpdateCoordinator__async_update_mareo_data",
+        AsyncMock(return_value=None),
     )
     return mocks
 
@@ -192,8 +192,8 @@ async def test_two_locations_create_distinct_devices_and_sensor_ids(
     )
     monkeypatch.setattr(
         FMIDataUpdateCoordinator,
-        "_FMIDataUpdateCoordinator__update_mareo_data",
-        lambda self: None,
+        "_FMIDataUpdateCoordinator__async_update_mareo_data",
+        AsyncMock(return_value=None),
     )
     entries = [
         _entry(hass),

@@ -3,16 +3,23 @@
 
 """The FMI (Finnish Meteorological Institute) component."""
 
-import time
+from __future__ import annotations
+
 import xml.etree.ElementTree as ET
 from asyncio import gather, timeout
-from datetime import datetime, timedelta
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from threading import Lock
+from time import monotonic
+from typing import Any
 
 import fmi_weather_client.errors as fmi_erros
 import fmi_weather_client.models as fmi_models
-import requests
+from aiohttp import ClientError as AiohttpClientError
+from aiohttp import ClientSession, ClientTimeout
 from geopy.distance import geodesic
-from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
+from geopy.exc import GeocoderServiceError
 from geopy.geocoders import Nominatim
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_OFFSET
@@ -30,6 +37,62 @@ from . import fmi_client as fmi
 LOGGER = const.LOGGER
 PLATFORMS = ["sensor", "weather"]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(const.DOMAIN)  # pylint: disable=invalid-name
+_NOMINATIM_RATE_LOCK = Lock()
+_NOMINATIM_NEXT_REQUEST_AT = 0.0
+
+
+class OptionalSourceError(RuntimeError):
+    """Report a classified optional-source transport or payload failure."""
+
+
+def _reserve_nominatim_request() -> bool:
+    """Reserve one process-wide public Nominatim request without blocking a worker."""
+    global _NOMINATIM_NEXT_REQUEST_AT  # pylint: disable=global-statement
+
+    now = monotonic()
+    with _NOMINATIM_RATE_LOCK:
+        if now < _NOMINATIM_NEXT_REQUEST_AT:
+            return False
+        _NOMINATIM_NEXT_REQUEST_AT = now + const.NOMINATIM_REQUEST_INTERVAL_SECONDS
+        return True
+
+
+@dataclass(slots=True)
+class _LightningState:
+    """Keep optional lightning settings, data, and geocoder cache together."""
+
+    enabled: bool
+    radius: int
+    max_age_minutes: int
+    data: list[FMILightningStruct] | None = None
+    geocode_cache: dict[tuple[float, float], str] = field(default_factory=dict)
+    geolocator: Nominatim | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _LightningRawRow:
+    """Numeric values decoded from one aligned FMI lightning row."""
+
+    latitude: float
+    longitude: float
+    epoch_seconds: float
+    strikes: float
+    peak_current: float
+    cloud_cover: float
+    ellipse_major: float
+
+
+@dataclass(frozen=True, slots=True)
+class _LightningCandidate:
+    """One age- and distance-validated lightning candidate."""
+
+    time: datetime
+    coordinates: tuple[float, float]
+    distance: float
+    strikes: int
+    peak_current: float
+    cloud_cover: float
+    ellipse_major: float
 
 
 def base_unique_id(latitude, longitude):
@@ -145,33 +208,28 @@ async def update_listener(hass, config_entry):
     await hass.config_entries.async_reload(config_entry.entry_id)
 
 
+@dataclass(frozen=True, slots=True)
 class FMILightningStruct:
-    """Lightning data structure"""
+    """One validated lightning strike group."""
 
-    def __init__(
-        self, time_val, location, distance, strikes, peak_current, cloud_cover, ellipse_major
-    ):
-        """Initialize the lightning parameters."""
-        # self.time = time_val
-        _time = datetime.fromisoformat(time_val)
-        self.time = _time.strftime("%Y-%m-%d %H:%M")
-        self.location = location
-        self.distance = float(f"{float(distance):.2f}")
-        self.strikes = int(strikes)
-        self.peak_current = float(peak_current)
-        self.cloud_cover = float(cloud_cover)
-        self.ellipse_major = float(ellipse_major)
+    time: datetime
+    location: str
+    distance: float
+    strikes: int
+    peak_current: float
+    cloud_cover: float
+    ellipse_major: float
 
 
 class FMIMareoStruct:
-    """Mareo data structure"""
+    """Validated sea-level data ordered by aware timestamp."""
 
+    @dataclass(frozen=True, slots=True)
     class SeaLevelData:
-        def __init__(self, time_val: str, sea_level: float):
-            """Initialize the sea level data."""
-            _time = datetime.fromisoformat(time_val)
-            self.time = _time.strftime("%Y-%m-%d %H:%M")
-            self.sea_level = float(sea_level)
+        """One supported sea-level value."""
+
+        time: datetime
+        sea_level: float
 
     def __init__(self):
         """Initialize the sea height data."""
@@ -185,12 +243,12 @@ class FMIMareoStruct:
         """Get the sea level values."""
         return list(self.sea_levels)
 
-    def append(self, sea_level_data: SeaLevelData):
-        """Clear the sea level data."""
+    def append(self, sea_level_data: SeaLevelData) -> None:
+        """Append one validated sea-level value."""
         self.sea_levels.append(sea_level_data)
 
-    def append_values(self, time_val, sea_level):
-        """Clear the sea level data."""
+    def append_values(self, time_val: datetime, sea_level: float) -> None:
+        """Append validated values as a typed sea-level record."""
         sea_level_data = FMIMareoStruct.SeaLevelData(time_val, sea_level)
         self.sea_levels.append(sea_level_data)
 
@@ -208,11 +266,10 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         name="",
     ):
         """Initialize."""
-        _ = session
-
         self.logger = const.LOGGER.getChild("coordinator")
 
         self._hass = hass
+        self._session: ClientSession = session
         self.latitude = latitude = config_entry.data[CONF_LATITUDE]
         self.longitude = longitude = config_entry.data[CONF_LONGITUDE]
         identity = config_entry.data.get(
@@ -244,9 +301,17 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             _options.get(const.CONF_MAX_PRECIPITATION, const.PRECIPITATION_MAX_DEFAULT)
         )
         self.daily_mode = bool(_options.get(const.CONF_DAILY_MODE, const.DAILY_MODE_DEFAULT))
-        self.lightning_mode = bool(_options.get(const.CONF_LIGHTNING, const.LIGHTNING_DEFAULT))
-        self.lightning_radius = int(
-            _options.get(const.CONF_LIGHTNING_DISTANCE, const.BOUNDING_BOX_HALF_SIDE_KM)
+        self._lightning_state = _LightningState(
+            enabled=bool(_options.get(const.CONF_LIGHTNING, const.LIGHTNING_DEFAULT)),
+            radius=int(
+                _options.get(const.CONF_LIGHTNING_DISTANCE, const.BOUNDING_BOX_HALF_SIDE_KM)
+            ),
+            max_age_minutes=int(
+                _options.get(
+                    const.CONF_LIGHTNING_MAX_AGE,
+                    const.LIGHTNING_MAX_AGE_DEFAULT_MINUTES,
+                )
+            ),
         )
 
         # Observation data if the station id is set and valid
@@ -265,9 +330,6 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         self.best_precipitation: float | None = None
         self.best_state: str | None = None
 
-        # Lightning strikes
-        self.lightning_data: list[FMILightningStruct] | None = None
-
         # Mareo
         self.mareo_data: FMIMareoStruct | None = None
         self._source_available: dict[str, bool] = {}
@@ -279,6 +341,31 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass, self.logger, config_entry=config_entry, name=name, update_interval=update_interval
         )
+
+    @property
+    def lightning_mode(self) -> bool:
+        """Return whether lightning retrieval is enabled."""
+        return self._lightning_state.enabled
+
+    @property
+    def lightning_radius(self) -> int:
+        """Return the configured lightning bounding-box radius."""
+        return self._lightning_state.radius
+
+    @property
+    def lightning_max_age_minutes(self) -> int:
+        """Return the inclusive maximum strike age in minutes."""
+        return self._lightning_state.max_age_minutes
+
+    @property
+    def lightning_data(self) -> list[FMILightningStruct] | None:
+        """Return the latest validated lightning groups."""
+        return self._lightning_state.data
+
+    @lightning_data.setter
+    def lightning_data(self, value: list[FMILightningStruct] | None) -> None:
+        """Replace lightning data, clearing stale values on failures."""
+        self._lightning_state.data = value
 
     def get_observation(self) -> fmi_models.Weather | None:
         """Return the current observation data."""
@@ -394,178 +481,278 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 self.best_wind_speed = wind_speed
                 self.best_precipitation = precipitation_amount
 
-    def __lightning_strikes_postions(self, loc_list: list, text: str, timeout_time: float):
-        home_cords = (self.latitude, self.longitude)
-        val_list = text.lstrip().split("\n")
+    @staticmethod
+    def __xml_rows(root: ET.Element, local_name: str) -> list[str]:
+        """Return non-empty whitespace-normalized rows for an XML local name."""
+        return [
+            row
+            for element in root.iter()
+            if element.tag.rsplit("}", 1)[-1] == local_name and element.text
+            for row in element.text.splitlines()
+            if row.strip()
+        ]
 
-        for loc_index, val in enumerate(val_list):
-            if not val:
-                continue
+    @staticmethod
+    def __parse_xml(payload: bytes, source: str) -> ET.Element:
+        """Parse one bounded XML payload with a classified failure."""
+        try:
+            return ET.fromstring(payload)
+        except ET.ParseError as error:
+            raise OptionalSourceError(f"{source} invalid XML") from error
 
-            val_split = val.split(" ")
-            lightning_coords = (float(val_split[0]), float(val_split[1]))
-            distance = 0
+    def __lightning_location(
+        self,
+        coordinates: tuple[float, float],
+        *,
+        allow_request: bool,
+    ) -> tuple[str, bool]:
+        """Return a cached address or bounded raw-coordinate fallback."""
+        cached = self._lightning_state.geocode_cache.get(coordinates)
+        if cached is not None:
+            return cached, False
 
-            try:
-                distance = geodesic(lightning_coords, home_cords).km
-            except AttributeError, ValueError:
-                self.logger.error(
-                    f"Unable to find distance between {lightning_coords} and {home_cords}"
-                )
+        fallback = f"{coordinates[0]}, {coordinates[1]}"
+        if not allow_request or not _reserve_nominatim_request():
+            return fallback, False
 
-            add_tuple = (val_split[0], val_split[1], val_split[2], distance, loc_index)
-            loc_list.append(add_tuple)
-
-            if time.time() > timeout_time:
-                break
-
-    def __lightning_strikes_reasons_list(self, loc_list: list, text: str, timeout_time: float):
-        val_list = text.lstrip().split("\n")
-
-        for index, val in enumerate(val_list):
-            if not val:
-                continue
-
-            val_split = val.split(" ")
-            exist_tuple = loc_list[index]
-
-            if index != exist_tuple[4]:
-                self.logger.debug("Record mismatch - aborting query")
-                break
-
-            loc_list[index] = (
-                exist_tuple[0],
-                exist_tuple[1],
-                exist_tuple[2],
-                exist_tuple[3],
-                val_split[0],
-                val_split[1],
-                val_split[2],
-                val_split[3],
+        try:
+            if self._lightning_state.geolocator is None:
+                self._lightning_state.geolocator = Nominatim(user_agent=const.NOMINATIM_USER_AGENT)
+            result = self._lightning_state.geolocator.reverse(
+                coordinates,
+                language="en",
+                exactly_one=True,
+                timeout=const.NOMINATIM_TIMEOUT_SECONDS,
             )
+            location = result.address if result is not None else fallback
+        except (AttributeError, GeocoderServiceError, TypeError, ValueError) as error:
+            self.logger.warning("Unable to reverse geocode %s: %s", fallback, error)
+            location = fallback
 
-            if time.time() > timeout_time:
-                break
+        self._lightning_state.geocode_cache[coordinates] = location
+        return location, True
 
-    def __get_lightning_url(self):
-        """Generate URL and fetch data from FMI for lightning sensors."""
-
-        start_time = datetime.today() - timedelta(days=const.LIGHTNING_DAYS_LIMIT)
-        # Format datetime to string accepted as path parameter in REST
-        start_time = start_time.strftime("starttime=%Y-%m-%dT%H:%M:%SZ")
-
-        # Get Bounding Box coords
-        bbox_coords = utils.get_bounding_box(
-            self.latitude, self.longitude, half_side_in_km=self.lightning_radius
+    def __decode_lightning_row(
+        self,
+        position: str,
+        reason: str,
+    ) -> _LightningRawRow | None:
+        """Decode aligned numeric fields without accepting missing or non-finite data."""
+        raw_values = position.split() + reason.split()
+        if len(raw_values) != 7:
+            self.logger.warning("Skipping malformed lightning row")
+            return None
+        values: list[float] = []
+        for raw_value in raw_values:
+            value = utils.finite_float(raw_value)
+            if value is None:
+                self.logger.warning("Skipping malformed lightning values")
+                return None
+            values.append(value)
+        row = _LightningRawRow(
+            latitude=values[0],
+            longitude=values[1],
+            epoch_seconds=values[2],
+            strikes=values[3],
+            peak_current=values[4],
+            cloud_cover=values[5],
+            ellipse_major=values[6],
         )
-        bbox_uri_param = (
-            "bbox="
-            f"{bbox_coords.lon_min},{bbox_coords.lat_min},"
-            f"{bbox_coords.lon_max},{bbox_coords.lat_max}"
+        if (
+            not -90 <= row.latitude <= 90
+            or not -180 <= row.longitude <= 180
+            or not row.strikes.is_integer()
+            or row.strikes < 0
+        ):
+            self.logger.warning("Skipping malformed lightning values")
+            return None
+        return row
+
+    def __lightning_candidate(
+        self,
+        row: _LightningRawRow,
+        cutoff: datetime,
+        now: datetime,
+    ) -> _LightningCandidate | None:
+        """Validate one strike timestamp and distance against the current update."""
+        try:
+            strike_time = datetime.fromtimestamp(row.epoch_seconds, UTC)
+        except OverflowError, OSError, ValueError:
+            self.logger.warning("Skipping invalid lightning timestamp")
+            return None
+        if strike_time < cutoff or strike_time > now:
+            return None
+        coordinates = (row.latitude, row.longitude)
+        try:
+            distance = geodesic(coordinates, (self.latitude, self.longitude)).km
+        except AttributeError, TypeError, ValueError:
+            self.logger.warning("Skipping invalid lightning coordinates %s", coordinates)
+            return None
+        return _LightningCandidate(
+            time=strike_time,
+            coordinates=coordinates,
+            distance=round(distance, 2),
+            strikes=int(row.strikes),
+            peak_current=row.peak_current,
+            cloud_cover=row.cloud_cover,
+            ellipse_major=row.ellipse_major,
         )
 
-        base_url = const.LIGHTNING_GET_URL + start_time + "&" + bbox_uri_param + "&"
-        self.logger.debug(f"FMI: Lightning URI - {base_url}")
-
-        # Fetch data
-        response = requests.get(base_url, timeout=const.TIMEOUT_LIGHTNING_PULL_IN_SECS)
-        return ET.fromstring(response.content)
-
-    def __update_lightning_strikes(self):
-        self.logger.debug("FMI: Lightning started")
-
-        loc_time_list = []
-        root = self.__get_lightning_url()
-        _timeout = time.time() + (const.LIGHTNING_LOOP_TIMEOUT_IN_SECS * 1000)
-
-        for child in root.iter():
-            if not child.text:
-                continue
-            if child.tag.find("positions") > 0:
-                self.__lightning_strikes_postions(loc_time_list, child.text, _timeout)
-
-            elif child.tag.find("doubleOrNilReasonTupleList") > 0:
-                self.__lightning_strikes_reasons_list(loc_time_list, child.text, _timeout)
-
-        # First sort for closes entries and filter to limit
-        loc_time_list = sorted(loc_time_list, key=lambda item: item[3])
-
-        self.logger.debug(f"FMI - Coords retrieved for Lightning Data- {len(loc_time_list)}")
-
-        loc_time_list = loc_time_list[: const.LIGHTNING_LIMIT]
-
-        # Second Sort based on date
-        loc_time_list = sorted(loc_time_list, key=(lambda item: item[2]), reverse=True)
-
-        geolocator = Nominatim(user_agent="fmi_hassio_sensor")
-
-        # Reverse geocoding
-        op_tuples = []
-        for v in loc_time_list:
-            location = str(v[0]) + ", " + str(v[1])
-            loc_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(int(v[2])))
-            try:
-                location = geolocator.reverse(location, language="en", timeout=5).address
-            except (AttributeError, ValueError, GeocoderUnavailable, GeocoderTimedOut) as e:
-                self.logger.error(
-                    f"Unable to reverse geocode for address-{location}. Got error-{e}"
-                )
-
-            # Time, Location, Distance, Strikes, Peak Current, Cloud Cover, Ellipse Major
-            op = FMILightningStruct(
-                time_val=loc_time,
-                location=location,
-                distance=v[3],
-                strikes=v[4],
-                peak_current=v[5],
-                cloud_cover=v[6],
-                ellipse_major=v[7],
+    def __build_lightning_data(
+        self,
+        candidates: list[_LightningCandidate],
+    ) -> list[FMILightningStruct]:
+        """Resolve at most one new address and build immutable sensor records."""
+        geocode_available = True
+        lightning_data: list[FMILightningStruct] = []
+        for candidate in candidates:
+            location, attempted = self.__lightning_location(
+                candidate.coordinates,
+                allow_request=geocode_available,
             )
-            op_tuples.append(op)
-        self.lightning_data = op_tuples
-        self.logger.debug("FMI: Lightning ended")
-
-    # Update mareo data
-    def __update_mareo_data(self):
-        """Get the latest mareograph forecast data from FMI and update the states."""
-
-        self.logger.debug("FMI: mareo started")
-        # Format datetime to string accepted as path parameter in REST
-        start_time = datetime.today().strftime("starttime=%Y-%m-%dT%H:%M:%SZ")
-
-        # Format location to string accepted as path parameter in REST
-        loc_string = "latlon=" + str(self.latitude) + "," + str(self.longitude)
-
-        base_mareo_url = const.MAREO_GET_URL + loc_string + "&" + start_time + "&"
-        self.logger.debug("FMI: Using Mareo URL: %s", base_mareo_url)
-
-        # Fetch data
-        response_mareo = requests.get(base_mareo_url, timeout=const.TIMEOUT_MAREO_PULL_IN_SECS)
-
-        root_mareo: list = ET.fromstring(response_mareo.content)
-
-        self.mareo_data = mareo_data = FMIMareoStruct()
-
-        # for n in range(len(root_mareo)):
-        for index, mareo in enumerate(root_mareo):
-            try:
-                if mareo[0][2].text == "SeaLevel":
-                    mareo_data.append_values(mareo[0][1].text, mareo[0][3].text)
-                elif mareo[0][2].text == "SeaLevelN2000":
-                    continue
-                else:
-                    self.logger.debug("Sealevel forecast unsupported record: %s", mareo[0][2].text)
-                    continue
-            except IndexError:
-                self.logger.debug(
-                    "Sealevel forecast records not in expected format "
-                    f"for index - {index} of locstring - {loc_string}"
+            geocode_available = geocode_available and not attempted
+            lightning_data.append(
+                FMILightningStruct(
+                    time=candidate.time,
+                    location=location,
+                    distance=candidate.distance,
+                    strikes=candidate.strikes,
+                    peak_current=candidate.peak_current,
+                    cloud_cover=candidate.cloud_cover,
+                    ellipse_major=candidate.ellipse_major,
                 )
+            )
+        return lightning_data
 
-        if mareo_data.size():
-            self.logger.debug("FMI: Mareo data updated")
-        else:
-            self.logger.debug("FMI: Mareo data not updated. No data available")
+    def __parse_lightning_payload(
+        self,
+        payload: bytes,
+        now: datetime,
+    ) -> list[FMILightningStruct]:
+        """Validate, age-filter, distance-limit, and label lightning rows."""
+        root = self.__parse_xml(payload, "lightning")
+        positions = self.__xml_rows(root, "positions")
+        reasons = self.__xml_rows(root, "doubleOrNilReasonTupleList")
+        if not positions and not reasons:
+            return []
+        if len(positions) != len(reasons):
+            raise OptionalSourceError("lightning parallel arrays have unequal lengths")
+
+        now = now.astimezone(UTC)
+        cutoff = now - timedelta(minutes=self.lightning_max_age_minutes)
+        candidates: list[_LightningCandidate] = []
+        for position, reason in zip(positions, reasons, strict=True):
+            row = self.__decode_lightning_row(position, reason)
+            if row is None:
+                continue
+            candidate = self.__lightning_candidate(row, cutoff, now)
+            if candidate is not None:
+                candidates.append(candidate)
+
+        candidates = sorted(candidates, key=lambda item: item.distance)[: const.LIGHTNING_LIMIT]
+        candidates.sort(key=lambda item: item.time, reverse=True)
+        return self.__build_lightning_data(candidates)
+
+    def __parse_mareo_payload(self, payload: bytes) -> FMIMareoStruct:
+        """Validate supported sea-level records and retain aware timestamps."""
+        root = self.__parse_xml(payload, "sea-level")
+        mareo_data = FMIMareoStruct()
+        for member in root:
+            try:
+                record = member[0]
+                raw_time = record[1].text
+                parameter = record[2].text
+                raw_value = record[3].text
+            except IndexError as error:
+                raise OptionalSourceError("invalid sea-level record shape") from error
+            if parameter == "SeaLevelN2000":
+                continue
+            if parameter != "SeaLevel":
+                continue
+            if raw_time is None or raw_value is None:
+                raise OptionalSourceError("invalid sea-level record values")
+            try:
+                timestamp = datetime.fromisoformat(raw_time)
+            except ValueError as error:
+                raise OptionalSourceError("invalid sea-level record timestamp") from error
+            if timestamp.tzinfo is None:
+                raise OptionalSourceError("invalid sea-level record timestamp")
+            sea_level = utils.finite_float(raw_value)
+            if sea_level is None:
+                raise OptionalSourceError("invalid sea-level record value")
+            mareo_data.append_values(timestamp.astimezone(UTC), sea_level)
+        mareo_data.sea_levels.sort(key=lambda item: item.time)
+        return mareo_data
+
+    async def __fetch_optional_payload(self, source: str, url: str) -> bytes:
+        """Fetch one optional payload with bounded HA-managed HTTP I/O."""
+        request_timeout = ClientTimeout(
+            total=const.AUX_HTTP_TOTAL_TIMEOUT_SECONDS,
+            connect=const.AUX_HTTP_CONNECT_TIMEOUT_SECONDS,
+            sock_connect=const.AUX_HTTP_CONNECT_TIMEOUT_SECONDS,
+            sock_read=const.AUX_HTTP_READ_TIMEOUT_SECONDS,
+        )
+        try:
+            async with self._session.get(url, timeout=request_timeout) as response:
+                if not 200 <= response.status < 300:
+                    category = "server" if response.status >= 500 else "client"
+                    raise OptionalSourceError(f"{source} {category} error HTTP {response.status}")
+                if (
+                    response.content_length is not None
+                    and response.content_length > const.AUX_HTTP_MAX_PAYLOAD_BYTES
+                ):
+                    raise OptionalSourceError(f"{source} response exceeds size limit")
+                chunks: list[bytes] = []
+                remaining = const.AUX_HTTP_MAX_PAYLOAD_BYTES + 1
+                while remaining:
+                    chunk = await response.content.read(min(64 * 1024, remaining))
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    remaining -= len(chunk)
+                payload = b"".join(chunks)
+        except TimeoutError as error:
+            raise OptionalSourceError(f"{source} request timed out") from error
+        except AiohttpClientError as error:
+            raise OptionalSourceError(f"{source} transport error: {error}") from error
+        if len(payload) > const.AUX_HTTP_MAX_PAYLOAD_BYTES:
+            raise OptionalSourceError(f"{source} response exceeds size limit")
+        if not payload.strip():
+            raise OptionalSourceError(f"{source} empty response")
+        return payload
+
+    async def __async_update_lightning_strikes(self) -> None:
+        """Fetch and parse bounded lightning data without blocking the event loop."""
+        now = dt_util.utcnow()
+        start_time = now - timedelta(minutes=self.lightning_max_age_minutes)
+        bbox = utils.get_bounding_box(
+            self.latitude,
+            self.longitude,
+            half_side_in_km=self.lightning_radius,
+        )
+        url = (
+            f"{const.LIGHTNING_GET_URL}starttime={start_time:%Y-%m-%dT%H:%M:%SZ}&"
+            f"bbox={bbox.lon_min},{bbox.lat_min},{bbox.lon_max},{bbox.lat_max}&"
+        )
+        payload = await self.__fetch_optional_payload("lightning", url)
+        self.lightning_data = await self._hass.async_add_executor_job(
+            self.__parse_lightning_payload,
+            payload,
+            now,
+        )
+
+    async def __async_update_mareo_data(self) -> None:
+        """Fetch and parse bounded sea-level data without blocking the event loop."""
+        now = dt_util.utcnow()
+        url = (
+            f"{const.MAREO_GET_URL}latlon={self.latitude},{self.longitude}&"
+            f"starttime={now:%Y-%m-%dT%H:%M:%SZ}&"
+        )
+        payload = await self.__fetch_optional_payload("sea-level", url)
+        self.mareo_data = await self._hass.async_add_executor_job(
+            self.__parse_mareo_payload,
+            payload,
+        )
 
     async def _fetch_forecast_weather(self):
         """Fetch current weather data based on estimation (forecast)."""
@@ -614,13 +801,13 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_optional_source(
         self,
         source: str,
-        update_func,
+        update_func: Callable[[], Awaitable[None]],
         data_attribute: str,
-        data_available,
+        data_available: Callable[[Any], bool],
     ) -> None:
         """Keep an optional source failure from disabling current weather."""
         try:
-            await self._hass.async_add_executor_job(update_func)
+            await update_func()
         except Exception as error:  # pylint: disable=broad-exception-caught
             setattr(self, data_attribute, None)
             self._set_source_availability(source, False, str(error) or type(error).__name__)
@@ -662,14 +849,14 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         if self.lightning_mode and self.lightning_radius:
             await self._async_update_optional_source(
                 "lightning",
-                self.__update_lightning_strikes,
+                self.__async_update_lightning_strikes,
                 "lightning_data",
                 bool,
             )
 
         await self._async_update_optional_source(
             "sea level",
-            self.__update_mareo_data,
+            self.__async_update_mareo_data,
             "mareo_data",
             lambda data: bool(data and data.size()),
         )
