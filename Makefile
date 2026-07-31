@@ -13,7 +13,7 @@ CONTAINER_RUN_OFFLINE = $(CONTAINER_RUN) --network=none
 
 .PHONY: lock lock-build dev-build shell format format-check lint \
 	type-check test-fast test-full test-network-block validate validate-local \
-	validate-hassfest live
+	validate-hassfest live audit licenses outdated
 
 lock-build:
 	$(CONTAINER_BUILD) --target lock -t $(LOCK_IMAGE) .
@@ -75,3 +75,12 @@ validate: validate-local validate-hassfest
 
 live: dev-build
 	$(CONTAINER_RUN) $(DEV_IMAGE) python -m pytest -o addopts= --strict-config --strict-markers -m live
+
+audit: dev-build
+	$(CONTAINER_RUN) $(DEV_IMAGE) python -m pip_audit --strict
+
+licenses: dev-build
+	$(CONTAINER_RUN_OFFLINE) $(DEV_IMAGE) python -m piplicenses --format=markdown
+
+outdated: dev-build
+	$(CONTAINER_RUN) $(DEV_IMAGE) python -m pip list --outdated

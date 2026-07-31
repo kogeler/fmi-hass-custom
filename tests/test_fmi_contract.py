@@ -1,4 +1,4 @@
-"""Contract tests for fmi-weather-client 0.7.0."""
+"""Contract tests for the selected fmi-weather-client release."""
 
 from __future__ import annotations
 

@@ -6,7 +6,9 @@ All local commands that depend on the supported Python or Home Assistant version
 
 `Containerfile.dev` pins the multi-architecture digest for the official Python 3.14.2 slim image. `requirements-direct.txt` is the reviewed human-maintained dependency source. Root `requirements.txt` is generated from a clean `lock` stage with `python -m pip freeze`, then installed with `--no-deps` in the development image. This makes the resolver input and the complete installed graph reviewable separately.
 
-The current test helper is `pytest-homeassistant-custom-component==0.13.348`, which maps exactly to Home Assistant 2026.7.4. Version 0.13.349 targets Home Assistant 2026.8.0b0 and is intentionally not used for the stable S01 environment.
+Both container stages and the test workflow upgrade the base image's bootstrap installer to `pip==26.2` before installing dependencies. Normal `pip freeze` output omits this bootstrap package.
+
+The current test helper is `pytest-homeassistant-custom-component==0.13.348`, which maps exactly to Home Assistant 2026.7.4. Versions 0.13.349 and 0.13.350 target Home Assistant 2026.8 prereleases and are intentionally excluded from the stable environment.
 
 ## Commands
 
@@ -23,8 +25,13 @@ The current test helper is `pytest-homeassistant-custom-component==0.13.348`, wh
 | Prove unexpected network access fails | `make test-network-block` |
 | Local layout and hassfest validation | `make validate` |
 | Opt-in live tests | `make live` |
+| Audit known dependency vulnerabilities | `make audit` |
+| Print the resolved license inventory | `make licenses` |
+| Report outdated packages | `make outdated` |
 
 Build and lock commands may access package registries. Formatting, linting, typing, ordinary tests, and local validation run with Podman's `--network=none`; pytest also uses `pytest-socket`. `make live` is the only test target with container networking and will have no selected tests until S12.
+
+`make audit` checks the complete Home Assistant development/test graph and intentionally remains nonzero while the owner-approved Pillow/PyJWT exception in root `TODO.md` is open. Do not add audit ignores or override Home Assistant's exact package pins to make it green. The separately resolved integration-declared dependency closure had no known vulnerabilities in S03; details and evidence are in `docs/maintenance/DEPENDENCIES.md`.
 
 The official HACS action validates a GitHub ref through the GitHub API and requires `GITHUB_TOKEN`; it cannot validate an uncommitted local working tree anonymously. It is included in the PR workflow and is not emulated or bypassed locally. Hassfest does validate the mounted local tree and is part of `make validate`.
 

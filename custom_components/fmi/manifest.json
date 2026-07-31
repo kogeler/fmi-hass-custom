@@ -2,17 +2,17 @@
   "domain": "fmi",
   "name": "Finnish Meteorological Institute",
   "codeowners": [
-    "@anand-p-r"
+    "@kogeler"
   ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/kogeler/fmi-hass-custom",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/anand-p-r/fmi-hass-custom/issues",
+  "issue_tracker": "https://github.com/kogeler/fmi-hass-custom/issues",
   "requirements": [
-    "async-timeout",
-    "fmi-weather-client==0.7.0",
-    "geopy>=2.1.0"
+    "fmi-weather-client==1.0.0",
+    "geopy==2.5.0",
+    "python-dateutil==2.9.0.post0"
   ],
   "version": "0.6.2"
 }

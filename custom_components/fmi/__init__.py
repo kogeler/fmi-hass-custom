@@ -2,13 +2,13 @@
 
 import time
 import xml.etree.ElementTree as ET
+from asyncio import timeout
 from datetime import date, datetime, timedelta
 
 import fmi_weather_client as fmi
 import fmi_weather_client.errors as fmi_erros
 import fmi_weather_client.models as fmi_models
 import requests
-from async_timeout import timeout
 from dateutil import tz
 from geopy.distance import geodesic
 from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
