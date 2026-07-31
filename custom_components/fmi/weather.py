@@ -114,7 +114,7 @@ class FMIWeatherEntity(CoordinatorEntity[FMIDataUpdateCoordinator], WeatherEntit
         self._attr_unique_id = "_".join(_attr_unique_id)
         self._attr_device_info = {
             "identifiers": {(const.DOMAIN, coordinator.unique_id)},
-            "name": const.NAME + _name_extra,
+            "name": (_weather.place if _weather else name) + _name_extra,
             "manufacturer": const.MANUFACTURER,
             "entry_type": DeviceEntryType.SERVICE,
         }

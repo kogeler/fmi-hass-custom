@@ -11,6 +11,7 @@ import pytest
 from fmi_weather_client import models
 from fmi_weather_client.errors import ClientError, ServerError
 
+from custom_components.fmi import fmi_client as integration_fmi_client
 from tests.helpers.fmi import (
     CONSUMED_WEATHER_DATA_FIELDS,
     FIXTURE_DIR,
@@ -58,6 +59,135 @@ def test_current_client_maps_three_second_wind_gust_field() -> None:
 
     assert data.wind_gust == models.Value(7.8, "m/s")
     assert data.wind_max == models.Value(None, "m/s")
+
+
+def test_current_client_forecast_query_omits_hourly_maximum_gust() -> None:
+    """Reproduce the upstream query mismatch behind issue #111."""
+    params = fmi.http._create_params(  # noqa: SLF001
+        models.RequestType.FORECAST,
+        60,
+        4,
+        lat=60.17,
+        lon=24.94,
+    )
+
+    assert "WindGust" in params["parameters"]
+    assert "HourlyMaximumGust" not in params["parameters"]
+
+
+@pytest.mark.parametrize(
+    ("hourly_gust", "native_gust", "expected"),
+    [
+        (9.4, 7.0, 9.4),
+        (0.0, 7.0, 0.0),
+        (None, 7.0, 7.0),
+        (None, None, None),
+    ],
+)
+def test_client_adapter_maps_hourly_maximum_gust_with_finite_precedence(
+    monkeypatch,
+    hourly_gust: float | None,
+    native_gust: float | None,
+    expected: float | None,
+) -> None:
+    """Map forecast hourly maximum first and retain a valid native fallback."""
+    timestamp = datetime(2026, 5, 20, 12, tzinfo=UTC)
+    weather = weather_from_fixture("forecast_normal.json")
+    assert weather is not None
+    sample = weather.data._replace(
+        time=timestamp,
+        wind_gust=models.Value(native_gust, "m/s"),
+        wind_max=models.Value(None, "m/s"),
+    )
+    parsed = models.Forecast("Helsinki", 60.17, 24.94, [sample])
+    monkeypatch.setattr(
+        integration_fmi_client.upstream.forecast_parser,
+        "parse_fmi_response",
+        lambda body, request_type: parsed,
+    )
+    raw_hourly = "NaN" if hourly_gust is None else str(hourly_gust)
+    body = f"""
+        <wfs:FeatureCollection
+            xmlns:wfs="http://www.opengis.net/wfs/2.0"
+            xmlns:gml="http://www.opengis.net/gml/3.2"
+            xmlns:gmlcov="http://www.opengis.net/gmlcov/1.0"
+            xmlns:swe="http://www.opengis.net/swe/2.0">
+          <swe:DataRecord>
+            <swe:field name="WindGust" />
+            <swe:field name="HourlyMaximumGust" />
+          </swe:DataRecord>
+          <gmlcov:positions>60.17 24.94 {int(timestamp.timestamp())}</gmlcov:positions>
+          <gml:doubleOrNilReasonTupleList>NaN {raw_hourly}</gml:doubleOrNilReasonTupleList>
+        </wfs:FeatureCollection>
+    """
+
+    result = integration_fmi_client._parse_forecast_response(  # noqa: SLF001
+        body,
+        models.RequestType.FORECAST,
+    )
+
+    assert result.forecasts[0].wind_gust == models.Value(expected, "m/s")
+    assert result.forecasts[0].wind_max == models.Value(hourly_gust, "m/s")
+
+
+def test_client_adapter_adds_hourly_gust_without_second_request(monkeypatch) -> None:
+    """Change the selected parameter list while retaining one upstream HTTP call."""
+    captured: list[dict[str, object]] = []
+    parsed = forecast_from_fixture("forecast_normal.json")
+
+    def capture_request(params: dict[str, object]) -> str:
+        captured.append(dict(params))
+        return "synthetic body"
+
+    monkeypatch.setattr(
+        integration_fmi_client.upstream.http,
+        "_create_params",
+        lambda *args, **kwargs: {"parameters": "Temperature,WindGust"},
+    )
+    monkeypatch.setattr(
+        integration_fmi_client.upstream.http,
+        "_send_request",
+        capture_request,
+    )
+    monkeypatch.setattr(
+        integration_fmi_client,
+        "_parse_forecast_response",
+        lambda body, request_type: parsed,
+    )
+
+    result = integration_fmi_client._request_by_coordinates(  # noqa: SLF001
+        models.RequestType.FORECAST,
+        60.17,
+        24.94,
+        60,
+        48,
+    )
+
+    assert result is parsed
+    assert len(captured) == 1
+    assert captured[0]["parameters"] == "Temperature,WindGust,HourlyMaximumGust"
+
+
+async def test_client_adapter_preserves_weather_and_forecast_timesteps(monkeypatch) -> None:
+    """Keep the upstream ten-minute current query and hourly forecast query."""
+    calls: list[tuple[object, ...]] = []
+    parsed = forecast_from_fixture("forecast_normal.json")
+
+    def capture_request(*args):
+        calls.append(args)
+        return parsed
+
+    monkeypatch.setattr(integration_fmi_client, "_request_by_coordinates", capture_request)
+
+    current = await integration_fmi_client.async_weather_by_coordinates(60.17, 24.94)
+    forecast = await integration_fmi_client.async_forecast_by_coordinates(60.17, 24.94, 1, 48)
+
+    assert current is not None
+    assert forecast is parsed
+    assert calls == [
+        (models.RequestType.WEATHER, 60.17, 24.94, 10, 4),
+        (models.RequestType.FORECAST, 60.17, 24.94, 60, 48),
+    ]
 
 
 def test_observation_and_empty_results_use_real_models() -> None:

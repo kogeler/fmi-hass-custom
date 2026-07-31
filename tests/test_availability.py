@@ -118,7 +118,8 @@ async def test_issue_117_observation_by_place_loads_when_forecast_wfs_fails(
     mocks["place_observation"].assert_awaited_once_with("Synthetic Helsinki")
     assert all(state.state != STATE_UNAVAILABLE for state in hass.states.async_all("weather"))
     assert any(
-        state.attributes.get("friendly_name") == "Temperature" and state.state != STATE_UNAVAILABLE
+        state.attributes.get("friendly_name", "").endswith("Temperature")
+        and state.state != STATE_UNAVAILABLE
         for state in hass.states.async_all("sensor")
     )
 

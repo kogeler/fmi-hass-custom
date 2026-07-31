@@ -23,7 +23,6 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_WIND_BEARING,
     WeatherEntityFeature,
 )
-from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.util import dt as dt_util
 
 from custom_components.fmi import utils
@@ -170,11 +169,11 @@ def test_wind_gust_sensor_uses_current_client_field() -> None:
     observation = weather_from_fixture("observation.json", "observation")
     assert observation is not None
     sensor = object.__new__(FMIBestConditionSensor)
-    sensor._attr_state = STATE_UNAVAILABLE
+    sensor._attr_native_value = None
 
     cast(Any, sensor)._FMIBestConditionSensor__convert_float(observation.data, "wind_gust")
 
-    assert sensor._attr_state == 7.8
+    assert sensor._attr_native_value == 7.8
 
 
 def test_daily_forecast_sums_hourly_precipitation_issue_114(monkeypatch) -> None:
@@ -348,19 +347,15 @@ def test_hourly_forecast_uses_current_home_assistant_keys_and_units(monkeypatch)
     }
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="S08 missing-data robustness: Value(None) must make the sensor unavailable",
-)
 def test_sensor_handles_none_value_without_exception() -> None:
     weather = weather_from_fixture("missing_values.json")
     assert weather is not None
     sensor = object.__new__(FMIBestConditionSensor)
-    sensor._attr_state = 123
+    sensor._attr_native_value = 123
 
     cast(Any, sensor)._FMIBestConditionSensor__convert_float(weather.data, "temperature")
 
-    assert sensor._attr_state == STATE_UNAVAILABLE
+    assert sensor._attr_native_value is None
 
 
 @pytest.mark.xfail(

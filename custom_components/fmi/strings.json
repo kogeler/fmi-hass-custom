@@ -19,6 +19,23 @@
       "already_configured": "[%key:common::config_flow::abort::already_configured_location%]"
     }
   },
+  "entity": {
+    "sensor": {
+      "place": {"name": "Place"},
+      "condition": {"name": "Condition"},
+      "temperature": {"name": "Temperature"},
+      "wind_speed": {"name": "Wind speed"},
+      "wind_direction": {"name": "Wind direction"},
+      "wind_gust": {"name": "Wind gust"},
+      "humidity": {"name": "Humidity"},
+      "cloud_coverage": {"name": "Cloud coverage"},
+      "rain": {"name": "Rain"},
+      "forecast_time": {"name": "Time"},
+      "best_time_of_day": {"name": "Best time of day"},
+      "lightning_strikes": {"name": "Lightning strikes"},
+      "sea_level": {"name": "Sea level"}
+    }
+  },
   "options": {
     "step": {
       "user": {

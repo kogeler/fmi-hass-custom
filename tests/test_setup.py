@@ -82,9 +82,9 @@ async def test_mocked_config_entry_loads(
     await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.LOADED
-    assert hass.states.get("weather.fmi_helsinki") is not None
+    assert hass.states.get("weather.helsinki") is not None
 
-    entity = hass.data[DATA_COMPONENT].get_entity("weather.fmi_helsinki")
+    entity = hass.data[DATA_COMPONENT].get_entity("weather.helsinki")
     assert isinstance(entity, FMIWeatherEntity)
     assert entity.native_precipitation_unit == "mm"
 

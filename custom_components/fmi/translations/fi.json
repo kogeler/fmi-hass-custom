@@ -19,6 +19,23 @@
             }
         }
     },
+    "entity": {
+        "sensor": {
+            "place": {"name": "Sijainti"},
+            "condition": {"name": "Säätila"},
+            "temperature": {"name": "Lämpötila"},
+            "wind_speed": {"name": "Tuulen nopeus"},
+            "wind_direction": {"name": "Tuulen suunta"},
+            "wind_gust": {"name": "Puuska"},
+            "humidity": {"name": "Ilmankosteus"},
+            "cloud_coverage": {"name": "Pilvisyys"},
+            "rain": {"name": "Sade"},
+            "forecast_time": {"name": "Ennusteen aika"},
+            "best_time_of_day": {"name": "Päivän paras aika"},
+            "lightning_strikes": {"name": "Salamaniskut"},
+            "sea_level": {"name": "Merenpinnan korkeus"}
+        }
+    },
     "options": {
         "step": {
             "user": {

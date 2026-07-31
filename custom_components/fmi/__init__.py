@@ -5,7 +5,6 @@ import xml.etree.ElementTree as ET
 from asyncio import gather, timeout
 from datetime import date, datetime, timedelta
 
-import fmi_weather_client as fmi
 import fmi_weather_client.errors as fmi_erros
 import fmi_weather_client.models as fmi_models
 import requests
@@ -22,6 +21,7 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from . import const, utils
+from . import fmi_client as fmi
 
 LOGGER = const.LOGGER
 PLATFORMS = ["sensor", "weather"]
