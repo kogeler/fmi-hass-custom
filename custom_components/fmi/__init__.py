@@ -177,9 +177,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         _options: dict = config_entry.options
 
         self.time_step = int(_options.get(CONF_OFFSET, const.FORECAST_OFFSET[0]))
-        self.forecast_points = (
-            int(_options.get(const.CONF_FORECAST_DAYS, const.DAYS_DEFAULT)) * 24 // self.time_step
-        )
+        self.forecast_points = int(_options.get(const.CONF_FORECAST_DAYS, const.DAYS_DEFAULT)) * 24
         self.min_temperature = float(_options.get(const.CONF_MIN_TEMP, const.TEMP_MIN_DEFAULT))
         self.max_temperature = float(_options.get(const.CONF_MAX_TEMP, const.TEMP_MAX_DEFAULT))
         self.min_humidity = float(_options.get(const.CONF_MIN_HUMIDITY, const.HUMIDITY_MIN_DEFAULT))
@@ -242,7 +240,14 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         return self.current
 
     def get_forecasts(self) -> list[fmi_models.WeatherData]:
-        """Return the current forecast data."""
+        """Return forecast data at the configured legacy interval."""
+        forecasts = self.get_hourly_forecasts()
+        if self.time_step <= 1:
+            return forecasts
+        return forecasts[:: self.time_step]
+
+    def get_hourly_forecasts(self) -> list[fmi_models.WeatherData]:
+        """Return every hourly sample needed by Home Assistant forecasts."""
         if self.forecast is None:
             return []
         return self.forecast.forecasts
@@ -550,7 +555,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             return
         try:
             forecast = await fmi.async_forecast_by_coordinates(
-                self.latitude, self.longitude, self.time_step, self.forecast_points
+                self.latitude, self.longitude, 1, self.forecast_points
             )
         except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
             self._set_source_availability("forecast", False, self._fmi_error_detail(error))

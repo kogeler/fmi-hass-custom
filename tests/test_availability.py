@@ -6,7 +6,13 @@ from unittest.mock import AsyncMock
 
 from fmi_weather_client.errors import ClientError
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME, STATE_UNAVAILABLE
+from homeassistant.const import (
+    CONF_LATITUDE,
+    CONF_LONGITUDE,
+    CONF_NAME,
+    CONF_OFFSET,
+    STATE_UNAVAILABLE,
+)
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -62,8 +68,15 @@ def _patch_sea_level(monkeypatch, update=None) -> None:
     )
 
 
-def _entry(hass: HomeAssistant, *, station_id: int = 0) -> MockConfigEntry:
+def _entry(
+    hass: HomeAssistant,
+    *,
+    station_id: int = 0,
+    forecast_interval: int | None = None,
+) -> MockConfigEntry:
     options = {CONF_OBSERVATION_STATION: station_id} if station_id else {}
+    if forecast_interval is not None:
+        options[CONF_OFFSET] = forecast_interval
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Synthetic Helsinki",
@@ -169,6 +182,26 @@ async def test_forecast_loads_when_station_observation_fails(
     weather_states = hass.states.async_all("weather")
     assert sum(state.state == STATE_UNAVAILABLE for state in weather_states) == 1
     assert sum(state.state != STATE_UNAVAILABLE for state in weather_states) == 1
+
+
+async def test_coarse_legacy_interval_preserves_hourly_forecast_source(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Fetch every Precipitation1h sample even with a coarse legacy interval."""
+    weather = weather_from_fixture("forecast_normal.json")
+    forecast = forecast_from_fixture("forecast_normal.json")
+    mocks = _patch_fmi_sources(monkeypatch, weather=weather, forecast=forecast)
+    _patch_sea_level(monkeypatch)
+    entry = _entry(hass, forecast_interval=3)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    mocks["forecast"].assert_awaited_once_with(60.17, 24.94, 1, 96)
+    assert len(coordinator.get_hourly_forecasts()) == 49
+    assert len(coordinator.get_forecasts()) == 17
 
 
 async def test_both_current_sources_fail_initial_setup(

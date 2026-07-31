@@ -4,13 +4,21 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+from homeassistant.components.weather import (
+    ATTR_FORECAST_PRECIPITATION,
+    ATTR_FORECAST_TEMP,
+    ATTR_FORECAST_TIME,
+)
+from homeassistant.components.weather.const import DATA_COMPONENT
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME
 from homeassistant.core import HomeAssistant
+from homeassistant.util.json import JsonValueType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.fmi import FMIDataUpdateCoordinator
-from custom_components.fmi.const import DOMAIN
+from custom_components.fmi.const import COORDINATOR, DOMAIN
+from custom_components.fmi.weather import FMIWeatherEntity
 
 
 def _value(value: float, unit: str = "") -> SimpleNamespace:
@@ -75,3 +83,25 @@ async def test_mocked_config_entry_loads(
 
     assert entry.state is ConfigEntryState.LOADED
     assert hass.states.get("weather.fmi_helsinki") is not None
+
+    entity = hass.data[DATA_COMPONENT].get_entity("weather.fmi_helsinki")
+    assert isinstance(entity, FMIWeatherEntity)
+    assert entity.native_precipitation_unit == "mm"
+
+    forecast_updates: list[list[JsonValueType] | None] = []
+    unsubscribe = entity.async_subscribe_forecast("daily", forecast_updates.append)
+    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    unsubscribe()
+
+    assert len(forecast_updates) == 1
+    update = forecast_updates[0]
+    assert update is not None
+    forecast = update[0]
+    assert isinstance(forecast, dict)
+    assert forecast[ATTR_FORECAST_TEMP] == 12.5
+    assert forecast[ATTR_FORECAST_PRECIPITATION] == 0.0
+    forecast_time = forecast[ATTR_FORECAST_TIME]
+    assert isinstance(forecast_time, str)
+    assert forecast_time.endswith("+00:00")

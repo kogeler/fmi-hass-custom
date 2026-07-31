@@ -1,0 +1,143 @@
+{
+  "_meta": {
+    "kind": "synthetic",
+    "purpose": "Daily aggregation, missing values, DST end, ordering, and duplicate timestamps"
+  },
+  "place": "Helsinki",
+  "lat": 60.17,
+  "lon": 24.94,
+  "defaults": {
+    "temperature": {"value": 0.0, "unit": "°C"},
+    "dew_point": {"value": -2.0, "unit": "°C"},
+    "pressure": {"value": 1000.0, "unit": "hPa"},
+    "humidity": {"value": 50.0, "unit": "%"},
+    "wind_direction": {"value": 90.0, "unit": "°"},
+    "wind_speed": {"value": 2.0, "unit": "m/s"},
+    "wind_max": {"value": null, "unit": "m/s"},
+    "wind_gust": {"value": 4.0, "unit": "m/s"},
+    "symbol": {"value": 1.0, "unit": ""},
+    "cloud_cover": {"value": 10.0, "unit": "%"},
+    "precipitation_amount": {"value": 0.0, "unit": "mm/h"}
+  },
+  "mixed_conditions": [
+    {
+      "time": "2026-04-30T21:00:00+00:00",
+      "values": {
+        "temperature": -5.0,
+        "dew_point": -7.0,
+        "pressure": 1000.0,
+        "humidity": 40.0,
+        "wind_speed": 2.0,
+        "wind_gust": 5.0,
+        "wind_direction": 90.0,
+        "cloud_cover": 10.0,
+        "symbol": 1.0,
+        "precipitation_amount": 0.0
+      }
+    },
+    {
+      "time": "2026-04-30T22:00:00+00:00",
+      "values": {
+        "temperature": -2.0,
+        "dew_point": -4.0,
+        "pressure": 1002.0,
+        "humidity": 60.0,
+        "wind_speed": 8.0,
+        "wind_gust": 10.0,
+        "wind_direction": 225.0,
+        "cloud_cover": 70.0,
+        "symbol": 31.0,
+        "precipitation_amount": 0.4
+      }
+    },
+    {
+      "time": "2026-04-30T23:00:00+00:00",
+      "values": {
+        "temperature": -3.0,
+        "dew_point": -3.0,
+        "pressure": 1004.0,
+        "humidity": 80.0,
+        "wind_speed": 5.0,
+        "wind_gust": 12.0,
+        "wind_direction": 180.0,
+        "cloud_cover": 100.0,
+        "symbol": 51.0,
+        "precipitation_amount": 0.2
+      }
+    }
+  ],
+  "no_precipitation": [
+    {
+      "time": "2026-05-01T21:00:00+00:00",
+      "values": {"precipitation_amount": null}
+    },
+    {
+      "time": "2026-05-01T22:00:00+00:00",
+      "values": {"precipitation_amount": "NaN"}
+    }
+  ],
+  "explicit_zero_precipitation": [
+    {
+      "time": "2026-05-02T21:00:00+00:00",
+      "values": {"precipitation_amount": 0.0}
+    },
+    {
+      "time": "2026-05-02T22:00:00+00:00",
+      "values": {"precipitation_amount": 0.0}
+    }
+  ],
+  "missing_temperatures": [
+    {
+      "time": "2026-05-03T21:00:00+00:00",
+      "values": {"temperature": null}
+    },
+    {
+      "time": "2026-05-03T22:00:00+00:00",
+      "values": {"temperature": -5.0}
+    },
+    {
+      "time": "2026-05-03T23:00:00+00:00",
+      "values": {"temperature": -2.0}
+    },
+    {
+      "time": "2026-05-04T00:00:00+00:00",
+      "values": {"temperature": "NaN"}
+    }
+  ],
+  "all_temperatures_missing": [
+    {
+      "time": "2026-05-04T21:00:00+00:00",
+      "values": {"temperature": null}
+    },
+    {
+      "time": "2026-05-04T22:00:00+00:00",
+      "values": {"temperature": "NaN"}
+    }
+  ],
+  "unordered_duplicates": [
+    {
+      "time": "2026-05-05T00:00:00+00:00",
+      "values": {"temperature": 3.0, "precipitation_amount": 0.3}
+    },
+    {
+      "time": "2026-05-04T22:00:00+00:00",
+      "values": {"temperature": 1.0, "precipitation_amount": 0.1}
+    },
+    {
+      "time": "2026-05-04T23:00:00+00:00",
+      "values": {"temperature": 2.0, "precipitation_amount": 9.0}
+    },
+    {
+      "time": "2026-05-04T23:00:00+00:00",
+      "values": {"temperature": 2.5, "precipitation_amount": 0.2}
+    }
+  ],
+  "dst_end": [
+    {"time": "2026-10-24T21:00:00+00:00", "values": {"temperature": 0.0}},
+    {"time": "2026-10-24T22:00:00+00:00", "values": {"temperature": 1.0}},
+    {"time": "2026-10-24T23:00:00+00:00", "values": {"temperature": 2.0}},
+    {"time": "2026-10-25T00:00:00+00:00", "values": {"temperature": 3.0}},
+    {"time": "2026-10-25T01:00:00+00:00", "values": {"temperature": 4.0}},
+    {"time": "2026-10-25T02:00:00+00:00", "values": {"temperature": 5.0}}
+  ]
+}
