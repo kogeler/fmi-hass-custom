@@ -15,12 +15,13 @@ All notable changes to this project are documented in this file.
 - Added a validated location reconfigure flow that reloads the moved entry while preserving config, device, and entity identity, including customized entity IDs.
 - Prevented polar-day/night crashes with a deterministic daytime fallback for incomplete sun events.
 - Fixed best-time selection across month/year boundaries and made forecast output reject malformed timestamps, unknown symbols, missing fields, and non-finite values without crashing.
+- Corrected weather entity naming under current Home Assistant semantics so fresh daily and observation entities no longer duplicate their device names or generated entity IDs, while retaining their existing unique IDs.
 
 ### Added
 
 - Added a translated lightning maximum-age option with a backward-compatible 24-hour default and exact inclusive age filtering.
 - Added a reproducible rootless Podman development and test environment targeting Home Assistant 2026.7.4 on Python 3.14.2.
-- Added deterministic offline FMI fixtures, dependency contract tests, Home Assistant setup coverage, entity characterization tests, and explicit regression cases for the known maintenance issues.
+- Added deterministic offline FMI fixtures, dependency contract tests, full Home Assistant config-flow/lifecycle and public-entity coverage, entity characterization tests, and explicit regression cases for the known maintenance issues.
 - Added Ruff formatting/linting, coverage, type checking, network-blocking tests, hassfest/HACS validation, and pinned GitHub Actions checks.
 - Added a verified maintenance baseline, dependency/license inventory, session handoffs, and repository guidance for future maintenance work.
 

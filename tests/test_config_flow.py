@@ -100,6 +100,127 @@ async def test_options_flow_defaults_and_stores_lightning_max_age(
     assert entry.options[CONF_LIGHTNING_MAX_AGE] == 60
 
 
+async def test_user_flow_form_uses_home_assistant_location_defaults(
+    hass: HomeAssistant,
+) -> None:
+    """Expose the complete translated setup form through the public flow API."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_USER},
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "user"
+    assert result["errors"] == {}
+    schema = result["data_schema"]
+    assert schema is not None
+    assert schema({}) == {
+        CONF_NAME: "FMI",
+        CONF_LATITUDE: hass.config.latitude,
+        CONF_LONGITUDE: hass.config.longitude,
+    }
+
+
+@pytest.mark.parametrize(
+    ("validation_result", "expected_error"),
+    [
+        (None, "cannot_connect"),
+        (ClientError(400, "Synthetic client failure"), "cannot_connect"),
+        (ValueError("Synthetic malformed response"), "unknown"),
+    ],
+)
+async def test_user_flow_translates_validation_failures(
+    hass: HomeAssistant,
+    monkeypatch,
+    validation_result: object,
+    expected_error: str,
+) -> None:
+    """Return stable UI error keys for empty, transport, and malformed FMI responses."""
+    validate = (
+        AsyncMock(side_effect=validation_result)
+        if isinstance(validation_result, Exception)
+        else AsyncMock(return_value=validation_result)
+    )
+    monkeypatch.setattr(fmi_client, "async_weather_by_coordinates", validate)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_USER},
+        data={
+            CONF_NAME: "FMI",
+            CONF_LATITUDE: 60.17,
+            CONF_LONGITUDE: 24.94,
+        },
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "user"
+    assert result["errors"] == {"base": expected_error}
+    assert not hass.config_entries.async_entries(DOMAIN)
+
+
+async def test_user_flow_rejects_existing_location_before_validation(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Abort a duplicate setup without making an unnecessary FMI request."""
+    validate = AsyncMock()
+    monkeypatch.setattr(fmi_client, "async_weather_by_coordinates", validate)
+    _entry(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_USER},
+        data={
+            CONF_NAME: "FMI",
+            CONF_LATITUDE: 60.17,
+            CONF_LONGITUDE: 24.94,
+        },
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    validate.assert_not_awaited()
+
+
+async def test_user_flow_rechecks_duplicate_after_validation(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Close the race where another flow stores the location during validation."""
+    weather = weather_from_fixture("forecast_normal.json")
+    assert weather is not None
+
+    async def validate_and_add_duplicate(_latitude: float, _longitude: float):
+        _entry(
+            hass,
+            entry_id="concurrent-entry",
+            unique_id="fmi:concurrent-entry",
+            entity_identity="concurrent-identity",
+        )
+        return weather
+
+    monkeypatch.setattr(
+        fmi_client,
+        "async_weather_by_coordinates",
+        validate_and_add_duplicate,
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_USER},
+        data={
+            CONF_NAME: "FMI",
+            CONF_LATITUDE: 60.17,
+            CONF_LONGITUDE: 24.94,
+        },
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+
+
 def _patch_location_sources(monkeypatch) -> dict[str, AsyncMock]:
     helsinki, helsinki_forecast, tampere, tampere_forecast = _locations()
     weather_by_coordinates = {

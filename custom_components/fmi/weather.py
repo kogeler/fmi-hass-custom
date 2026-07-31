@@ -62,14 +62,12 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
     entity_list = [FMIWeatherEntity(name, coordinator)]
     if daily_mode:
-        entity_list.append(FMIWeatherEntity(f"{name} (daily)", coordinator, daily_mode=True))
+        entity_list.append(FMIWeatherEntity(name, coordinator, daily_mode=True))
     if station_id:
         try:
             coordinator = domain_data.get(const.COORDINATOR_OBSERVATION)
             if coordinator is not None:
-                entity_list.append(
-                    FMIWeatherEntity(f"{name} (observation)", coordinator, station_id=station_id)
-                )
+                entity_list.append(FMIWeatherEntity(name, coordinator, station_id=station_id))
         except (KeyError, AttributeError) as error:
             const.LOGGER.error("Unable to setup observation object! ERROR: %s", error)
 
@@ -103,21 +101,22 @@ class FMIWeatherEntity(CoordinatorEntity[FMIDataUpdateCoordinator], WeatherEntit
             coordinator.get_observation if station_id else coordinator.get_weather
         )
         _weather = self._data_func()
-        _attr_name = [_weather.place if _weather else name]
+        place = _weather.place if _weather else name
+        entity_name: str | None = None
         _attr_unique_id = [f"{coordinator.unique_id}"]
-        _name_extra = ""
+        device_name = place
         if daily_mode:
-            _attr_name.append("(daily)")
+            entity_name = "(daily)"
             _attr_unique_id.append("daily")
         elif station_id:
-            _attr_name.append("(observation)")
             _attr_unique_id.append("observation")
-            _name_extra = " Observation"
-        self._attr_name = " ".join(_attr_name)
+            device_name = f"{place} Observation"
+        self._attr_has_entity_name = True
+        self._attr_name = entity_name
         self._attr_unique_id = "_".join(_attr_unique_id)
         self._attr_device_info = {
             "identifiers": {(const.DOMAIN, coordinator.unique_id)},
-            "name": (_weather.place if _weather else name) + _name_extra,
+            "name": device_name,
             "manufacturer": const.MANUFACTURER,
             "entry_type": DeviceEntryType.SERVICE,
         }

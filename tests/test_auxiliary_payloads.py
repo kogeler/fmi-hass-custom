@@ -230,6 +230,20 @@ def test_lightning_unequal_arrays_are_rejected() -> None:
         )
 
 
+def test_empty_lightning_payload_has_no_strikes() -> None:
+    """Treat a valid XML response without either parallel array as empty data."""
+    coordinator = _coordinator()
+
+    assert (
+        _parse_lightning(
+            coordinator,
+            b"<root />",
+            datetime(2026, 5, 28, 21, 0, tzinfo=UTC),
+        )
+        == []
+    )
+
+
 def test_geocoder_failure_keeps_coordinates_and_caches_fallback(monkeypatch) -> None:
     coordinator = _coordinator()
     geocoder = _SyntheticGeocoder(integration.GeocoderServiceError("synthetic outage"))
@@ -375,6 +389,19 @@ async def test_optional_response_size_is_bounded() -> None:
 
     with pytest.raises(OptionalSourceError, match="exceeds size limit"):
         await coordinator_private._FMIDataUpdateCoordinator__async_update_mareo_data()
+
+
+async def test_optional_content_length_rejects_oversized_response_before_read() -> None:
+    """Reject a declared oversized response without consuming its stream."""
+    oversized = b"x" * (integration.const.AUX_HTTP_MAX_PAYLOAD_BYTES + 1)
+    session = _FakeSession(oversized)
+    coordinator = _coordinator(session=session)
+    coordinator_private = cast(Any, coordinator)
+
+    with pytest.raises(OptionalSourceError, match="exceeds size limit"):
+        await coordinator_private._FMIDataUpdateCoordinator__async_update_mareo_data()
+
+    assert session.response.content.offset == 0
 
 
 def test_nominatim_reservation_enforces_four_per_minute(monkeypatch) -> None:
