@@ -1,0 +1,11 @@
+{
+  "_meta": {
+    "kind": "synthetic",
+    "purpose": "Empty forecast and observation results"
+  },
+  "place": "Helsinki",
+  "lat": 60.17,
+  "lon": 24.94,
+  "forecasts": [],
+  "observation": null
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:gmlcov="http://www.opengis.net/gmlcov/1.0">
+  <gmlcov:positions>60.20 24.90 1780000000
+60.25 25.00 1780000300</gmlcov:positions>
+  <gml:doubleOrNilReasonTupleList>1 12.5 40.0 1.2
+2 -8.0 55.0 1.5</gml:doubleOrNilReasonTupleList>
+</root>

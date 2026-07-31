@@ -1,30 +1,51 @@
-name: tests
+name: Tests and validation
+
 on:
   pull_request:
   push:
     branches:
       - master
 
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  test:
     runs-on: ubuntu-24.04
-    strategy:
-      matrix:
-        python-version: ["3.12", "3.13"]
+    timeout-minutes: 20
+    container:
+      image: docker.io/library/python@sha256:1a3c6dbfd2173971abba880c3cc2ec4643690901f6ad6742d0827bae6cefc925
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install frozen dependencies
+        run: |
+          python -m pip install --no-deps -r requirements.txt
+          python -m pip check
+      - name: Basic lint
+        run: python -m ruff check .
+      - name: Offline smoke tests
+        run: python -m pytest -q
+
+  hassfest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Hassfest
+        uses: home-assistant/actions/hassfest@ab22029681aa532bfe7de5774a9972d67bfbd2c0 # master 2026-07-30
+
+  hacs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: HACS validation
+        uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa # main 2026-06-08
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: prepare env
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: flake8
-        run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --statistics
-      - name: pylint
-        run: |
-          pylint *.py --init-hook='import sys; sys.path.append(".")'
+          category: integration
+          comment: "false"

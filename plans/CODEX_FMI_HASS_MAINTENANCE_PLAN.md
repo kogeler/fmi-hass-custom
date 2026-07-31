@@ -10,16 +10,16 @@
 
 ## 1. How to use this plan
 
-Place this file in the repository root without renaming it. The recommended filename is:
+Keep this file at the canonical repository path:
 
 ```text
-CODEX_FMI_HASS_MAINTENANCE_PLAN.md
+plans/CODEX_FMI_HASS_MAINTENANCE_PLAN.md
 ```
 
 For the first Codex session, use this prompt:
 
 ```text
-Read CODEX_FMI_HASS_MAINTENANCE_PLAN.md in full. Execute Session S00 only.
+Read plans/CODEX_FMI_HASS_MAINTENANCE_PLAN.md in full. Execute Session S00 only.
 Follow the session protocol, update the session tracker in that file, create the
 required handoff, and stop after S00 is complete. Do not start S01.
 ```
@@ -27,7 +27,7 @@ required handoff, and stop after S00 is complete. Do not start S01.
 For every later session, use this prompt:
 
 ```text
-Read AGENTS.md and CODEX_FMI_HASS_MAINTENANCE_PLAN.md in full. Inspect git status,
+Read AGENTS.md and plans/CODEX_FMI_HASS_MAINTENANCE_PLAN.md in full. Inspect git status,
 the latest commits, and the previous session handoff. Execute exactly the next
 session whose status is NOT_STARTED and whose prerequisites are DONE. Update the
 tracker and write the required handoff. Do not start a later session.
@@ -36,7 +36,7 @@ tracker and write the required handoff. Do not start a later session.
 To request a specific session:
 
 ```text
-Read AGENTS.md and CODEX_FMI_HASS_MAINTENANCE_PLAN.md in full. Execute Session SXX
+Read AGENTS.md and plans/CODEX_FMI_HASS_MAINTENANCE_PLAN.md in full. Execute Session SXX
 only, provided that all of its prerequisites are DONE. Update the tracker and
 write the required handoff. Do not perform work assigned to another session.
 ```
@@ -173,7 +173,7 @@ A dependency may remain below newest stable only when the incompatibility is rep
 ### 4.6 Security and privacy
 
 - Use least-privilege GitHub Actions permissions.
-- Pin third-party actions to full immutable commit SHAs, with a comment identifying the corresponding release tag.
+- Pin third-party actions to full immutable commit SHAs, with a comment identifying the corresponding release tag. If the reviewed commit has no corresponding tag, comment its upstream branch/date and record the latest available tag plus the reason it was not selected.
 - Never expose secrets to pull requests from forks.
 - Do not log exact user coordinates at normal log levels.
 - Sanitize diagnostics and test artifacts.
@@ -188,6 +188,7 @@ A dependency may remain below newest stable only when the incompatibility is rep
 - Do not run any Git operation that may require a hardware token, interactive credential prompt, or authenticated SSH access. Use local read-only Git commands and anonymous public HTTPS/API access for remote inspection. Do not contact a credentialed remote unless the repository owner explicitly performs or authorizes that exact operation.
 - Codex must not create commits. The repository owner owns all commits. At session end, leave a reviewed working tree and provide exactly one concise suggested commit message beginning with `SXX:`.
 - While the owner-controlled commit is pending, use `OWNER_TO_COMMIT` in commit fields. A session may be marked `DONE` when all non-commit acceptance criteria pass, its handoff is complete, and the suggested commit message is recorded. A later session should replace `OWNER_TO_COMMIT` with the owner's resulting SHA when it is available.
+- Use rootless Podman containers for all local commands that require the project's supported Python or Home Assistant version. Pin the container base image, run repository commands through the documented Podman entry point, and do not silently fall back to the host Python. Host tools may be used only for version discovery or checks that do not depend on the supported Python environment.
 
 ---
 
@@ -243,12 +244,12 @@ The status, test, and commit fields in this table are living project records and
 | Reference | Classification | Required outcome | Owning session | Regression test | Fix commit | Status | Notes |
 |---|---|---|---|---|---|---|---|
 | [#110](https://github.com/anand-p-r/fmi-hass-custom/issues/110) Lightning max age | Enhancement/reliability | Add a user-configurable maximum strike age; discard older items safely; preserve a documented backward-compatible default | S09 | TBD | TBD | NOT_STARTED | Test exact boundary, timezone-aware timestamps, missing/malformed timestamps, and option migration |
-| [#111](https://github.com/anand-p-r/fmi-hass-custom/issues/111) Wind gust unavailable | Regression | Restore a correctly typed and available wind-gust sensor when FMI provides valid gust data; do not invent a value when data is absent | S06 | TBD | TBD | NOT_STARTED | Verify current client field names and units rather than hard-coding an assumption |
+| [#111](https://github.com/anand-p-r/fmi-hass-custom/issues/111) Wind gust unavailable | Regression | Restore a correctly typed and available wind-gust sensor when FMI provides valid gust data; do not invent a value when data is absent | S06 | `tests/test_fmi_contract.py::test_current_client_maps_three_second_wind_gust_field`; `tests/test_forecast_characterization.py::test_wind_gust_sensor_uses_current_client_field` | TBD | CHARACTERIZED | Client 0.7.0 maps `WindGust` to `WeatherData.wind_gust` in m/s; `wind_max` is unsupported and `None`. S06 must reproduce the full Home Assistant issue before fixing it. |
 | [#112](https://github.com/anand-p-r/fmi-hass-custom/issues/112) Sensors not grouped/named by location | Regression | Restore location-aware grouping and appropriate generated names for new entities while preserving customized/existing IDs through safe migration | S06/S11 | TBD | TBD | NOT_STARTED | Include collision and customized-ID cases |
-| [#114](https://github.com/anand-p-r/fmi-hass-custom/issues/114) Incorrect daily forecast | Correctness | Replace first-sample-of-day behavior with documented, deterministic daily aggregation, including summing hourly precipitation amounts | S05 | TBD | TBD | NOT_STARTED | Cover timezone, DST, month/year boundaries, missing samples, and partial days |
+| [#114](https://github.com/anand-p-r/fmi-hass-custom/issues/114) Incorrect daily forecast | Correctness | Replace first-sample-of-day behavior with documented, deterministic daily aggregation, including summing hourly precipitation amounts | S05 | `tests/test_forecast_characterization.py::test_daily_forecast_sums_hourly_precipitation_issue_114` (`strict xfail`) | TBD | REPRODUCED | S02 also added passing hourly, DST, month-boundary, and year-boundary characterization. Convert the strict xfail in S05. |
 | [#115](https://github.com/anand-p-r/fmi-hass-custom/issues/115) Location selection/editing | User-facing maintenance | Add a current Home Assistant reconfigure flow that updates an existing entry's coordinates without forcing users to rebuild automations | S07/S11 | TBD | TBD | NOT_STARTED | Dynamic tracking of the Home zone is optional; safe coordinate editing is mandatory |
 | [#117](https://github.com/anand-p-r/fmi-hass-custom/issues/117) Forecast failure disables observations | Availability | Degrade gracefully: observations/current conditions remain usable when forecast WFS fails; forecast entities/data show unavailable/empty appropriately and recover automatically | S04 | TBD | TBD | NOT_STARTED | Setup must fail only when no required data source can initialize according to the documented availability policy |
-| [PR #116](https://github.com/anand-p-r/fmi-hass-custom/pull/116) `None` sunrise/sunset near poles | Correctness | Review, adopt or reimplement the guard; add deterministic polar-day and polar-night tests | S08 | TBD | TBD | NOT_STARTED | Do not rely only on the contributor's manual test |
+| [PR #116](https://github.com/anand-p-r/fmi-hass-custom/pull/116) `None` sunrise/sunset near poles | Correctness | Review, adopt or reimplement the guard; add deterministic polar-day and polar-night tests | S08 | `tests/test_forecast_characterization.py::test_clear_condition_handles_missing_polar_sun_events` (`strict xfail`) | TBD | REPRODUCED | Synthetic high-latitude fixture deterministically reproduces the `None.astimezone` failure. Convert the strict xfail in S08. |
 | New issues discovered after 2026-07-31 | Triage | Classify all new open issues; fix any critical/high correctness, availability, migration, security, or compatibility defect in this maintenance effort | S00/S13 | TBD | TBD | NOT_STARTED | Add rows rather than hiding new scope |
 
 ### Closure policy
@@ -445,9 +446,9 @@ A session is not `DONE` unless its acceptance criteria pass, its handoff exists,
 
 | ID | Session | Prerequisites | Status | Started UTC | Completed UTC | Commit(s) | Handoff / notes |
 |---|---|---|---|---|---|---|---|
-| S00 | Bootstrap, refresh baseline, and create initial `AGENTS.md` | None | DONE | 2026-07-31T06:44:16Z | 2026-07-31T06:55:14Z | OWNER_TO_COMMIT | `docs/agent-handoffs/S00.md`; suggested message recorded |
-| S01 | Reproducible development/test environment and validation skeleton | S00 | NOT_STARTED | — | — | — | `docs/agent-handoffs/S01.md` |
-| S02 | FMI fixture corpus, contract boundary, and characterization tests | S01 | NOT_STARTED | — | — | — | `docs/agent-handoffs/S02.md` |
+| S00 | Bootstrap, refresh baseline, and create initial `AGENTS.md` | None | DONE | 2026-07-31T06:44:16Z | 2026-07-31T06:55:14Z | `389c67901085efe6b53bee1474a2f89bfab20867` | `docs/agent-handoffs/S00.md` |
+| S01 | Reproducible development/test environment and validation skeleton | S00 | DONE | 2026-07-31T06:59:13Z | 2026-07-31T08:09:34Z | `OWNER_TO_COMMIT` | `docs/agent-handoffs/S01.md`; owner authorized S02 before a combined S01/S02 commit |
+| S02 | FMI fixture corpus, contract boundary, and characterization tests | S01 | DONE | 2026-07-31T08:10:37Z | 2026-07-31T08:34:20Z | `OWNER_TO_COMMIT` | `docs/agent-handoffs/S02.md`; combined suggestion: `S01-S02: add Podman test environment and FMI fixtures` |
 | S03 | Upgrade all dependencies and adapt to newest stable FMI client | S02 | NOT_STARTED | — | — | — | `docs/agent-handoffs/S03.md` |
 | S04 | Coordinator/setup resilience and issue #117 | S03 | NOT_STARTED | — | — | — | `docs/agent-handoffs/S04.md` |
 | S05 | Correct hourly/daily forecast semantics and issue #114 | S04 | NOT_STARTED | — | — | — | `docs/agent-handoffs/S05.md` |
@@ -598,7 +599,7 @@ Create a reproducible local developer environment and the smallest useful automa
 
 ### Required work
 
-1. Choose a current, minimal Python environment/locking approach compatible with Home Assistant custom-component development. Prefer current Home Assistant ecosystem tooling; document why the chosen approach fits this standalone repository.
+1. Use rootless Podman as the mandatory local execution environment for the current supported Python/Home Assistant version. Pin the base image, provide a simple repository command that builds/runs it, and document why the selected dependency/locking approach fits this standalone repository. Do not use the host Python as a fallback for project checks.
 2. Separate concerns clearly:
    - runtime requirements installed by Home Assistant from `manifest.json`;
    - development/test tooling;
@@ -630,6 +631,13 @@ Create a reproducible local developer environment and the smallest useful automa
    - live tests.
 9. Add a minimal PR CI skeleton that runs the setup smoke test and basic validation. S15 will harden/finalize CI.
 10. Replace `TBD` command placeholders in `AGENTS.md` with the commands established here.
+11. Use Ruff as the sole flake8-style linter and formatter:
+   - remove active flake8 dependencies, configuration, CI, and developer commands;
+   - configure a documented Ruff rule set rather than preserving only the former flake8 fatal-error subset;
+   - apply Ruff formatting and safe fixes to the repository;
+   - make both `make format-check` and `make lint` pass;
+   - retain factual flake8 references only in historical S00/baseline evidence.
+12. Store this maintenance plan at `plans/CODEX_FMI_HASS_MAINTENANCE_PLAN.md` and update every active repository reference to its canonical path.
 
 ### Verification
 
@@ -637,7 +645,8 @@ Create a reproducible local developer environment and the smallest useful automa
 - Install/sync dependencies successfully.
 - Run the setup smoke test.
 - Run the initial formatter/linter/type-check command, recording any pre-existing failures rather than masking them.
-- Run HACS and hassfest validation against the chosen layout.
+- Verify Ruff format and lint checks pass with no active flake8 configuration, dependency, or command remaining.
+- Run hassfest locally against the chosen layout. Add the official HACS validation job to preliminary CI and verify it after the owner creates the session commit; the HACS action validates a GitHub ref through the GitHub API and cannot validate an uncommitted local tree anonymously. Do not request or use an owner token merely to bypass that limitation.
 - Verify ordinary tests fail if a test tries to access the network unexpectedly.
 
 ### Exit criteria
@@ -646,6 +655,8 @@ Create a reproducible local developer environment and the smallest useful automa
 - One documented command runs the offline tests.
 - Home Assistant can load a mocked config entry in a test.
 - The repository layout has a documented, evidence-based decision.
+- Ruff is the only active flake8-style lint/format tool, and both Ruff gates pass.
+- The plan lives under `plans/` and active links point to its canonical path.
 - No intentional runtime behavior change.
 
 ---
@@ -1302,7 +1313,7 @@ Turn all established checks into secure, reliable, maintainable GitHub Actions w
    - `compatibility.yml`: scheduled stable/beta and dependency-resolution checks;
    - `live-fmi.yml`: manual and modest scheduled live FMI tests.
 2. Use a matrix only where it tests a declared support dimension. Avoid redundant matrices that multiply CI time without increasing confidence.
-3. Pin all external actions to full commit SHAs and annotate the release tag/version in comments.
+3. Pin all external actions to full commit SHAs and annotate the release tag/version in comments. Inspect composite and container actions for nested action/image references; replace, digest-pin, or explicitly block any mutable nested reference such as an image tag.
 4. Apply least-privilege permissions at workflow/job level.
 5. Add concurrency cancellation, job timeouts, and safe caching.
 6. Ensure pull requests from forks cannot access secrets or write tokens.
@@ -1479,8 +1490,10 @@ Codex must add rows for material architecture, semantics, migration, support, or
 
 | ID | Session | Date UTC | Decision | Alternatives considered | Evidence/rationale | Document/commit |
 |---|---|---|---|---|---|---|
-| D001 | TBD | — | Repository layout: retain root or migrate to `custom_components/fmi` | TBD | Must be decided by current HACS/hassfest/test evidence, not preference | TBD |
-| D002 | TBD | — | Supported Home Assistant/Python matrix | TBD | Follow current Home Assistant stable requirements and maintenance capacity | TBD |
+| D001 | S01 | 2026-07-31 | Migrate the integration from repository root to `custom_components/fmi/` | Retain root with `content_in_root: true` | HACS documents root content as valid, but the current hassfest container rejected it with `Domain does not match dir name`; the standard layout also enables public-loader Home Assistant tests without import shims | `docs/agent-handoffs/S01.md`; OWNER_TO_COMMIT |
+| D002 | S01 | 2026-07-31 | Target Home Assistant 2026.7.4 on Python 3.14.2 for the reproducible S01 environment, using `pytest-homeassistant-custom-component==0.13.348` | Use the helper's newest release 0.13.349 with Home Assistant 2026.8.0b0; retain an older Home Assistant/Python pair | Home Assistant 2026.7.4 is the current stable release and requires Python 3.14.2; helper 0.13.348 pins that exact stable version, while 0.13.349 targets the next beta | `docs/maintenance/DEVELOPMENT.md`; `docs/agent-handoffs/S01.md`; OWNER_TO_COMMIT |
+| D007 | S01 | 2026-07-31 | Use Ruff as the sole flake8-style linter and formatter with `E`, `F`, `I`, `UP`, `B`, and `ASYNC`; retain Pylint as a complementary check | Keep the former flake8 fatal subset; run Ruff alongside flake8; drop Pylint | The broader Ruff selection exposed import, modernization, and bugbear findings, supports both safe fixes and formatting, and now passes with no active legacy dependency, configuration, or command; Pylint continues to pass at 10.00/10 | `docs/maintenance/DEVELOPMENT.md`; `docs/agent-handoffs/S01.md`; OWNER_TO_COMMIT |
+| D008 | S02 | 2026-07-31 | Use compact synthetic fixture specifications that build the installed client's real models, plus a narrow async fake for the three consumed client methods | Store raw live FMI captures; use `SimpleNamespace` throughout tests; add a production wrapper before an upgrade requires it | Synthetic values avoid owner-coordinate/license risk, generated hourly series stay reviewable, real `NamedTuple` models expose dependency-shape changes, and the fake provides deterministic client/server failures without production refactoring | `tests/helpers/fmi.py`; `tests/fixtures/fmi/README.md`; `docs/agent-handoffs/S02.md`; OWNER_TO_COMMIT |
 | D003 | TBD | — | Daily condition/wind/other-field aggregation semantics | TBD | Must follow FMI field meaning and current Home Assistant schema | TBD |
 | D004 | TBD | — | Immutable config-entry/entity identity and v0.6.2 migration | TBD | Coordinates/place names are mutable; user automations must survive | TBD |
 | D005 | TBD | — | Lightning max-age default and units | TBD | Backward compatibility, usefulness, and clear UI semantics | TBD |

@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "kind": "synthetic",
+    "purpose": "Client, server, and malformed-response failures"
+  },
+  "client": {
+    "status_code": 400,
+    "message": "Synthetic invalid stored query"
+  },
+  "server": {
+    "status_code": 503,
+    "body": "Synthetic service unavailable"
+  },
+  "parse": {
+    "body": "<wfs:FeatureCollection><broken>"
+  }
+}

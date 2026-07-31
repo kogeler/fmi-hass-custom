@@ -1,18 +1,20 @@
 """Support for retrieving meteorological data from FMI (Finnish Meteorological Institute)."""
-import math
-from dateutil import tz
 
+import math
+
+import homeassistant.core as ha_core
+from dateutil import tz
 from homeassistant.components.weather import (
+    ATTR_FORECAST_CLOUD_COVERAGE,
     ATTR_FORECAST_CONDITION,
     ATTR_FORECAST_NATIVE_PRECIPITATION,
     ATTR_FORECAST_NATIVE_TEMP,
+    ATTR_FORECAST_NATIVE_TEMP_LOW,
+    ATTR_FORECAST_NATIVE_WIND_SPEED,
     ATTR_FORECAST_TIME,
     ATTR_FORECAST_WIND_BEARING,
-    ATTR_FORECAST_NATIVE_WIND_SPEED,
-    ATTR_FORECAST_NATIVE_TEMP_LOW,
-    ATTR_FORECAST_CLOUD_COVERAGE,
-    WeatherEntity,
     Forecast,
+    WeatherEntity,
 )
 from homeassistant.components.weather.const import (
     ATTR_WEATHER_HUMIDITY,
@@ -20,14 +22,10 @@ from homeassistant.components.weather.const import (
     WeatherEntityFeature,
 )
 from homeassistant.const import CONF_NAME
-import homeassistant.core as ha_core
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import FMIDataUpdateCoordinator
-from . import const
-from . import utils
-
+from . import FMIDataUpdateCoordinator, const, utils
 
 PARALLEL_UPDATES = 1
 
@@ -44,14 +42,14 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
     entity_list = [FMIWeatherEntity(name, coordinator)]
     if daily_mode:
-        entity_list.append(FMIWeatherEntity(f"{name} (daily)", coordinator,
-                                            daily_mode=True))
+        entity_list.append(FMIWeatherEntity(f"{name} (daily)", coordinator, daily_mode=True))
     if station_id:
         try:
             coordinator = domain_data.get(const.COORDINATOR_OBSERVATION)
             if coordinator is not None:
-                entity_list.append(FMIWeatherEntity(
-                    f"{name} (observation)", coordinator, station_id=station_id))
+                entity_list.append(
+                    FMIWeatherEntity(f"{name} (observation)", coordinator, station_id=station_id)
+                )
         except (KeyError, AttributeError) as error:
             const.LOGGER.error("Unable to setup observation object! ERROR: %s", error)
 
@@ -62,12 +60,16 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
     """Define an FMI Weather Entity."""
 
     _attr_supported_features = (
-        WeatherEntityFeature.FORECAST_HOURLY |
-        WeatherEntityFeature.FORECAST_DAILY
+        WeatherEntityFeature.FORECAST_HOURLY | WeatherEntityFeature.FORECAST_DAILY
     )
 
-    def __init__(self, name, coordinator: FMIDataUpdateCoordinator,
-                 station_id: bool = False, daily_mode: bool = False):
+    def __init__(
+        self,
+        name,
+        coordinator: FMIDataUpdateCoordinator,
+        station_id: bool = False,
+        daily_mode: bool = False,
+    ):
         """Initialize FMI weather object."""
         self.logger = const.LOGGER.getChild("weather")
         super().__init__(coordinator)

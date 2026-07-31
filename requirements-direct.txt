@@ -1,0 +1,17 @@
+# Home Assistant stable test harness. The helper version maps exactly to HA 2026.7.4.
+homeassistant==2026.7.4
+pytest-homeassistant-custom-component==0.13.348
+
+# Direct runtime requirements retained from the pre-S01 requirements file.
+async-timeout
+fmi-weather-client==0.7.0
+geopy>=2.1.0
+python-dateutil
+requests>=2.32.4
+voluptuous
+xmltodict>=0.14.2
+
+# Development checks.
+mypy==2.3.0
+pylint==4.0.6
+ruff==0.16.1

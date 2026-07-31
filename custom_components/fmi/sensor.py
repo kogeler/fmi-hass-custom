@@ -3,15 +3,14 @@
 import enum
 import math
 from datetime import datetime
-from dateutil import tz
+
 # Import homeassistant platform dependencies
 import homeassistant.const as ha_const
 import homeassistant.core as ha_core
+from dateutil import tz
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import FMIDataUpdateCoordinator
-from . import utils
-from . import const
+from . import FMIDataUpdateCoordinator, const, utils
 
 
 class SensorType(enum.IntEnum):
@@ -33,17 +32,25 @@ class SensorType(enum.IntEnum):
 SENSOR_TYPES = {
     SensorType.PLACE: ["Place", None, "mdi:city-variant"],
     SensorType.WEATHER: ["Condition", None, None],
-    SensorType.TEMPERATURE: ["Temperature", ha_const.UnitOfTemperature.CELSIUS,
-                             "mdi:thermometer"],
-    SensorType.WIND_SPEED: ["Wind Speed", ha_const.UnitOfSpeed.METERS_PER_SECOND,
-                            "mdi:weather-windy"],
+    SensorType.TEMPERATURE: ["Temperature", ha_const.UnitOfTemperature.CELSIUS, "mdi:thermometer"],
+    SensorType.WIND_SPEED: [
+        "Wind Speed",
+        ha_const.UnitOfSpeed.METERS_PER_SECOND,
+        "mdi:weather-windy",
+    ],
     SensorType.WIND_DIR: ["Wind Direction", "", "mdi:weather-windy"],
-    SensorType.WIND_GUST: ["Wind Gust", ha_const.UnitOfSpeed.METERS_PER_SECOND,
-                           "mdi:weather-windy"],
+    SensorType.WIND_GUST: [
+        "Wind Gust",
+        ha_const.UnitOfSpeed.METERS_PER_SECOND,
+        "mdi:weather-windy",
+    ],
     SensorType.HUMIDITY: ["Humidity", ha_const.PERCENTAGE, "mdi:water"],
     SensorType.CLOUDS: ["Cloud Coverage", ha_const.PERCENTAGE, "mdi:weather-cloudy"],
-    SensorType.RAIN: ["Rain", ha_const.UnitOfVolumetricFlux.MILLIMETERS_PER_HOUR,
-                      "mdi:weather-pouring"],
+    SensorType.RAIN: [
+        "Rain",
+        ha_const.UnitOfVolumetricFlux.MILLIMETERS_PER_HOUR,
+        "mdi:weather-pouring",
+    ],
     SensorType.TIME_FORECAST: ["Time", None, "mdi:av-timer"],
     SensorType.TIME: ["Best Time Of Day", None, "mdi:av-timer"],
 }
@@ -69,18 +76,16 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     entity_list = []
 
     for sensor_type, sensor_data in SENSOR_TYPES.items():
-        entity_list.append(
-            FMIBestConditionSensor(
-                name, coordinator, sensor_type, sensor_data))
+        entity_list.append(FMIBestConditionSensor(name, coordinator, sensor_type, sensor_data))
 
     if lightning_mode:
         for sensor_type, sensor_data in SENSOR_LIGHTNING_TYPES.items():
             entity_list.append(
-                FMILightningStrikesSensor(name, coordinator, sensor_type, sensor_data))
+                FMILightningStrikesSensor(name, coordinator, sensor_type, sensor_data)
+            )
 
     for sensor_type, sensor_data in SENSOR_MAREO_TYPES.items():
-        entity_list.append(
-            FMIMareoSensor(name, coordinator, sensor_type, sensor_data))
+        entity_list.append(FMIMareoSensor(name, coordinator, sensor_type, sensor_data))
 
     async_add_entities(entity_list, False)
 
@@ -88,16 +93,18 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 class _BaseSensorClass(CoordinatorEntity):
     """Common base class for all the sensor types."""
 
-    def __init__(self, name, coordinator: FMIDataUpdateCoordinator,
-                 sensor_type, sensor_data, only_name=None):
+    def __init__(
+        self, name, coordinator: FMIDataUpdateCoordinator, sensor_type, sensor_data, only_name=None
+    ):
         """Initialize the sensor base data."""
         self.logger = const.LOGGER.getChild("sensor")
         super().__init__(coordinator)
         self.client_name = name
         self._name, self._attr_unit_of_measurement, self._attr_icon = sensor_data
         self.type = sensor_type
-        self._attr_unique_id = \
+        self._attr_unique_id = (
             f"{coordinator.unique_id}_{name.replace(' ', '_')}_{self._name.replace(' ', '_')}"
+        )
         if only_name:
             self._attr_name = f"{self._name}"
         else:
@@ -155,8 +162,11 @@ class FMIBestConditionSensor(_BaseSensorClass):
     def get_wind_direction_string(wind_direction_in_deg):
         """Get the string interpretation of wind direction in degrees."""
 
-        if wind_direction_in_deg is None or \
-                wind_direction_in_deg < 0 or wind_direction_in_deg > 360:
+        if (
+            wind_direction_in_deg is None
+            or wind_direction_in_deg < 0
+            or wind_direction_in_deg > 360
+        ):
             return ha_const.STATE_UNAVAILABLE
 
         if wind_direction_in_deg <= 23 or wind_direction_in_deg > 338:
@@ -347,8 +357,6 @@ class FMIMareoSensor(_BaseSensorClass):
         # update the extra state attributes
         self._attr_extra_state_attributes = {
             ha_const.ATTR_TIME: mareo_data[0].time,
-            "FORECASTS": [
-                {"time": item.time, "height": item.sea_level} for item in mareo_data[1:]
-            ],
+            "FORECASTS": [{"time": item.time, "height": item.sea_level} for item in mareo_data[1:]],
             ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION,
         }

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+  <member>
+    <record>
+      <ignored>synthetic</ignored>
+      <time>2026-05-20T12:00:00+00:00</time>
+      <parameter>SeaLevel</parameter>
+      <value>12.5</value>
+    </record>
+  </member>
+  <member>
+    <record>
+      <ignored>synthetic</ignored>
+      <time>2026-05-20T12:30:00+00:00</time>
+      <parameter>SeaLevel</parameter>
+      <value>13.0</value>
+    </record>
+  </member>
+  <member>
+    <record>
+      <ignored>synthetic</ignored>
+      <time>2026-05-20T12:30:00+00:00</time>
+      <parameter>SeaLevelN2000</parameter>
+      <value>7.0</value>
+    </record>
+  </member>
+</root>

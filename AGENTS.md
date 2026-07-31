@@ -2,11 +2,11 @@
 
 ## Purpose and scope
 
-This repository contains the `fmi` Home Assistant custom integration. It exposes Finnish Meteorological Institute forecast, observation, lightning, and sea-level data. Preserve existing user configuration and entity identity while executing the bounded maintenance sessions in `CODEX_FMI_HASS_MAINTENANCE_PLAN.md`.
+This repository contains the `fmi` Home Assistant custom integration. It exposes Finnish Meteorological Institute forecast, observation, lightning, and sea-level data. Preserve existing user configuration and entity identity while executing the bounded maintenance sessions in `plans/CODEX_FMI_HASS_MAINTENANCE_PLAN.md`.
 
 ## Before work
 
-- Read `CODEX_FMI_HASS_MAINTENANCE_PLAN.md` in full, inspect its session tracker, and read the latest file in `docs/agent-handoffs/`.
+- Read `plans/CODEX_FMI_HASS_MAINTENANCE_PLAN.md` in full, inspect its session tracker, and read the latest file in `docs/agent-handoffs/`.
 - Execute exactly one eligible session. Do not start a later session or absorb unrelated cleanup.
 - Correct the plan immediately when verified code or source evidence reveals an inaccuracy, mismatch, or necessary scope expansion. Record the correction in the current handoff.
 
@@ -22,16 +22,21 @@ This repository contains the `fmi` Home Assistant custom integration. It exposes
 
 ## Commands
 
-S01 must establish and document the reproducible environment and canonical commands. Until then:
+Run all supported Python and Home Assistant commands through rootless Podman; do not use the host Python as a fallback.
 
-- Environment setup/sync: `TBD (S01)`
-- Format: `TBD (S01)`
-- Lint: `TBD (S01)`
-- Type check: `TBD (S01)`
-- Fast offline tests: `TBD (S01)`
-- Full offline tests and coverage: `TBD (S01)`
-- HACS/hassfest validation: `TBD (S01)`
-- Live tests: `TBD (S01; never part of the ordinary suite)`
+- Environment setup/sync: `make dev-build`
+- Regenerate the complete dependency freeze: `make lock`
+- Format: `make format`
+- Format check: `make format-check`
+- Lint: `make lint`
+- Type check: `make type-check`
+- Fast offline tests: `make test-fast`
+- Full offline tests and coverage: `make test-full`
+- Local layout and hassfest validation: `make validate`
+- Prove unexpected network access fails: `make test-network-block`
+- Live tests: `make live` (opt-in and never part of the ordinary suite)
+
+The build and lock commands may use package registries. Formatting, linting, typing, ordinary tests, and local validation run with Podman `--network=none`; pytest additionally blocks sockets. `make live` is the only test command with container networking.
 
 ## Session handoff
 

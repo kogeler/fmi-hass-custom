@@ -1,10 +1,10 @@
 """Constants for the FMI Weather and Sensor integrations."""
-from datetime import timedelta
 
 import logging
+from datetime import timedelta
 
 LOGGER = logging.getLogger(__package__)
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.DEBUG)
 
 DOMAIN = "fmi"
 NAME = "FMI"
@@ -45,8 +45,8 @@ WIND_SPEED_MIN_DEFAULT = 0
 WIND_SPEED_MAX_DEFAULT = 25
 DAYS_RANGE = list(range(0, 11))  # 0 to 10 days, 0 = disable forecast
 DAYS_DEFAULT = 4  # default to 4 days
-PRECIPITATION_MIN_DEFAULT = .0
-PRECIPITATION_MAX_DEFAULT = .2
+PRECIPITATION_MIN_DEFAULT = 0.0
+PRECIPITATION_MAX_DEFAULT = 0.2
 DAILY_MODE_DEFAULT = False
 LIGHTNING_DEFAULT = False
 
@@ -78,8 +78,9 @@ BOUNDING_BOX_HALF_SIDE_KM = 200
 LIGHTNING_DAYS_LIMIT = 1
 LIGHTNING_LIMIT = 5
 
-URL_FMI_BASE = "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0" \
-    "&request=getFeature&storedquery_id="
+URL_FMI_BASE = (
+    "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id="
+)
 
 LIGHTNING_QUERY_ID = "fmi::observations::lightning::multipointcoverage"
 LIGHTNING_GET_URL = f"{URL_FMI_BASE}{LIGHTNING_QUERY_ID}&timestep=3600&"

@@ -1,0 +1,41 @@
+# Development Environment
+
+## Decision
+
+All local commands that depend on the supported Python or Home Assistant version run in rootless Podman. The host currently provides Python 3.13.5, while Home Assistant 2026.7.4 requires Python 3.14.2 or newer, so host execution is not a valid fallback.
+
+`Containerfile.dev` pins the multi-architecture digest for the official Python 3.14.2 slim image. `requirements-direct.txt` is the reviewed human-maintained dependency source. Root `requirements.txt` is generated from a clean `lock` stage with `python -m pip freeze`, then installed with `--no-deps` in the development image. This makes the resolver input and the complete installed graph reviewable separately.
+
+The current test helper is `pytest-homeassistant-custom-component==0.13.348`, which maps exactly to Home Assistant 2026.7.4. Version 0.13.349 targets Home Assistant 2026.8.0b0 and is intentionally not used for the stable S01 environment.
+
+## Commands
+
+| Task | Command |
+|---|---|
+| Regenerate the complete freeze | `make lock` |
+| Build/sync the development image | `make dev-build` |
+| Format | `make format` |
+| Check formatting | `make format-check` |
+| Lint | `make lint` |
+| Type check | `make type-check` |
+| Fast offline tests | `make test-fast` |
+| Full offline tests with coverage | `make test-full` |
+| Prove unexpected network access fails | `make test-network-block` |
+| Local layout and hassfest validation | `make validate` |
+| Opt-in live tests | `make live` |
+
+Build and lock commands may access package registries. Formatting, linting, typing, ordinary tests, and local validation run with Podman's `--network=none`; pytest also uses `pytest-socket`. `make live` is the only test target with container networking and will have no selected tests until S12.
+
+The official HACS action validates a GitHub ref through the GitHub API and requires `GITHUB_TOKEN`; it cannot validate an uncommitted local working tree anonymously. It is included in the PR workflow and is not emulated or bypassed locally. Hassfest does validate the mounted local tree and is part of `make validate`.
+
+## Formatting and linting
+
+Ruff is the sole flake8-style linter and the repository formatter. Its configured rule families are `E`, `F`, `I`, `UP`, `B`, and `ASYNC`: core correctness/style, import ordering, Python upgrades, bugbear checks, and async correctness. `make lint` runs Ruff first and then Pylint as a complementary static analysis pass; Pylint does not duplicate the removed legacy toolchain.
+
+## Layout
+
+S01 moved the integration to `custom_components/fmi/`. Although HACS permits root content with `content_in_root: true`, current hassfest rejected the old checkout because the domain did not match the directory name. The standard layout passes the files to Home Assistant's normal custom-integration loader and avoids test-only import shims.
+
+## Podman storage warning
+
+This host reports that its configured `overlay` driver is overridden by the existing `vfs` storage database. Commands still run rootless with `runc`. S01 does not delete or reset the user's Podman storage to suppress this warning.

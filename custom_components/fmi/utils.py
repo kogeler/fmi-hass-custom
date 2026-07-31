@@ -2,9 +2,10 @@
 
 import math
 from datetime import date, datetime
+
 from dateutil import tz
+from homeassistant.const import SUN_EVENT_SUNRISE, SUN_EVENT_SUNSET
 from homeassistant.helpers.sun import get_astral_event_date
-from homeassistant.const import SUN_EVENT_SUNSET, SUN_EVENT_SUNRISE
 
 try:
     from . import const
@@ -12,9 +13,8 @@ except ImportError:
     import const
 
 
-class BoundingBox():
-    def __init__(self, lat_min=None, lon_min=None,
-                 lat_max=None, lon_max=None):
+class BoundingBox:
+    def __init__(self, lat_min=None, lon_min=None, lat_max=None, lon_max=None):
         self.lat_min = lat_min
         self.lon_min = lon_min
         self.lat_max = lat_max
