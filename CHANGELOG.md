@@ -21,7 +21,7 @@ All notable changes to this project are documented in this file.
 
 - Added a translated lightning maximum-age option with a backward-compatible 24-hour default and exact inclusive age filtering.
 - Added a reproducible rootless Podman development and test environment targeting Home Assistant 2026.7.4 on Python 3.14.2.
-- Added deterministic offline FMI fixtures, dependency contract tests, full Home Assistant config-flow/lifecycle and public-entity coverage, entity characterization tests, and explicit regression cases for the known maintenance issues.
+- Added deterministic offline FMI fixtures, dependency contract tests, full Home Assistant config-flow/lifecycle and public-entity coverage, realistic v0.6.2 registry migration tests, entity characterization tests, and explicit regression cases for the known maintenance issues.
 - Added Ruff formatting/linting, coverage, type checking, network-blocking tests, hassfest/HACS validation, and pinned GitHub Actions checks.
 - Added a verified maintenance baseline, dependency/license inventory, session handoffs, and repository guidance for future maintenance work.
 
@@ -36,7 +36,7 @@ All notable changes to this project are documented in this file.
 - Split reviewed direct dependencies from the complete 173-package `pip freeze` lock generated in a clean container.
 - Updated weather forecasts to Home Assistant's separate hourly/daily API with UTC timestamps and complete one-hour FMI source data; the deprecated forecast property was removed.
 - Updated sensors to Home Assistant's current `SensorEntity`, entity-description, device-class, state-class, translated-name, and native-unit conventions while retaining existing unique IDs.
-- Migrated config entries from coordinate-based identifiers to stable internal identities so coordinates and resolved place names can change safely.
+- Migrated config entries from coordinate-based identifiers to stable internal identities so coordinates and resolved place names can change safely, while conservatively preserving registry/unique IDs, customized or ambiguous suffixed entity IDs, and the optional legacy daily entity.
 
 ### Security
 

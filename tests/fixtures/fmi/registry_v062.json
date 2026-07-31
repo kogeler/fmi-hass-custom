@@ -1,0 +1,110 @@
+{
+  "_meta": {
+    "kind": "synthetic",
+    "description": "Synthetic v0.6.2 config-entry and registry history",
+    "source": "Constructed from the local v0.6.2 tag; contains no live FMI data or private coordinates"
+  },
+  "entries": [
+    {
+      "key": "helsinki",
+      "title": "Helsinki",
+      "unique_id": "60.17_24.94",
+      "version": 1,
+      "minor_version": 1,
+      "data": {
+        "name": "FMI",
+        "latitude": 60.17,
+        "longitude": 24.94
+      },
+      "options": {
+        "forecast_days": 4,
+        "offset": 1,
+        "min_relative_humidity": 30,
+        "max_relative_humidity": 70,
+        "min_temperature": 10,
+        "max_temperature": 30,
+        "min_wind_speed": 0,
+        "max_wind_speed": 25,
+        "min_precipitation": 0.0,
+        "max_precipitation": 0.2,
+        "daily_mode": true,
+        "lightning_sensor": false,
+        "lightning_radius": 200,
+        "lightning_max_age_minutes": 1440,
+        "observation_station_id": 0
+      },
+      "device": {
+        "name": "FMI",
+        "identifier": "60.17:24.94"
+      },
+      "sensors": [
+        {"key": "helsinki_place", "name": "Place", "created_entity_id": "sensor.place", "entity_id": "sensor.place"},
+        {"key": "helsinki_condition", "name": "Condition", "created_entity_id": "sensor.condition", "entity_id": "sensor.condition"},
+        {"key": "helsinki_temperature", "name": "Temperature", "created_entity_id": "sensor.temperature", "entity_id": "sensor.temperature"},
+        {"key": "helsinki_wind_speed", "name": "Wind Speed", "created_entity_id": "sensor.wind_speed", "entity_id": "sensor.wind_speed"},
+        {"key": "helsinki_wind_direction", "name": "Wind Direction", "created_entity_id": "sensor.wind_direction", "entity_id": "sensor.wind_direction"},
+        {"key": "helsinki_wind_gust", "name": "Wind Gust", "created_entity_id": "sensor.wind_gust", "entity_id": "sensor.wind_gust"},
+        {"key": "helsinki_humidity", "name": "Humidity", "created_entity_id": "sensor.humidity", "entity_id": "sensor.outdoor_humidity"},
+        {"key": "helsinki_cloud_coverage", "name": "Cloud Coverage", "created_entity_id": "sensor.cloud_coverage", "entity_id": "sensor.cloud_coverage"},
+        {"key": "helsinki_rain", "name": "Rain", "created_entity_id": "sensor.rain", "entity_id": "sensor.rain"},
+        {"key": "helsinki_time", "name": "Time", "created_entity_id": "sensor.time", "entity_id": "sensor.time"},
+        {"key": "helsinki_best_time", "name": "Best Time Of Day", "created_entity_id": "sensor.best_time_of_day", "entity_id": "sensor.best_time_of_day"},
+        {"key": "helsinki_sea_level", "name": "Sea Level", "created_entity_id": "sensor.helsinki_sea_level", "entity_id": "sensor.helsinki_sea_level"}
+      ],
+      "weather": [
+        {"key": "helsinki_weather", "suffix": "", "name": "Helsinki", "created_entity_id": "weather.helsinki", "entity_id": "weather.helsinki"},
+        {"key": "helsinki_daily", "suffix": "_daily", "name": "Helsinki (daily)", "created_entity_id": "weather.helsinki_daily", "entity_id": "weather.helsinki_legacy_daily"}
+      ]
+    },
+    {
+      "key": "tampere",
+      "title": "Tampere",
+      "unique_id": "61.5_23.76",
+      "version": 1,
+      "minor_version": 1,
+      "data": {
+        "name": "FMI",
+        "latitude": 61.5,
+        "longitude": 23.76
+      },
+      "options": {
+        "forecast_days": 4,
+        "offset": 1,
+        "min_relative_humidity": 30,
+        "max_relative_humidity": 70,
+        "min_temperature": 10,
+        "max_temperature": 30,
+        "min_wind_speed": 0,
+        "max_wind_speed": 25,
+        "min_precipitation": 0.0,
+        "max_precipitation": 0.2,
+        "daily_mode": false,
+        "lightning_sensor": false,
+        "lightning_radius": 200,
+        "lightning_max_age_minutes": 1440,
+        "observation_station_id": 0
+      },
+      "device": {
+        "name": "FMI",
+        "identifier": "61.5:23.76"
+      },
+      "sensors": [
+        {"key": "tampere_place", "name": "Place", "created_entity_id": "sensor.place_2", "entity_id": "sensor.place_2"},
+        {"key": "tampere_condition", "name": "Condition", "created_entity_id": "sensor.condition_2", "entity_id": "sensor.condition_2"},
+        {"key": "tampere_temperature", "name": "Temperature", "created_entity_id": "sensor.temperature_2", "entity_id": "sensor.temperature_2"},
+        {"key": "tampere_wind_speed", "name": "Wind Speed", "created_entity_id": "sensor.wind_speed_2", "entity_id": "sensor.wind_speed_2"},
+        {"key": "tampere_wind_direction", "name": "Wind Direction", "created_entity_id": "sensor.wind_direction_2", "entity_id": "sensor.wind_direction_2"},
+        {"key": "tampere_wind_gust", "name": "Wind Gust", "created_entity_id": "sensor.wind_gust_2", "entity_id": "sensor.wind_gust_2"},
+        {"key": "tampere_humidity", "name": "Humidity", "created_entity_id": "sensor.humidity_2", "entity_id": "sensor.humidity_2"},
+        {"key": "tampere_cloud_coverage", "name": "Cloud Coverage", "created_entity_id": "sensor.cloud_coverage_2", "entity_id": "sensor.cloud_coverage_2"},
+        {"key": "tampere_rain", "name": "Rain", "created_entity_id": "sensor.rain_2", "entity_id": "sensor.rain_2"},
+        {"key": "tampere_time", "name": "Time", "created_entity_id": "sensor.time_2", "entity_id": "sensor.time_2"},
+        {"key": "tampere_best_time", "name": "Best Time Of Day", "created_entity_id": "sensor.best_time_of_day_2", "entity_id": "sensor.best_time_of_day_2"},
+        {"key": "tampere_sea_level", "name": "Sea Level", "created_entity_id": "sensor.tampere_sea_level", "entity_id": "sensor.tampere_sea_level"}
+      ],
+      "weather": [
+        {"key": "tampere_weather", "suffix": "", "name": "Tampere", "created_entity_id": "weather.tampere", "entity_id": "weather.tampere"}
+      ]
+    }
+  ]
+}

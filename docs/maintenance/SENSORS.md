@@ -41,7 +41,7 @@ Before adding sensors, S06 looks up each unchanged unique ID in the entity regis
 - A user-customized ID is preserved.
 - An occupied location-aware target is not overwritten.
 - The registry entry and unique ID are updated in place; no entity is deleted or recreated.
-- Ambiguous suffixed defaults such as `sensor.temperature_2` are not guessed to be integration-generated. S11 owns complete multi-entry migration evidence and any safe extension.
+- Ambiguous suffixed defaults such as `sensor.temperature_2` are preserved because current registry data cannot distinguish an automatically allocated suffix from the same user-selected ID. S11's two-entry acceptance fixture proves that these entities retain their internal/unique IDs and acquire the correct location device without guessing. See `MIGRATIONS.md`.
 
 ## Sensor Metadata
 

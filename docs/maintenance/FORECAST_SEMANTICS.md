@@ -76,7 +76,7 @@ Multiple FMI symbols that map to the same Home Assistant condition are equivalen
 
 ## Entity compatibility
 
-Every retained weather entity advertises and implements both hourly and daily forecast methods with their literal granularities. The old `daily_mode` option may still create its legacy extra entity so existing unique IDs are not removed without registry migration evidence. Its methods are no longer mode-dependent. S11 owns the registry-safe decision to preserve, migrate, or retire that duplicate entity.
+Every retained weather entity advertises and implements both hourly and daily forecast methods with their literal granularities. The old `daily_mode` option still creates its legacy extra entity, and its methods are no longer mode-dependent. S11 registry evidence requires preserving that entity: disabling the option leaves its registry/custom ID intact and unavailable, and re-enabling it restores the same record. See `MIGRATIONS.md`.
 
 ## References
 

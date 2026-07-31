@@ -521,6 +521,15 @@ async def test_v062_migration_collision_keeps_safe_legacy_config_id(
     assert legacy.data[CONF_ENTITY_IDENTITY] == "60.17:24.94"
     assert occupied.unique_id == f"fmi:{legacy.entry_id}"
 
+    first_result = (dict(legacy.data), legacy.unique_id, legacy.version, legacy.minor_version)
+    assert await async_migrate_entry(hass, legacy)
+    assert (
+        dict(legacy.data),
+        legacy.unique_id,
+        legacy.version,
+        legacy.minor_version,
+    ) == first_result
+
 
 async def test_loaded_reconfigure_preserves_custom_entity_and_loads_new_place(
     hass: HomeAssistant,

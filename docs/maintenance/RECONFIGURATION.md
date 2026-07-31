@@ -33,7 +33,7 @@ Fresh entries receive a random coordinate-independent identity. A v0.6.2/version
 
 Reconfiguration never changes `entity_identity` or the config-entry unique ID. Duplicate detection therefore compares current coordinates rather than stable IDs.
 
-Ambiguous automatically suffixed legacy entity IDs and complex multi-entry registry histories remain assigned to S11. Reconfiguration does not guess whether those IDs were generated or customized.
+S11 acceptance tests confirm that exact unsuffixed legacy sensor defaults migrate in place when safe, while ambiguous automatically suffixed IDs, customized IDs, and occupied targets are preserved. Reconfiguration does not guess whether a suffixed ID was generated or customized. The complete rules are in `MIGRATIONS.md`.
 
 ## Failure and privacy rules
 
