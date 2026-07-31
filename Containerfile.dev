@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 ARG PYTHON_IMAGE=docker.io/library/python@sha256:1a3c6dbfd2173971abba880c3cc2ec4643690901f6ad6742d0827bae6cefc925
 
 FROM ${PYTHON_IMAGE} AS lock

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 SHELL := /bin/bash
 
 CONTAINER_ENGINE ?= podman

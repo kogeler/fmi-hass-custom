@@ -1,3 +1,5 @@
+<!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
+
 # Maintenance TODO
 
 ## Replace vulnerable Home Assistant-pinned packages

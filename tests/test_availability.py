@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 """Availability and recovery tests for independent FMI data sources."""
 
 import logging
@@ -92,7 +95,7 @@ def _entry(
     return entry
 
 
-async def test_issue_117_observation_by_place_loads_when_forecast_wfs_fails(
+async def test_observation_by_place_loads_when_forecast_wfs_fails(
     hass: HomeAssistant,
     monkeypatch,
 ) -> None:

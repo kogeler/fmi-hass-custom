@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 """Deliberately failing probe used by `make test-network-block`."""
 
 import socket

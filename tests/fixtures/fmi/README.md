@@ -1,3 +1,5 @@
+<!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
+
 # FMI Fixture Metadata
 
 All fixtures in this directory are synthetic and deterministic. Weather values were constructed for tests, place coordinates are rounded public city/locality coordinates, and no response was captured from the FMI service. They therefore contain no owner coordinates, secrets, or FMI-licensed source dataset.

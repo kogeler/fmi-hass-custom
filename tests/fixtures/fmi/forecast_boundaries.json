@@ -29,6 +29,11 @@
     {"time": "2026-12-31T22:00:00+00:00", "values": {"temperature": -3.0}},
     {"time": "2027-01-01T04:00:00+00:00", "values": {"temperature": -2.0}}
   ],
+  "leap_day": [
+    {"time": "2028-02-28T22:00:00+00:00", "values": {"temperature": -4.0}},
+    {"time": "2028-02-29T12:00:00+00:00", "values": {"temperature": -2.0}},
+    {"time": "2028-02-29T22:00:00+00:00", "values": {"temperature": 0.0}}
+  ],
   "dst_transition": [
     {"time": "2026-03-28T22:00:00+00:00", "values": {"temperature": 0.0}},
     {"time": "2026-03-29T00:00:00+00:00", "values": {"temperature": 1.0}},

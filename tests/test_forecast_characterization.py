@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 """Characterization tests for current FMI entity behavior."""
 
 from __future__ import annotations
@@ -105,6 +108,7 @@ def test_hourly_forecast_spans_three_local_dates(monkeypatch) -> None:
     [
         ("month_boundary", [date(2026, 1, 31), date(2026, 2, 1)]),
         ("year_boundary", [date(2026, 12, 31), date(2027, 1, 1)]),
+        ("leap_day", [date(2028, 2, 29), date(2028, 3, 1)]),
     ],
 )
 def test_daily_grouping_crosses_calendar_boundaries(
@@ -176,7 +180,7 @@ def test_wind_gust_sensor_uses_current_client_field() -> None:
     assert sensor._attr_native_value == 7.8
 
 
-def test_daily_forecast_sums_hourly_precipitation_issue_114(monkeypatch) -> None:
+def test_daily_forecast_sums_hourly_precipitation(monkeypatch) -> None:
     _set_helsinki_timezone(monkeypatch)
     forecast = forecast_from_fixture("forecast_normal.json")
 
@@ -358,12 +362,8 @@ def test_sensor_handles_none_value_without_exception() -> None:
     assert sensor._attr_native_value is None
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="PR #116: polar sun events may be None; guard is implemented in S08",
-)
 def test_clear_condition_handles_missing_polar_sun_events(monkeypatch) -> None:
     fixture = load_json_fixture("high_latitude.json")
     monkeypatch.setattr(utils, "get_astral_event_date", lambda *args: fixture["sunrise"])
 
-    assert utils.get_weather_symbol(1, hass=object()) in {"sunny", "clear-night"}
+    assert utils.get_weather_symbol(1, hass=cast(Any, object())) == "sunny"

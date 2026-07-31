@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 """Config flow for the Finnish Meteorological Institute integration."""
 
 from __future__ import annotations

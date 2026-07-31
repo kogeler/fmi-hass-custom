@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 """Deterministic builders for the installed FMI client contract."""
 
 from __future__ import annotations

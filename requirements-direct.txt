@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 # Home Assistant stable test harness. Newer helper releases target HA prereleases.
 homeassistant==2026.7.4
 pytest-homeassistant-custom-component==0.13.348
@@ -5,7 +8,6 @@ pytest-homeassistant-custom-component==0.13.348
 # Direct runtime requirements not supplied as Home Assistant Core requirements.
 fmi-weather-client==1.0.0
 geopy==2.5.0
-python-dateutil==2.9.0.post0
 
 # Development checks.
 mypy==2.3.0

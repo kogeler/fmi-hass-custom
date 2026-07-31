@@ -1,4 +1,7 @@
-"""Home Assistant sensor regressions for FMI issues #111 and #112."""
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
+"""Home Assistant regressions for wind gusts and sensor location grouping."""
 
 import math
 from typing import Any, cast
@@ -77,7 +80,7 @@ def _legacy_temperature_unique_id(latitude: float = 60.17, longitude: float = 24
     return f"{latitude}:{longitude}_FMI_Temperature"
 
 
-async def test_issue_111_hourly_maximum_gust_restores_sensor(
+async def test_hourly_maximum_gust_restores_sensor(
     hass: HomeAssistant,
     monkeypatch,
 ) -> None:
@@ -103,7 +106,7 @@ async def test_issue_111_hourly_maximum_gust_restores_sensor(
     assert state.attributes["unit_of_measurement"] == UnitOfSpeed.KILOMETERS_PER_HOUR
 
 
-async def test_issue_112_fresh_sensors_use_location_device_context(
+async def test_fresh_sensors_use_location_device_context(
     hass: HomeAssistant,
     monkeypatch,
 ) -> None:

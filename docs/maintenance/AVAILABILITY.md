@@ -1,6 +1,8 @@
+<!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
+
 # Source Availability Policy
 
-This policy defines how the integration behaves when one FMI data source is unavailable. It was implemented for issue #117 and applies to the stable Home Assistant environment selected by the maintenance plan.
+This policy defines how the integration behaves when one FMI data source is unavailable. It addresses forecast failures disabling observations and applies to the stable Home Assistant environment selected by the maintenance plan.
 
 ## Current conditions and setup
 
@@ -34,4 +36,4 @@ Source logs are transition-based: one warning when a source becomes unavailable 
 
 Lightning and sea-level work remains optional to current weather. An exception at either optional update boundary clears only that source and does not fail the primary coordinator. Detailed transport, parsing, freshness, geocoding, and option behavior remains assigned to S09.
 
-Policy evidence: [upstream issue #117](https://github.com/anand-p-r/fmi-hass-custom/issues/117), checked 2026-07-31.
+Policy evidence: forecast failure disabling observations report, checked 2026-07-31.

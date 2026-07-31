@@ -1,3 +1,5 @@
+<!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
+
 # Development Environment
 
 ## Decision

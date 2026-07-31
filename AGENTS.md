@@ -1,3 +1,5 @@
+<!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
+
 # FMI Custom Integration Agent Guide
 
 ## Purpose and scope
@@ -17,6 +19,7 @@ This repository contains the `fmi` Home Assistant custom integration. It exposes
 - Do not overwrite, reset, stash, reformat, or otherwise disturb unexplained user changes.
 - Do not run Git operations that may require a hardware token, interactive credential prompt, or authenticated SSH access. Use local Git and anonymous public HTTPS/API inspection only.
 - Do not commit. The repository owner creates commits. End each session with exactly one concise suggested message beginning with `SXX:` and record `OWNER_TO_COMMIT` until the owner SHA is known.
+- Add `Copyright (c) 2026 kogeler` and the MIT SPDX identifier to every new human-authored file when its format supports comments. Do not alter generated locks or data fixtures solely to add a header; the repository-level `LICENSE` notice covers them.
 - Keep `manifest.json` runtime requirements separate from development/test dependencies. After dependency upgrades, generate the complete root `requirements.txt` from a clean supported environment with `python -m pip freeze`; do not hand-edit that generated freeze.
 - Never claim a check passed unless that exact check was run successfully. Record unavailable tools and failures precisely.
 

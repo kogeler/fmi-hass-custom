@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 """Smoke tests for FMI config-entry setup."""
 
 from datetime import UTC, datetime

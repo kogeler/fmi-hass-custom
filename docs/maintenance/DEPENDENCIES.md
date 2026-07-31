@@ -1,3 +1,5 @@
+<!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
+
 # Dependency Inventory
 
 Inventory date: 2026-07-31. Versions were checked against package metadata from PyPI and action metadata from the upstream GitHub repositories. The supported test environment is Home Assistant 2026.7.4 on Python 3.14.2.
@@ -18,13 +20,13 @@ Inventory date: 2026-07-31. Versions were checked against package metadata from 
 | `pytest-homeassistant-custom-component` | HA test harness; direct development | 0.13.348 | 0.13.350 | 0.13.348 | MIT | 0.13.348 pins HA 2026.7.4. Releases 0.13.349/0.13.350 pin 2026.8 prereleases, so they do not represent the stable support matrix. [PyPI](https://pypi.org/project/pytest-homeassistant-custom-component/) |
 | `fmi-weather-client` | FMI API; direct runtime | 0.7.0 | 1.0.0 | 1.0.0 | GPL-3.0 | Exact manifest pin. Public models, errors, and async methods remain compatible. S06 found that 1.0.0 still requests forecast `WindGust`, which FMI returns as NaN for the selected producer; the integration now uses a narrow contract-tested adapter to add `HourlyMaximumGust` to the same request and normalize the existing model. [PyPI](https://pypi.org/project/fmi-weather-client/), [source](https://codeberg.org/saaste/fmi-weather-client) |
 | `geopy` | Reverse geocoding/distance; direct runtime | >=2.1.0 | 2.5.0 | 2.5.0 | MIT | Exact manifest pin because integration modules import it directly. [PyPI](https://pypi.org/project/geopy/) |
-| `python-dateutil` | Time-zone conversion; direct runtime | unpinned | 2.9.0.post0 | 2.9.0.post0 | Apache-2.0 / BSD-3-Clause | Added to the manifest because integration modules import it and Home Assistant Core does not guarantee it as a direct requirement. [PyPI](https://pypi.org/project/python-dateutil/) |
+| `python-dateutil` | Legacy time-zone conversion; removed direct runtime | unpinned | 2.9.0.post0 | Test transitive only | Apache-2.0 / BSD-3-Clause | S08 replaced integration imports with Home Assistant's current timezone helpers. It remains in the complete freeze through `freezegun`, selected by the Home Assistant pytest helper. [PyPI](https://pypi.org/project/python-dateutil/) |
 | `async-timeout` | Legacy timeout helper; removed | unpinned / 5.0.1 resolved | 5.0.1 | removed | Apache-2.0 | Replaced by `asyncio.timeout`, available in the supported Python. No installed dependency still requires this package. [PyPI](https://pypi.org/project/async-timeout/) |
 | `requests` | HTTP exceptions; Core-supplied transitive | >=2.32.4 | 2.34.2 | 2.34.2 | Apache-2.0 | Integration imports it, but HA 2026.7.4 requires exactly 2.34.2 and FMI client also requires `~=2.32`; removed as a redundant direct input/manifest candidate. [PyPI](https://pypi.org/project/requests/) |
 | `voluptuous` | Config schema; Core-supplied transitive | unpinned | 0.16.0 | 0.15.2 | BSD-3-Clause | Integration imports it, but HA 2026.7.4 guarantees exactly 0.15.2. Selecting 0.16.0 would violate Core metadata. [PyPI](https://pypi.org/project/voluptuous/) |
 | `xmltodict` | FMI XML parser; FMI transitive | >=0.14.2 | 1.0.4 | 1.0.4 | MIT | Not imported by the integration; FMI client 1.0.0 requires `~=1.0`. Removed from direct inputs. [PyPI](https://pypi.org/project/xmltodict/) |
 
-The FMI 1.0.0 PyPI source distribution was inspected because the upstream Codeberg API returned HTTP 503 during S03. It contains no changelog file. S06 later compared the installed source, current upstream branch, issue #111 evidence, and FMI's current producer metadata: the stable client still requests forecast `WindGust`, while the edited Scandinavia producer publishes `HourlyMaximumGust`. `custom_components/fmi/fmi_client.py` is therefore an explicit private-API boundary protected by offline request, parser, field-precedence, and timestep contract tests; it does not add another FMI request.
+The FMI 1.0.0 PyPI source distribution was inspected because the upstream Codeberg API returned HTTP 503 during S03. It contains no changelog file. S06 later compared the installed source, current upstream branch, wind-gust availability evidence, and FMI's current producer metadata: the stable client still requests forecast `WindGust`, while the edited Scandinavia producer publishes `HourlyMaximumGust`. `custom_components/fmi/fmi_client.py` is therefore an explicit private-API boundary protected by offline request, parser, field-precedence, and timestep contract tests; it does not add another FMI request.
 
 ## Development tools
 
@@ -60,7 +62,7 @@ All action references are immutable commit SHAs. Branch-tip actions do not have 
 
 ## Vulnerability and license results
 
-- The integration-declared dependency closure (`fmi-weather-client`, `geopy`, `python-dateutil`, and their resolved transitives) reports no known vulnerability.
+- The integration-declared dependency closure (`fmi-weather-client`, `geopy`, and their resolved transitives) reports no known vulnerability.
 - The complete HA development/test graph reports 28 advisory rows for two HA-pinned packages: Pillow 12.2.0 (fixed in 12.3.0) and PyJWT 2.12.1 (fixed in 2.13.0). The advisories include High-severity findings. Home Assistant 2026.7.4 requires both affected versions exactly.
 - The repository owner accepted this temporary risk on 2026-07-31 for private testing. The exception is tracked in root `TODO.md`; fixed versions must not be forced over Core's exact metadata.
 - Upgrading the container installer from pip 25.3 to 26.2 removed the installer advisories found in the first audit.

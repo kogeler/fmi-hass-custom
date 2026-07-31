@@ -1,17 +1,19 @@
+<!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
+
 # Maintenance Baseline
 
 ## Snapshot
 
 - Accessed: 2026-07-31
 - Local repository: `kogeler/fmi-hass-custom`
-- Upstream repository: `anand-p-r/fmi-hass-custom`
-- Default branch: `master` for both repositories
+- Repository: `kogeler/fmi-hass-custom`
+- Default branch: `master`
 - Base commit: `77a265cf910050aa6e2e37a4eb57d951bddc2910`
 - Base commit date: `2025-07-24T23:53:46+03:00`
 - Base commit subject: `Manifest updated for v0.6.2`
-- Latest upstream release: `v0.6.2`, published 2025-07-24
+- Baseline release: `v0.6.2`, published 2025-07-24
 
-The local `master`, its `origin/master`, and the anonymously fetched upstream `master` all point to the base commit. `git rev-list --left-right --count upstream/master...master` returned `0 0`; the fork has no commit absent upstream. Upstream `develop` has no commit absent `master` and is 37 commits behind it. The latest tag is `v0.6.2`.
+The local `master` and its `origin/master` both pointed to the base commit at the start of maintenance. The latest baseline tag was `v0.6.2`.
 
 ## Repository layout
 
@@ -61,7 +63,7 @@ The `fmi-weather-client` 1.0.0 wheel was inspected without installing it. It is 
 
 ## Current CI and command baseline
 
-The only workflow runs on pull requests and `master` pushes. It uses mutable `actions/checkout@v4` and `actions/setup-python@v5` tags, installs `requirements.txt`, runs flake8's selected fatal-error check plus a non-blocking `--exit-zero` report, and runs pylint. The base commit's upstream workflow run completed successfully on 2025-07-24. PR #116's workflow is `action_required`, not a completed validation result.
+The only workflow runs on pull requests and `master` pushes. It uses mutable `actions/checkout@v4` and `actions/setup-python@v5` tags, installs `requirements.txt`, runs flake8's selected fatal-error check plus a non-blocking `--exit-zero` report, and runs pylint. The base commit's workflow run completed successfully on 2025-07-24. The polar sunrise/sunset proposal had no completed validation result.
 
 | Command | Result | Evidence |
 |---|---|---|
@@ -76,32 +78,32 @@ The only workflow runs on pull requests and `master` pushes. It uses mutable `ac
 
 S00 did not install tools because reproducible environment setup belongs to S01. The host's Python 3.13.5 is also below the current Home Assistant requirement, so it cannot be treated as a valid current Home Assistant test environment.
 
-## Upstream issue and pull-request inventory
+## Maintenance report inventory
 
-The current open inventory exactly matches the maintenance plan. No new open issue needs an additional closure-matrix row.
+The reports reviewed at the maintenance baseline exactly match the maintenance plan. No additional closure-matrix row was needed.
 
 | Reference | State | Opened/updated UTC | Maintenance relevance |
 |---|---|---|---|
-| [#110 Lightning max age](https://github.com/anand-p-r/fmi-hass-custom/issues/110) | Open | 2025-08-01 / 2025-08-01 | Required S09 enhancement/reliability work. |
-| [#111 Wind gust unavailable](https://github.com/anand-p-r/fmi-hass-custom/issues/111) | Open | 2025-08-03 / 2026-01-28 | Required S06 regression. |
-| [#112 Sensors not grouped by location](https://github.com/anand-p-r/fmi-hass-custom/issues/112) | Open | 2025-08-12 / 2025-08-12 | Required S06/S11 naming and migration work. |
-| [#114 Incorrect daily forecast](https://github.com/anand-p-r/fmi-hass-custom/issues/114) | Open | 2025-11-07 / 2025-11-07 | Required S05 correctness work. |
-| [#115 Location selection](https://github.com/anand-p-r/fmi-hass-custom/issues/115) | Open | 2026-05-21 / 2026-05-21 | Required S07/S11 reconfigure and identity work. |
-| [PR #116 Polar sunrise/sunset](https://github.com/anand-p-r/fmi-hass-custom/pull/116) | Open | 2026-07-02 / 2026-07-02 | Required S08 review and regression tests. |
-| [#117 Forecast failure disables observations](https://github.com/anand-p-r/fmi-hass-custom/issues/117) | Open | 2026-07-20 / 2026-07-20 | Required S04 availability work. |
+| Lightning maximum age | Open | 2025-08-01 / 2025-08-01 | Required S09 enhancement/reliability work. |
+| Wind gust unavailable | Open | 2025-08-03 / 2026-01-28 | Required S06 regression. |
+| Sensors not grouped by location | Open | 2025-08-12 / 2025-08-12 | Required S06/S11 naming and migration work. |
+| Incorrect daily forecast | Open | 2025-11-07 / 2025-11-07 | Required S05 correctness work. |
+| Location selection | Open | 2026-05-21 / 2026-05-21 | Required S07/S11 reconfigure and identity work. |
+| Polar sunrise/sunset | Open | 2026-07-02 / 2026-07-02 | Required S08 review and regression tests. |
+| Forecast failure disables observations | Open | 2026-07-20 / 2026-07-20 | Required S04 availability work. |
 
-Recently closed issues reviewed for regression context:
+Previously closed reports reviewed for regression context:
 
 | Reference | Closed UTC | Relevance |
 |---|---|---|
-| [#113 Missing integration icon](https://github.com/anand-p-r/fmi-hass-custom/issues/113) | 2025-09-17 | Closed UI/brand report; no production-code change is present in this fork. |
-| [#108 Forecast output format](https://github.com/anand-p-r/fmi-hass-custom/issues/108) | 2025-07-24 | Closed around v0.6.2; forecast API behavior remains relevant to S05/S10. |
-| [#106 Error fetching FMI data](https://github.com/anand-p-r/fmi-hass-custom/issues/106) | 2025-07-24 | Closed service/setup failure report; relevant to S04/S13. |
-| [#104 Wrong observation location](https://github.com/anand-p-r/fmi-hass-custom/issues/104) | 2025-07-22 | Closed v0.6.0 regression; relevant to naming, station, and migration tests. |
-| [#103 Incorrect weather icons](https://github.com/anand-p-r/fmi-hass-custom/issues/103) | 2025-07-22 | Closed v0.6.0 regression; relevant to symbol characterization. |
-| [#100 Empty weather state](https://github.com/anand-p-r/fmi-hass-custom/issues/100) | 2025-07-22 | Closed v0.6.0 regression; relevant to current-weather entity tests. |
-| [#99 Separate update intervals](https://github.com/anand-p-r/fmi-hass-custom/issues/99) | 2025-07-22 | Implemented by separate coordinators; lifecycle/update behavior requires tests. |
-| [#97 Sensor unique IDs](https://github.com/anand-p-r/fmi-hass-custom/issues/97) | 2025-07-18 | Closed regression; directly relevant to S06/S11 identity coverage. |
+| Missing integration icon | 2025-09-17 | Closed UI/brand report; no production-code change was present at the baseline. |
+| Forecast output format | 2025-07-24 | Closed around v0.6.2; forecast API behavior remains relevant to S05/S10. |
+| Error fetching FMI data | 2025-07-24 | Closed service/setup failure report; relevant to S04/S13. |
+| Wrong observation location | 2025-07-22 | Closed v0.6.0 regression; relevant to naming, station, and migration tests. |
+| Incorrect weather icons | 2025-07-22 | Closed v0.6.0 regression; relevant to symbol characterization. |
+| Empty weather state | 2025-07-22 | Closed v0.6.0 regression; relevant to current-weather entity tests. |
+| Separate update intervals | 2025-07-22 | Implemented by separate coordinators; lifecycle/update behavior requires tests. |
+| Sensor unique IDs | 2025-07-18 | Closed regression; directly relevant to S06/S11 identity coverage. |
 
 ## Current ecosystem support assumptions
 
@@ -109,7 +111,7 @@ Recently closed issues reviewed for regression context:
 - Home Assistant `2026.7.4` and `dev` both declare Python `>=3.14.2`, and the developer setup documentation requires Python 3.14.2 or newer. The repository's Python 3.12/3.13 CI matrix is therefore not a current Home Assistant compatibility matrix.
 - Current Home Assistant testing guidance uses pytest, recommends tests through integration-facing state/public behavior, and warns against testing private integration details. The exact standalone custom-component harness and commands remain an S01 decision.
 - Home Assistant Core's complete `dev` tree has no `homeassistant/components/fmi` path. Domain `fmi` is not currently owned by an official Core integration, so S00 is not blocked.
-- Latest HACS release is `2.0.5`. HACS documents root content as valid with `content_in_root: true`, but its repository rules also expect integration metadata such as `issue_tracker`; default-store inclusion additionally expects brands, topics, releases, HACS validation, and hassfest. The upstream repository currently has no GitHub topics.
+- Latest HACS release is `2.0.5`. HACS documents root content as valid with `content_in_root: true`, but its repository rules also expect integration metadata such as `issue_tracker`; default-store inclusion additionally expects brands, topics, releases, HACS validation, and hassfest. The repository had no GitHub topics at the baseline.
 - The official standalone hassfest action runs `ghcr.io/home-assistant/hassfest` in Docker. Its README demonstrates `home-assistant/actions/hassfest@master`; this plan's stricter supply-chain rule requires pinning the eventual workflow to a reviewed full commit SHA.
 
 ## FMI Open Data contract
@@ -133,13 +135,9 @@ Recently closed issues reviewed for regression context:
 
 All sources below were accessed on 2026-07-31.
 
-### Repository and upstream work
+### Repository
 
-- [Owner fork](https://github.com/kogeler/fmi-hass-custom)
-- [Upstream repository](https://github.com/anand-p-r/fmi-hass-custom)
-- [Upstream v0.6.2 release](https://github.com/anand-p-r/fmi-hass-custom/releases/tag/v0.6.2)
-- [Upstream issues](https://github.com/anand-p-r/fmi-hass-custom/issues)
-- [Upstream pull requests](https://github.com/anand-p-r/fmi-hass-custom/pulls)
+- [Repository](https://github.com/kogeler/fmi-hass-custom)
 
 ### Home Assistant, HACS, and hassfest
 

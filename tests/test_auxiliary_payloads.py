@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 """Characterize synthetic lightning and sea-level payload handling."""
 
 from __future__ import annotations

@@ -1,16 +1,15 @@
 """Common utilities for the FMI Weather and Sensor integrations."""
 
 import math
-from datetime import date, datetime
+from datetime import datetime
+from typing import Any, cast
 
-from dateutil import tz
 from homeassistant.const import SUN_EVENT_SUNRISE, SUN_EVENT_SUNSET
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.sun import get_astral_event_date
+from homeassistant.util import dt as dt_util
 
-try:
-    from . import const
-except ImportError:
-    import const
+from . import const
 
 
 class BoundingBox:
@@ -60,24 +59,48 @@ def get_bounding_box(latitude_in_degrees, longitude_in_degrees, half_side_in_km)
     return box
 
 
-def get_weather_symbol(symbol, hass=None):
-    """Get a weather symbol for the symbol value."""
-    ret_val = const.FMI_WEATHER_SYMBOL_MAP.get(symbol, "")
+def finite_float(value: object) -> float | None:
+    """Return a finite number while rejecting booleans and malformed values."""
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(cast(Any, value))
+    except TypeError, ValueError:
+        return None
+    return number if math.isfinite(number) else None
 
-    if hass is None or symbol != 1:  # was ret_val != 1 <- always False
+
+def as_local_aware_datetime(value: object) -> datetime | None:
+    """Convert an aware datetime to Home Assistant local time."""
+    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+        return None
+    return dt_util.as_local(value)
+
+
+def get_weather_symbol(symbol: object, hass: HomeAssistant | None = None) -> str:
+    """Get a weather symbol for the symbol value."""
+    numeric_symbol = finite_float(symbol)
+    if numeric_symbol is None or not numeric_symbol.is_integer():
+        return ""
+    symbol_code = int(numeric_symbol)
+    ret_val = const.FMI_WEATHER_SYMBOL_MAP.get(symbol_code, "")
+
+    if hass is None or symbol_code != 1:
         return ret_val
 
-    # Clear as per FMI
-    today = date.today()
-    sunset = get_astral_event_date(hass, SUN_EVENT_SUNSET, today)
-    sunset = sunset.astimezone(tz.tzlocal())
+    now = dt_util.now()
+    sunrise = get_astral_event_date(hass, SUN_EVENT_SUNRISE, now.date())
+    sunset = get_astral_event_date(hass, SUN_EVENT_SUNSET, now.date())
+    local_now = as_local_aware_datetime(now)
+    local_sunrise = as_local_aware_datetime(sunrise)
+    local_sunset = as_local_aware_datetime(sunset)
+    if local_now is None or local_sunrise is None or local_sunset is None:
+        return ret_val
 
-    sunrise = get_astral_event_date(hass, SUN_EVENT_SUNRISE, today)
-    sunrise = sunrise.astimezone(tz.tzlocal())
+    if local_sunrise >= local_sunset:
+        return ret_val
 
-    time_now = datetime.now().astimezone(tz.tzlocal())
-    if time_now <= sunrise or time_now >= sunset:
-        # Clear night
-        ret_val = const.FMI_WEATHER_SYMBOL_MAP[0]
+    if local_now <= local_sunrise or local_now >= local_sunset:
+        return const.FMI_WEATHER_SYMBOL_MAP[0]
 
     return ret_val

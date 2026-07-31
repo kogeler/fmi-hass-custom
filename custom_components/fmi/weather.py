@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 """Support for retrieving meteorological data from FMI (Finnish Meteorological Institute)."""
 
 import math
@@ -139,7 +142,7 @@ class FMIWeatherEntity(CoordinatorEntity[FMIDataUpdateCoordinator], WeatherEntit
         if _weather is None or not _last_update_success:
             self.logger.debug("%s: no data available from FMI", self._attr_name)
             return
-        _time = dt_util.as_local(_weather.data.time)
+        _time = utils.as_local_aware_datetime(getattr(_weather.data, "time", None))
         self.logger.debug(f"{self._attr_name}: updated: {_last_update_success} time {_time}")
         # Update the entity attributes
         self._attr_native_temperature_unit = self.__get_unit(_weather, "temperature")
@@ -161,32 +164,35 @@ class FMIWeatherEntity(CoordinatorEntity[FMIDataUpdateCoordinator], WeatherEntit
         self._attr_cloud_coverage = self.__get_value(_weather, "cloud_cover")
         self._attr_native_pressure = self.__get_value(_weather, "pressure")
         self._attr_native_dew_point = self.__get_value(_weather, "dew_point")
-        self._attr_condition = utils.get_weather_symbol(_weather.data.symbol.value, _fmi.hass)
+        condition = utils.get_weather_symbol(self.__get_value(_weather, "symbol"), _fmi.hass)
+        self._attr_condition = condition or None
 
     def __get_value(self, _weather, name):
         if _weather is None:
             return None
-        value = getattr(_weather.data if hasattr(_weather, "data") else _weather, name)
-        if value is None or value.value is None or not math.isfinite(value.value):
-            return None
-        return value.value
+        source = _weather.data if hasattr(_weather, "data") else _weather
+        value = getattr(source, name, None)
+        return utils.finite_float(getattr(value, "value", None))
 
     def __get_unit(self, _weather, name):
         if _weather is None:
             return None
-        value = getattr(_weather.data, name)
-        if value is None or not value.unit:
-            return None
-        return value.unit
+        source = _weather.data if hasattr(_weather, "data") else _weather
+        value = getattr(source, name, None)
+        return getattr(value, "unit", None) or None
 
     def _normalized_forecasts(self) -> list[fmi_models.WeatherData]:
         """Return unique timezone-aware samples in chronological order."""
         by_time: dict[datetime, fmi_models.WeatherData] = {}
         for forecast in self.coordinator.get_hourly_forecasts():
-            if forecast.time.tzinfo is None:
-                self.logger.warning("FMI: ignoring forecast with a timezone-naive timestamp")
+            timestamp = getattr(forecast, "time", None)
+            if (
+                not isinstance(timestamp, datetime)
+                or utils.as_local_aware_datetime(timestamp) is None
+            ):
+                self.logger.warning("FMI: ignoring forecast without a timezone-aware timestamp")
                 continue
-            by_time[forecast.time.astimezone(UTC)] = forecast
+            by_time[timestamp.astimezone(UTC)] = forecast
         return [by_time[timestamp] for timestamp in sorted(by_time)]
 
     def _condition(self, forecast: fmi_models.WeatherData) -> str | None:

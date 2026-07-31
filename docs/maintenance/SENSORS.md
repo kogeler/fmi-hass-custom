@@ -1,6 +1,8 @@
+<!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
+
 # Sensor And Gust Contract
 
-This document defines the S06 behavior for FMI sensor entities, issue #111 wind gusts, and issue #112 location grouping. It applies to Home Assistant 2026.7.4 and `fmi-weather-client==1.0.0`.
+This document defines the S06 behavior for FMI sensor entities, wind-gust availability, and location grouping. It applies to Home Assistant 2026.7.4 and `fmi-weather-client==1.0.0`.
 
 ## Gust Sources
 
@@ -57,8 +59,8 @@ Static attribution remains the entity attribution rather than being duplicated i
 
 ## References
 
-- [Issue #111](https://github.com/anand-p-r/fmi-hass-custom/issues/111), including maintainer query evidence, checked 2026-07-31.
-- [Issue #112](https://github.com/anand-p-r/fmi-hass-custom/issues/112), checked 2026-07-31.
+- Wind-gust availability report and maintainer query evidence, checked 2026-07-31.
+- Sensor location-grouping report, checked 2026-07-31.
 - [FMI current producer parameter metadata](https://opendata.fmi.fi/info?what=qengine), checked 2026-07-31.
 - [FMI WFS examples and parameter guidance](https://en.ilmatieteenlaitos.fi/open-data-manual-wfs-examples-and-guidelines), checked 2026-07-31.
 - [Home Assistant entity naming](https://developers.home-assistant.io/docs/core/entity/), checked 2026-07-31.

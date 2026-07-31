@@ -1,3 +1,5 @@
+<!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
+
 # Changelog
 
 All notable changes to this project are documented in this file.
@@ -6,11 +8,13 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
-- Fixed issue #117 by falling back to place observations during forecast-current outages, keeping configured station observations independent, clearing stale forecast/current data, and recovering automatically on later successful refreshes.
-- Fixed issue #114 with timezone-aware daily aggregation: hourly precipitation is summed, temperatures use daily highs/lows, and condition, wind, pressure, humidity, cloud, and dew-point values follow documented deterministic policies.
-- Fixed issue #111 by requesting FMI's available hourly maximum gust for forecast-backed current and forecast data while preserving observation gusts, valid zero values, and missing-data availability.
-- Fixed issue #112 for fresh entries by grouping sensors under location devices and generating location-aware entity IDs; exact legacy defaults migrate conservatively without changing customized IDs or overwriting collisions.
-- Fixed issue #115 by adding a validated location reconfigure flow that reloads the moved entry while preserving config, device, and entity identity, including customized entity IDs.
+- Preserved observations during forecast-current outages by falling back to place observations, keeping configured station observations independent, clearing stale forecast/current data, and recovering automatically on later successful refreshes.
+- Corrected daily forecasts with timezone-aware aggregation: hourly precipitation is summed, temperatures use daily highs/lows, and condition, wind, pressure, humidity, cloud, and dew-point values follow documented deterministic policies.
+- Restored forecast wind gusts by requesting FMI's available hourly maximum gust while preserving observation gusts, valid zero values, and missing-data availability.
+- Grouped fresh-entry sensors under location devices and generated location-aware entity IDs; exact legacy defaults migrate conservatively without changing customized IDs or overwriting collisions.
+- Added a validated location reconfigure flow that reloads the moved entry while preserving config, device, and entity identity, including customized entity IDs.
+- Prevented polar-day/night crashes with a deterministic daytime fallback for incomplete sun events.
+- Fixed best-time selection across month/year boundaries and made forecast output reject malformed timestamps, unknown symbols, missing fields, and non-finite values without crashing.
 
 ### Added
 
@@ -22,7 +26,8 @@ All notable changes to this project are documented in this file.
 ### Changed
 
 - Moved the integration to the standard `custom_components/fmi/` layout required by current Home Assistant validation.
-- Upgraded `fmi-weather-client` from 0.7.0 to 1.0.0 and `geopy` to 2.5.0; added an exact `python-dateutil` runtime requirement.
+- Upgraded `fmi-weather-client` from 0.7.0 to 1.0.0 and `geopy` to 2.5.0.
+- Replaced direct `python-dateutil` use with Home Assistant timezone helpers and removed it from the integration's runtime requirements.
 - Replaced `async-timeout` with the Python standard-library timeout and removed redundant direct dependencies already supplied by Home Assistant or the FMI client.
 - Replaced flake8 completely with Ruff and upgraded existing CI action references to reviewed immutable commits.
 - Split reviewed direct dependencies from the complete 173-package `pip freeze` lock generated in a clean container.

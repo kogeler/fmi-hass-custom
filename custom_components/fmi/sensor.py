@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 """Support FMI sensor entities."""
 
 from __future__ import annotations
@@ -294,7 +297,7 @@ class _BaseSensorClass(CoordinatorEntity[FMIDataUpdateCoordinator], SensorEntity
         if weather is None:
             self._attr_native_value = None
             return
-        local_time = dt_util.as_local(weather.data.time)
+        local_time = utils.as_local_aware_datetime(getattr(weather.data, "time", None))
         self.logger.debug(
             "%s: updated: %s time %s",
             self.name,
@@ -380,7 +383,8 @@ class FMIBestConditionSensor(_BaseSensorClass):
         self._attr_native_value = None
 
     def __update_forecast_time(self, source_data: fmi_models.WeatherData) -> None:
-        self._attr_native_value = dt_util.as_local(source_data.time).strftime("%H:%M")
+        local_time = utils.as_local_aware_datetime(getattr(source_data, "time", None))
+        self._attr_native_value = local_time.strftime("%H:%M") if local_time is not None else None
 
     def __update_weather(self, source_data: fmi_models.WeatherData) -> None:
         symbol = self._finite_value(source_data, "symbol")

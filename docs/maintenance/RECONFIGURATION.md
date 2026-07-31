@@ -1,3 +1,5 @@
+<!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
+
 # Location Reconfiguration and Identity
 
 Last verified: 2026-07-31
@@ -17,7 +19,7 @@ The flow:
 
 Entity IDs and unique IDs are retained, including customized entity IDs used by automations and dashboards. Device and entity display context updates to the newly resolved FMI place after reload.
 
-Dynamic tracking of Home zone coordinates is intentionally not implemented. It would add a separate subscription and migration lifecycle without being necessary to resolve issue #115. Users can run Reconfigure when their location changes.
+Dynamic tracking of Home zone coordinates is intentionally not implemented. It would add a separate subscription and migration lifecycle without being necessary for safe location reconfiguration. Users can run Reconfigure when their location changes.
 
 ## Identity model
 
@@ -44,4 +46,4 @@ Ambiguous automatically suffixed legacy entity IDs and complex multi-entry regis
 
 - Home Assistant, "Integrations should have a reconfigure flow": <https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/reconfiguration-flow/> (accessed 2026-07-31)
 - Home Assistant, "Config flow": <https://developers.home-assistant.io/docs/core/integration/config_flow/> (accessed 2026-07-31)
-- Upstream issue #115: <https://github.com/anand-p-r/fmi-hass-custom/issues/115> (accessed 2026-07-31)
+- Location selection and editing requirement, verified 2026-07-31.

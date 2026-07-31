@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 """Contract tests for the selected fmi-weather-client release."""
 
 from __future__ import annotations
@@ -46,7 +49,7 @@ def test_consumed_async_method_signatures_match_installed_client() -> None:
 
 
 def test_current_client_maps_three_second_wind_gust_field() -> None:
-    """Characterize the upstream WindGust field consumed for issue #111."""
+    """Characterize the upstream WindGust field consumed by sensor entities."""
     data = fmi.forecast_parser._create_weather_data(  # noqa: SLF001
         datetime(2026, 5, 20, 12, tzinfo=UTC),
         {
@@ -62,7 +65,7 @@ def test_current_client_maps_three_second_wind_gust_field() -> None:
 
 
 def test_current_client_forecast_query_omits_hourly_maximum_gust() -> None:
-    """Reproduce the upstream query mismatch behind issue #111."""
+    """Reproduce the upstream query mismatch behind unavailable wind gusts."""
     params = fmi.http._create_params(  # noqa: SLF001
         models.RequestType.FORECAST,
         60,

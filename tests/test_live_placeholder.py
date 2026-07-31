@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 """Placeholder for the opt-in live FMI suite introduced in S12."""
 
 import pytest

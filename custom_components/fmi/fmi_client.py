@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 """Narrow compatibility boundary for the selected FMI weather client."""
 
 from __future__ import annotations

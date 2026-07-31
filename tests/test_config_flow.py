@@ -1,4 +1,7 @@
-"""Config-flow and location-reconfiguration regressions for FMI issue #115."""
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
+"""Config-flow and location-reconfiguration regressions for FMI."""
 
 from __future__ import annotations
 
@@ -143,7 +146,7 @@ async def test_user_flow_creates_coordinate_independent_identity(
     assert entry.data[CONF_LONGITUDE] == 24.94
 
 
-async def test_issue_115_reconfigure_updates_only_mutable_location(
+async def test_reconfigure_updates_only_mutable_location(
     hass: HomeAssistant,
     monkeypatch,
 ) -> None:

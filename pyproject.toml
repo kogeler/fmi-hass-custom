@@ -1,3 +1,6 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 [tool.pytest.ini_options]
 addopts = [
   "--strict-config",

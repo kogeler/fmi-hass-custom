@@ -1,6 +1,8 @@
+<!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
+
 # Forecast Semantics
 
-This document defines how FMI's one-hour point forecast samples are exposed through Home Assistant's hourly and daily weather forecast APIs. It is the S05 contract for issue #114.
+This document defines how FMI's one-hour point forecast samples are exposed through Home Assistant's hourly and daily weather forecast APIs. It is the S05 contract for correcting daily forecast aggregation.
 
 ## Source contracts
 
@@ -82,4 +84,4 @@ Every retained weather entity advertises and implements both hourly and daily fo
 - [Home Assistant forecast-type migration notice](https://developers.home-assistant.io/blog/2023/08/07/weather_entity_forecast_types/), checked 2026-07-31.
 - [FMI WFS examples and timestep guidance](https://en.ilmatieteenlaitos.fi/open-data-manual-wfs-examples-and-guidelines), checked 2026-07-31.
 - [`fmi-weather-client` 1.0.0 source](https://codeberg.org/saaste/fmi-weather-client/src/tag/1.0.0/fmi_weather_client/models.py), checked against the installed package 2026-07-31.
-- [Issue #114](https://github.com/anand-p-r/fmi-hass-custom/issues/114), checked 2026-07-31.
+- Incorrect daily forecast report, checked 2026-07-31.

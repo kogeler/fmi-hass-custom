@@ -54,6 +54,7 @@ determine the "Best Time Of The Day". Additionally there is are two options:
 - Set "Daily mode" that will provide a view of minimum and maximum temperatures for the forecasts. By default this is set to True.
 - Set "Lightning sensor" to display closes lightning strikes within a bounding box of 500 kilometers. By default this is set to False.
 
-## Original author
+## Maintainer
 
-Anand Radhakrishnan [@anand-p-r](https://github.com/anand-p-r)
+[@kogeler](https://github.com/kogeler) maintains this fork at
+[github.com/kogeler/fmi-hass-custom](https://github.com/kogeler/fmi-hass-custom).

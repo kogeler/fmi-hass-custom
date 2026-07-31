@@ -1,14 +1,16 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
 """The FMI (Finnish Meteorological Institute) component."""
 
 import time
 import xml.etree.ElementTree as ET
 from asyncio import gather, timeout
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 import fmi_weather_client.errors as fmi_erros
 import fmi_weather_client.models as fmi_models
 import requests
-from dateutil import tz
 from geopy.distance import geodesic
 from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 from geopy.geocoders import Nominatim
@@ -20,6 +22,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from . import const, utils
 from . import fmi_client as fmi
@@ -326,41 +329,43 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             return message
         return f"HTTP {status_code}: {message}"
 
-    def __update_best_weather_condition(self):
+    @staticmethod
+    def _finite_weather_value(source_data: object, name: str) -> float | None:
+        """Return one finite FMI value from a possibly incomplete model."""
+        wrapped = getattr(source_data, name, None)
+        return utils.finite_float(getattr(wrapped, "value", None))
 
-        _weather = self.get_weather()
-
-        if _weather is None:
+    def __update_best_weather_condition(self) -> None:
+        weather = self.get_weather()
+        if weather is None:
             return
 
-        _forecasts = self.get_forecasts()
-
-        curr_date = date.today()
-
-        # Init values
+        weather_data = getattr(weather, "data", None)
         self.best_state = const.BEST_CONDITION_NOT_AVAIL
-        self.best_time = _weather.data.time.astimezone(tz.tzlocal())
-        self.best_temperature = _weather.data.temperature.value
-        self.best_humidity = _weather.data.humidity.value
-        self.best_wind_speed = _weather.data.wind_speed.value
-        self.best_precipitation = _weather.data.precipitation_amount.value
+        self.best_time = utils.as_local_aware_datetime(getattr(weather_data, "time", None))
+        self.best_temperature = self._finite_weather_value(weather_data, "temperature")
+        self.best_humidity = self._finite_weather_value(weather_data, "humidity")
+        self.best_wind_speed = self._finite_weather_value(weather_data, "wind_speed")
+        self.best_precipitation = self._finite_weather_value(weather_data, "precipitation_amount")
 
-        for forecast in _forecasts:
-            local_time = forecast.time.astimezone(tz.tzlocal())
+        current_date = dt_util.now().date()
+        for forecast in self.get_forecasts():
+            local_time = utils.as_local_aware_datetime(getattr(forecast, "time", None))
+            if local_time is None or local_time.date() != current_date:
+                continue
 
-            if local_time.day == curr_date.day + 1:
-                # Tracking best conditions for only this day
-                break
+            symbol = self._finite_weather_value(forecast, "symbol")
+            wind_speed = self._finite_weather_value(forecast, "wind_speed")
 
             if (
-                forecast.symbol.value not in const.BEST_COND_SYMBOLS
-                or (wind_speed := forecast.wind_speed.value) is None
+                symbol not in const.BEST_COND_SYMBOLS
+                or wind_speed is None
                 or wind_speed < self.min_wind_speed
                 or wind_speed > self.max_wind_speed
             ):
                 continue
 
-            temperature = forecast.temperature.value
+            temperature = self._finite_weather_value(forecast, "temperature")
             if (
                 temperature is None
                 or temperature < self.min_temperature
@@ -368,32 +373,26 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             ):
                 continue
 
-            if (
-                (humidity := forecast.humidity.value) is None
-                or humidity < self.min_humidity
-                or humidity > self.max_humidity
-            ):
+            humidity = self._finite_weather_value(forecast, "humidity")
+            if humidity is None or humidity < self.min_humidity or humidity > self.max_humidity:
                 continue
 
+            precipitation_amount = self._finite_weather_value(forecast, "precipitation_amount")
             if (
-                (precipitation_amount := forecast.precipitation_amount.value) is None
+                precipitation_amount is None
                 or precipitation_amount < self.min_precip
                 or precipitation_amount > self.max_precip
             ):
                 continue
-
-            # What more can you ask for?
-            # Compare with temperature value already stored and
-            # update if necessary
 
             self.best_state = const.BEST_CONDITION_AVAIL
 
             if self.best_temperature is None or temperature > self.best_temperature:
                 self.best_time = local_time
                 self.best_temperature = temperature
-                self.best_humidity = forecast.humidity.value
-                self.best_wind_speed = forecast.wind_speed.value
-                self.best_precipitation = forecast.precipitation_amount.value
+                self.best_humidity = humidity
+                self.best_wind_speed = wind_speed
+                self.best_precipitation = precipitation_amount
 
     def __lightning_strikes_postions(self, loc_list: list, text: str, timeout_time: float):
         home_cords = (self.latitude, self.longitude)
