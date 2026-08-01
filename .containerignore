@@ -1,0 +1,13 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
+.git
+.cache
+.coverage
+.mypy_cache
+.pytest_cache
+.ruff_cache
+__pycache__
+*.pyc
+docs
+plans

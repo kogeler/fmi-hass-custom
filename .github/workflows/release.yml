@@ -1,0 +1,136 @@
+# Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT.
+
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-master
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Version increment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container:
+      image: docker.io/library/python@sha256:1a3c6dbfd2173971abba880c3cc2ec4643690901f6ad6742d0827bae6cefc925
+    steps:
+      - name: Check out previous version
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.before }}
+          path: base
+          persist-credentials: false
+      - name: Check out pushed version
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: source
+          persist-credentials: false
+      - name: Require synchronized version increase
+        working-directory: source
+        run: python .github/scripts/version.py check --base-root ../base
+
+  ci:
+    name: CI gate
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  validate:
+    name: Validation gate
+    uses: ./.github/workflows/validate.yml
+    permissions:
+      contents: read
+
+  publish:
+    name: Publish release
+    needs:
+      - ci
+      - validate
+      - version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    container:
+      image: docker.io/library/python@sha256:1a3c6dbfd2173971abba880c3cc2ec4643690901f6ad6742d0827bae6cefc925
+    steps:
+      - name: Check out release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Generate release notes
+        run: python .github/scripts/version.py notes --output release-notes.md
+      - name: Create exact-version tag and release
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          EXPECTED_REPOSITORY: kogeler/fmi-hass-custom
+          RELEASE_NOTES_PATH: release-notes.md
+          TARGET_SHA: ${{ github.sha }}
+          VERSION_PATH: .version
+        with:
+          script: |
+            const fs = await import("node:fs/promises");
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            if (repository !== process.env.EXPECTED_REPOSITORY) {
+              throw new Error(`Refusing to publish unexpected repository ${repository}`);
+            }
+            const version = (await fs.readFile(process.env.VERSION_PATH, "utf8")).trim();
+            const body = await fs.readFile(process.env.RELEASE_NOTES_PATH, "utf8");
+            const target = process.env.TARGET_SHA;
+
+            let tag;
+            try {
+              tag = await github.rest.git.getRef({
+                ...context.repo,
+                ref: `tags/${version}`,
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            if (tag && tag.data.object.sha !== target) {
+              throw new Error(`Tag ${version} already points to another object`);
+            }
+
+            try {
+              const existing = await github.rest.repos.getReleaseByTag({
+                ...context.repo,
+                tag: version,
+              });
+              if (!tag || tag.data.object.sha !== target) {
+                throw new Error(`Release ${version} is not attached to ${target}`);
+              }
+              if (
+                existing.data.name !== version ||
+                existing.data.body !== body ||
+                existing.data.target_commitish !== target ||
+                existing.data.draft ||
+                existing.data.prerelease
+              ) {
+                throw new Error(`Release ${version} metadata does not match this build`);
+              }
+              core.notice(`Release ${existing.data.html_url} already matches this commit`);
+              return;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            const created = await github.rest.repos.createRelease({
+              ...context.repo,
+              tag_name: version,
+              target_commitish: target,
+              name: version,
+              body,
+              draft: false,
+              prerelease: false,
+            });
+            core.notice(`Published ${created.data.html_url}`);

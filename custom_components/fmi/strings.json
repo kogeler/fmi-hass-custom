@@ -1,0 +1,69 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "FMI Configuration Parameters",
+        "title": "Finnish Meteorological Institute",
+        "data": {
+          "name": "[%key:common::config_flow::data::name%]",
+          "latitude": "[%key:common::config_flow::data::latitude%]",
+          "longitude": "[%key:common::config_flow::data::longitude%]"
+        }
+      },
+      "reconfigure": {
+        "description": "Update the coordinates used by this FMI entry. Existing entities and customized entity IDs are preserved.",
+        "title": "Move FMI location",
+        "data": {
+          "latitude": "[%key:common::config_flow::data::latitude%]",
+          "longitude": "[%key:common::config_flow::data::longitude%]"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
+    },
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_location%]",
+      "reconfigure_successful": "Location updated successfully"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "place": {"name": "Place"},
+      "condition": {"name": "Condition"},
+      "temperature": {"name": "Temperature"},
+      "wind_speed": {"name": "Wind speed"},
+      "wind_direction": {"name": "Wind direction"},
+      "wind_gust": {"name": "Wind gust"},
+      "humidity": {"name": "Humidity"},
+      "cloud_coverage": {"name": "Cloud coverage"},
+      "rain": {"name": "Rain"},
+      "forecast_time": {"name": "Time"},
+      "best_time_of_day": {"name": "Best time of day"},
+      "lightning_strikes": {"name": "Lightning strikes"},
+      "sea_level": {"name": "Sea level"}
+    }
+  },
+  "options": {
+    "step": {
+      "user": {
+        "title": "FMI Options",
+        "description": "FMI Configuration Parameters",
+        "data": {
+          "offset": "Forecast Interval",
+          "min_relative_humidity": "Min Relative Humidity",
+          "max_relative_humidity": "Max Relative Humidity",
+          "min_temperature": "Min Temperature",
+          "max_temperature": "Max Temperature",
+          "min_wind_speed": "Min Wind Speed",
+          "max_wind_speed": "Max Wind Speed",
+          "min_precipitation": "Min Precipitation",
+          "max_precipitation": "Max Precipitation",
+          "daily_mode": "Daily mode",
+          "lightning_max_age_minutes": "Lightning maximum age in minutes"
+        }
+      }
+    }
+  }
+}

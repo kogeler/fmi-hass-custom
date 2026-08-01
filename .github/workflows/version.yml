@@ -1,0 +1,50 @@
+# Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT.
+
+name: Version increment
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: Base branch or commit to compare with
+        required: true
+        default: master
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: version-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version:
+    name: Version increment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container:
+      image: docker.io/library/python@sha256:1a3c6dbfd2173971abba880c3cc2ec4643690901f6ad6742d0827bae6cefc925
+    steps:
+      - name: Check out target version
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.before || inputs.base_ref }}
+          path: base
+          persist-credentials: false
+      - name: Check out proposed version
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: source
+          persist-credentials: false
+      - name: Require synchronized version increase
+        working-directory: source
+        run: python .github/scripts/version.py check --base-root ../base

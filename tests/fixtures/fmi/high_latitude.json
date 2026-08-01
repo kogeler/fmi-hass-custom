@@ -1,0 +1,12 @@
+{
+  "_meta": {
+    "kind": "synthetic",
+    "purpose": "Polar day/night sun-event absence"
+  },
+  "place": "Utsjoki",
+  "lat": 69.91,
+  "lon": 27.03,
+  "date": "2026-06-21",
+  "sunrise": null,
+  "sunset": null
+}

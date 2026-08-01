@@ -1,0 +1,17 @@
+{
+  "domain": "fmi",
+  "name": "Finnish Meteorological Institute",
+  "codeowners": [
+    "@kogeler"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/kogeler/fmi-hass-custom",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/kogeler/fmi-hass-custom/issues",
+  "requirements": [
+    "fmi-weather-client==1.0.0",
+    "geopy==2.5.0"
+  ],
+  "version": "1.0.0"
+}

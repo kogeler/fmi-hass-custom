@@ -1,0 +1,31 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
+ARG PYTHON_IMAGE=docker.io/library/python@sha256:1a3c6dbfd2173971abba880c3cc2ec4643690901f6ad6742d0827bae6cefc925
+
+FROM ${PYTHON_IMAGE} AS lock
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /workspace
+COPY requirements-bootstrap.txt /workspace/requirements-bootstrap.txt
+COPY requirements-direct.txt /workspace/requirements-direct.txt
+RUN python -m pip install --upgrade -r requirements-bootstrap.txt \
+    && python -m pip install -r requirements-direct.txt
+
+FROM ${PYTHON_IMAGE} AS dev
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /workspace
+COPY requirements-bootstrap.txt /workspace/requirements-bootstrap.txt
+COPY requirements.txt /workspace/requirements.txt
+RUN python -m pip install --upgrade -r requirements-bootstrap.txt \
+    && python -m pip install --no-deps -r requirements.txt \
+    && python -m pip check
+
+CMD ["python", "-m", "pytest"]

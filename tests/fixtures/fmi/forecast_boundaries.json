@@ -1,0 +1,43 @@
+{
+  "_meta": {
+    "kind": "synthetic",
+    "purpose": "Month, year, and Europe/Helsinki DST boundaries"
+  },
+  "place": "Helsinki",
+  "lat": 60.17,
+  "lon": 24.94,
+  "defaults": {
+    "temperature": {"value": 1.0, "unit": "°C"},
+    "dew_point": {"value": -1.0, "unit": "°C"},
+    "pressure": {"value": 1005.0, "unit": "hPa"},
+    "humidity": {"value": 80.0, "unit": "%"},
+    "wind_direction": {"value": 225.0, "unit": "°"},
+    "wind_speed": {"value": 5.0, "unit": "m/s"},
+    "wind_max": {"value": null, "unit": "m/s"},
+    "wind_gust": {"value": 9.0, "unit": "m/s"},
+    "symbol": {"value": 3.0, "unit": ""},
+    "cloud_cover": {"value": 90.0, "unit": "%"},
+    "precipitation_amount": {"value": 0.0, "unit": "mm/h"}
+  },
+  "month_boundary": [
+    {"time": "2026-01-31T21:00:00+00:00", "values": {"temperature": -2.0}},
+    {"time": "2026-01-31T22:00:00+00:00", "values": {"temperature": -1.0}},
+    {"time": "2026-02-01T04:00:00+00:00", "values": {"temperature": 0.0}}
+  ],
+  "year_boundary": [
+    {"time": "2026-12-31T21:00:00+00:00", "values": {"temperature": -4.0}},
+    {"time": "2026-12-31T22:00:00+00:00", "values": {"temperature": -3.0}},
+    {"time": "2027-01-01T04:00:00+00:00", "values": {"temperature": -2.0}}
+  ],
+  "leap_day": [
+    {"time": "2028-02-28T22:00:00+00:00", "values": {"temperature": -4.0}},
+    {"time": "2028-02-29T12:00:00+00:00", "values": {"temperature": -2.0}},
+    {"time": "2028-02-29T22:00:00+00:00", "values": {"temperature": 0.0}}
+  ],
+  "dst_transition": [
+    {"time": "2026-03-28T22:00:00+00:00", "values": {"temperature": 0.0}},
+    {"time": "2026-03-29T00:00:00+00:00", "values": {"temperature": 1.0}},
+    {"time": "2026-03-29T01:00:00+00:00", "values": {"temperature": 2.0}},
+    {"time": "2026-03-29T02:00:00+00:00", "values": {"temperature": 3.0}}
+  ]
+}

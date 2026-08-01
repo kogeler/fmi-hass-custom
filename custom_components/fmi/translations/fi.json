@@ -1,0 +1,73 @@
+{
+    "config": {
+    "abort": {
+      "already_configured": "Antamasi sijainti on jo määritelty",
+      "reconfigure_successful": "Sijainti päivitettiin onnistuneesti"
+        },
+        "error": {
+            "cannot_connect": "Yhteydenotto epäonnistui",
+            "unknown": "Odottamaton virhe"
+        },
+        "step": {
+      "user": {
+                "data": {
+                    "latitude": "Leveysaste",
+                    "longitude": "Pituusaste",
+                    "name": "Nimi"
+                },
+        "description": "Ilmatieteen laitos määrittely parametrit",
+        "title": "Ilmatieteen laitos"
+      },
+      "reconfigure": {
+        "data": {
+          "latitude": "Leveysaste",
+          "longitude": "Pituusaste"
+        },
+        "description": "Päivitä tämän FMI-määrityksen koordinaatit. Olemassa olevat entiteetit ja mukautetut entiteettitunnukset säilyvät.",
+        "title": "Vaihda FMI-sijaintia"
+      }
+        }
+    },
+    "entity": {
+        "sensor": {
+            "place": {"name": "Sijainti"},
+            "condition": {"name": "Säätila"},
+            "temperature": {"name": "Lämpötila"},
+            "wind_speed": {"name": "Tuulen nopeus"},
+            "wind_direction": {"name": "Tuulen suunta"},
+            "wind_gust": {"name": "Puuska"},
+            "humidity": {"name": "Ilmankosteus"},
+            "cloud_coverage": {"name": "Pilvisyys"},
+            "rain": {"name": "Sade"},
+            "forecast_time": {"name": "Ennusteen aika"},
+            "best_time_of_day": {"name": "Päivän paras aika"},
+            "lightning_strikes": {"name": "Salamaniskut"},
+            "sea_level": {"name": "Merenpinnan korkeus"}
+        }
+    },
+    "options": {
+        "step": {
+            "user": {
+                "data": {
+                    "max_precipitation": "Maksimi sateenkertymä mm",
+                    "max_relative_humidity": "Maksimi suhteellinen kosteus %",
+                    "max_temperature": "Maksimi lämpötila °C",
+                    "max_wind_speed": "Maksimi tuulennopeus m/s",
+                    "min_precipitation": "Minimi sateenkertymä mm",
+                    "min_relative_humidity": "Minimi suhteellinen kosteus %",
+                    "min_temperature": "Minimi lämpötila °C",
+                    "min_wind_speed": "Minimi tuulennopeus m/s",
+                    "offset": "Sääennusteen aikaväli h",
+                    "forecast_days": "Ennustepäivien määrä",
+                    "daily_mode": "Aktivoi vuorokausiennuste-entiteetti",
+                    "lightning_sensor": "Aktivoi ukkostutka",
+                    "lightning_radius": "Ukkostutkan säde km",
+                    "lightning_max_age_minutes": "Salamaniskun enimmäisikä minuutteina",
+                    "observation_station_id": "FMI:n havaintoaseman ID"
+                },
+                "description": "Maksimin ja minimin sisältävät parametrit käytetään määrittämään päivän parhaan ajan",
+                "title": "Ilmatieteen laitos asetukset"
+            }
+        }
+    }
+}

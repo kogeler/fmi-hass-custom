@@ -1,0 +1,123 @@
+# Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT.
+
+name: PR changelog body
+
+on:
+  pull_request_target:
+    branches:
+      - master
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+# This privileged metadata workflow must never check out or execute PR head code.
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-body-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: Update managed changelog section
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    container:
+      image: docker.io/library/python@sha256:1a3c6dbfd2173971abba880c3cc2ec4643690901f6ad6742d0827bae6cefc925
+    env:
+      EXISTING_BODY: ${{ github.workspace }}/.existing-pr-body.md
+      EXPECTED_REPOSITORY: kogeler/fmi-hass-custom
+      SOURCE_CHANGELOG: ${{ github.workspace }}/.source-CHANGELOG.md
+      UPDATED_BODY: ${{ github.workspace }}/.updated-pr-body.md
+    steps:
+      - name: Check out trusted default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read source changelog as data
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = await import("node:fs/promises");
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            if (repository !== process.env.EXPECTED_REPOSITORY) {
+              throw new Error(`Refusing to update an unexpected repository: ${repository}`);
+            }
+
+            const pull = context.payload.pull_request;
+            const headRepository = pull?.head?.repo?.full_name;
+            const headSha = pull?.head?.sha;
+            if (!headRepository || !headSha) {
+              throw new Error("Pull request head repository or SHA is unavailable");
+            }
+            const [owner, repo, extra] = headRepository.split("/");
+            if (!owner || !repo || extra) {
+              throw new Error("Pull request head repository is invalid");
+            }
+
+            const response = await github.rest.repos.getContent({
+              owner,
+              repo,
+              path: "CHANGELOG.md",
+              ref: headSha,
+            });
+            const file = response.data;
+            if (
+              Array.isArray(file) ||
+              file.type !== "file" ||
+              file.encoding !== "base64" ||
+              typeof file.content !== "string"
+            ) {
+              throw new Error("Source CHANGELOG.md is not a regular Base64-encoded file");
+            }
+
+            const changelog = Buffer.from(file.content, "base64");
+            if (changelog.byteLength > 1_000_000) {
+              throw new Error("Source CHANGELOG.md exceeds the supported size limit");
+            }
+            const current = await github.rest.pulls.get({
+              ...context.repo,
+              pull_number: pull.number,
+            });
+            await fs.writeFile(process.env.SOURCE_CHANGELOG, changelog);
+            await fs.writeFile(process.env.EXISTING_BODY, current.data.body || "", "utf8");
+      - name: Build managed PR body
+        run: >-
+          python .github/scripts/pr_body.py
+          --changelog "$SOURCE_CHANGELOG"
+          --existing-body "$EXISTING_BODY"
+          --output "$UPDATED_BODY"
+      - name: Update pull request body
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = await import("node:fs/promises");
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            if (repository !== process.env.EXPECTED_REPOSITORY) {
+              throw new Error(`Refusing to update an unexpected repository: ${repository}`);
+            }
+
+            const pull = context.payload.pull_request;
+            const body = await fs.readFile(process.env.UPDATED_BODY, "utf8");
+            const previousBody = await fs.readFile(process.env.EXISTING_BODY, "utf8");
+            const current = await github.rest.pulls.get({
+              ...context.repo,
+              pull_number: pull.number,
+            });
+            const currentBody = current.data.body || "";
+            if (currentBody !== previousBody) {
+              throw new Error("Pull request body changed during synchronization; refusing overwrite");
+            }
+            if (body === currentBody) {
+              core.notice("Pull request body already matches the source changelog");
+              return;
+            }
+            await github.rest.pulls.update({
+              ...context.repo,
+              pull_number: pull.number,
+              body,
+            });
+            core.notice(`Updated pull request #${pull.number} from its source changelog`);

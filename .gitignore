@@ -1,0 +1,11 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
+.cache/
+.coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+requirements-compatibility-*-resolved.txt
+__pycache__/
+*.pyc

@@ -1,0 +1,73 @@
+{
+    "config": {
+    "abort": {
+      "already_configured": "The given location is already configured",
+      "reconfigure_successful": "Location updated successfully"
+        },
+        "error": {
+            "cannot_connect": "Failed to connect",
+            "unknown": "Unexpected error"
+        },
+        "step": {
+      "user": {
+                "data": {
+                    "latitude": "Latitude",
+                    "longitude": "Longitude",
+                    "name": "Name"
+                },
+        "description": "FMI Configuration Parameters",
+        "title": "Finnish Meteorological Institute"
+      },
+      "reconfigure": {
+        "data": {
+          "latitude": "Latitude",
+          "longitude": "Longitude"
+        },
+        "description": "Update the coordinates used by this FMI entry. Existing entities and customized entity IDs are preserved.",
+        "title": "Move FMI location"
+      }
+        }
+    },
+    "entity": {
+        "sensor": {
+            "place": {"name": "Place"},
+            "condition": {"name": "Condition"},
+            "temperature": {"name": "Temperature"},
+            "wind_speed": {"name": "Wind speed"},
+            "wind_direction": {"name": "Wind direction"},
+            "wind_gust": {"name": "Wind gust"},
+            "humidity": {"name": "Humidity"},
+            "cloud_coverage": {"name": "Cloud coverage"},
+            "rain": {"name": "Rain"},
+            "forecast_time": {"name": "Time"},
+            "best_time_of_day": {"name": "Best time of day"},
+            "lightning_strikes": {"name": "Lightning strikes"},
+            "sea_level": {"name": "Sea level"}
+        }
+    },
+    "options": {
+        "step": {
+            "user": {
+                "data": {
+                    "max_precipitation": "Max Precipitation mm",
+                    "max_relative_humidity": "Max Relative Humidity %",
+                    "max_temperature": "Max Temperature °C",
+                    "max_wind_speed": "Max Wind Speed m/s",
+                    "min_precipitation": "Min Precipitation mm",
+                    "min_relative_humidity": "Min Relative Humidity %",
+                    "min_temperature": "Min Temperature °C",
+                    "min_wind_speed": "Min Wind Speed m/s",
+                    "offset": "Forecast Interval h",
+                    "forecast_days": "Num of forecast days",
+                    "daily_mode": "Activate Daily forecast entity",
+                    "lightning_sensor": "Activate Lightning sensor",
+                    "lightning_radius": "Lightning sensor radius km",
+                    "lightning_max_age_minutes": "Lightning maximum age in minutes",
+                    "observation_station_id": "FMI's Observation Station ID"
+                },
+                "description": "Maximum and minimum parameters are used to determine the Best Time Of The Day",
+                "title": "Finnish Meteorological Institute Options"
+            }
+        }
+    }
+}

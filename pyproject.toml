@@ -1,0 +1,42 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
+[tool.pytest.ini_options]
+addopts = [
+  "--strict-config",
+  "--strict-markers",
+  "--disable-socket",
+  "--allow-unix-socket",
+  "-m",
+  "not live",
+]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]
+testpaths = ["tests"]
+markers = [
+  "live: opt-in tests that may access real external services",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["custom_components/fmi"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+exclude = ["plans/P01.md"]
+
+[tool.ruff.lint]
+select = ["ASYNC", "B", "E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.14"
+files = ["custom_components/fmi", "tests"]
+check_untyped_defs = true
+ignore_missing_imports = true
+show_error_codes = true
+warn_unused_configs = true

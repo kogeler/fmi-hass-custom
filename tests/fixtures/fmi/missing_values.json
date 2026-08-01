@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "kind": "synthetic",
+    "purpose": "None and NaN values in consumed fields"
+  },
+  "place": "Helsinki",
+  "lat": 60.17,
+  "lon": 24.94,
+  "defaults": {
+    "temperature": {"value": 5.0, "unit": "°C"},
+    "dew_point": {"value": 2.0, "unit": "°C"},
+    "pressure": {"value": 1008.0, "unit": "hPa"},
+    "humidity": {"value": 85.0, "unit": "%"},
+    "wind_direction": {"value": 90.0, "unit": "°"},
+    "wind_speed": {"value": 3.0, "unit": "m/s"},
+    "wind_max": {"value": null, "unit": "m/s"},
+    "wind_gust": {"value": 6.0, "unit": "m/s"},
+    "symbol": {"value": 21.0, "unit": ""},
+    "cloud_cover": {"value": 75.0, "unit": "%"},
+    "precipitation_amount": {"value": 0.2, "unit": "mm/h"}
+  },
+  "current": {
+    "time": "2026-04-15T09:00:00+00:00",
+    "values": {"temperature": null, "wind_gust": null}
+  },
+  "forecasts": [
+    {
+      "time": "2026-04-15T10:00:00+00:00",
+      "values": {"temperature": "NaN", "wind_gust": "NaN"}
+    },
+    {
+      "time": "2026-04-15T11:00:00+00:00",
+      "values": {"precipitation_amount": null}
+    }
+  ]
+}

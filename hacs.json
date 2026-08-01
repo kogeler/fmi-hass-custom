@@ -1,6 +1,6 @@
-{ 
+{
   "name": "FMI",
-  "content_in_root": true,
   "country": "FI",
+  "homeassistant": "2026.7.4",
   "render_readme": true
 }

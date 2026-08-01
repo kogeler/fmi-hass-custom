@@ -1,0 +1,100 @@
+# Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT.
+
+name: Home Assistant and HACS validation
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  metadata:
+    name: Layout and metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container:
+      image: docker.io/library/python@sha256:1a3c6dbfd2173971abba880c3cc2ec4643690901f6ad6742d0827bae6cefc925
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install frozen dependencies
+        run: |
+          python -m pip install --upgrade -r requirements-bootstrap.txt
+          python -m pip install --no-deps -r requirements.txt
+          python -m pip check
+      - name: Validate version and distribution
+        run: |
+          python .github/scripts/version.py check
+          python -m pytest -q tests/test_layout.py tests/test_distribution.py tests/test_setup.py
+
+  workflow-syntax:
+    name: Workflow syntax
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run actionlint
+        run: >-
+          docker run --rm --network=none
+          --volume "$GITHUB_WORKSPACE:/repo:ro"
+          --workdir /repo
+          docker.io/rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+
+  hassfest:
+    name: Hassfest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run hassfest
+        run: >-
+          docker run --rm --network=none
+          --volume "$GITHUB_WORKSPACE:/github/workspace:ro"
+          ghcr.io/home-assistant/hassfest@sha256:a77f1cf7cfc21ad626ebaae52ecb6131a45ab20223f8c2c0750bfca487aa4f05
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CATEGORY: integration
+      INPUT_GITHUB_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      REPOSITORY_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run HACS validation
+        run: >-
+          docker run --rm
+          --env CATEGORY
+          --env INPUT_GITHUB_TOKEN
+          --env REPOSITORY
+          --env REPOSITORY_REF
+          --env GITHUB_ACTOR
+          --env GITHUB_REPOSITORY
+          --env GITHUB_WORKSPACE=/github/workspace
+          --volume "$GITHUB_WORKSPACE:/github/workspace:ro"
+          ghcr.io/hacs/action@sha256:ea472b182558d08e50221c550fc5cdbba9e1bc1efba53f92bc4fed38e7bc56b9
