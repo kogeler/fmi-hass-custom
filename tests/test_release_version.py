@@ -162,11 +162,10 @@ def test_repository_metadata_is_release_ready() -> None:
 
 
 def test_initial_version_increments_legacy_release(tmp_path: Path) -> None:
-    """The first .version release compares with the legacy manifest at v0.6.2."""
+    """The first .version release reads the real root legacy manifest at v0.6.2."""
     base = tmp_path / "base"
-    integration = base / "custom_components" / "fmi"
-    integration.mkdir(parents=True)
-    (integration / "manifest.json").write_text(
+    base.mkdir()
+    (base / "manifest.json").write_text(
         json.dumps({"domain": "fmi", "version": "0.6.2"}) + "\n",
         encoding="utf-8",
     )

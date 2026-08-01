@@ -10,6 +10,7 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 PIP_EXECUTORS = [
     ROOT / "Containerfile.dev",
     ROOT / ".github" / "workflows" / "ci.yml",
+    ROOT / ".github" / "workflows" / "dependency-review.yml",
     ROOT / ".github" / "workflows" / "validate.yml",
     ROOT / ".github" / "scripts" / "compatibility.py",
 ]
@@ -126,3 +127,14 @@ def test_safe_branch_workflows_share_standard_event_matrix() -> None:
     assert "uses: ./.github/workflows/ci.yml" in release
     assert "uses: ./.github/workflows/validate.yml" in release
     assert "- version" in release
+
+
+def test_dependency_review_uses_supported_fork_fallback() -> None:
+    """Forks use the frozen audit; independent repositories retain native review."""
+    workflow = (WORKFLOWS / "dependency-review.yml").read_text(encoding="utf-8")
+
+    assert "actions/dependency-review-action@" in workflow
+    assert "if: github.event.repository.fork == false" in workflow
+    assert workflow.count("if: github.event.repository.fork") == 4
+    assert "python .github/scripts/dependency_audit.py" in workflow
+    assert "python -m pip install --no-deps -r requirements.txt" in workflow

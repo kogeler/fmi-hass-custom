@@ -13,8 +13,8 @@ Close this item when a stable Home Assistant release and its matching `pytest-ho
 
 1. Update the Home Assistant/helper pair in `requirements-direct.txt`.
 2. Run `make lock` and `make dev-build`.
-3. Run `make audit`, the full offline suite, and `make validate`.
-4. Remove the temporary exception from `docs/maintenance/DEPENDENCIES.md` and the S03 handoff only after the full audit passes.
+3. Run `make audit-raw`; after it reports no findings, remove the matching entries from `.github/dependency-audit-exceptions.json`.
+4. Run `make audit`, the full offline suite, and `make validate`, then remove the temporary exception from `docs/maintenance/DEPENDENCIES.md`. The policy audit intentionally fails when an exception becomes stale.
 
 Evidence rechecked 2026-08-01: [Pillow advisory](https://osv.dev/vulnerability/PYSEC-2026-2253), [PyJWT advisory](https://osv.dev/vulnerability/PYSEC-2026-179), and Home Assistant 2026.7.4/2026.8.0b3 package metadata. The beta pins the fixed releases, but stable does not yet.
 

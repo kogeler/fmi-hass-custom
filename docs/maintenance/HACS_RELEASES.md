@@ -81,15 +81,17 @@ The owner must retain these GitHub settings because they are not stored in the c
 
 - the repository remains public, with issues enabled;
 - the description states that this is an FMI weather integration for Home Assistant;
-- repository topics include at least `home-assistant`, `hacs`, `weather`, and `fmi`;
+- repository topics include `home-assistant`, `hacs`, and `integration`;
 - `master` protection uses the required checks listed in `docs/maintenance/CI.md`;
 - Actions' default token permission remains read-only; the workflow grants write only to the
   release publication job.
 
-The S15 implementation does not change remote settings or publish a release itself. Complete S16
-on the same `release/1.0.0` branch before merging it. The first `master` push containing that
-finished release activates the `1.0.0` gate and publication; pushing the release branch itself
-only runs any pull-request checks associated with an open PR.
+S15 enabled Issues and configured the three listed topics through the owner-authorized `gh`
+session after the first real HACS validation identified both omissions. The failed HACS job passed
+when rerun with no code change. S15 does not publish a release. Complete S16 on the same
+`release/1.0.0` branch before merging it. The first `master` push containing that finished release
+activates the `1.0.0` gate and publication; pushing the release branch itself only runs any
+pull-request checks associated with an open PR.
 
 ## Authoritative References
 

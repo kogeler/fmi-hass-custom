@@ -52,4 +52,5 @@ All notable changes to this project are documented in this file.
 - Upgraded the container and CI installer to pip 26.2 and added vulnerability/license audit commands.
 - Documented a temporary owner-approved exception for Pillow and PyJWT versions pinned by Home Assistant 2026.7.4. The required follow-up is tracked in `TODO.md`.
 - Prevented precise configured coordinates, raw FMI responses, and external exception payloads from reaching integration or dependency logs.
+- Removed an obsolete debug-only lightning script that logged precise coordinate-derived values and request URLs, resolving the PR CodeQL findings without suppressions.
 - Replaced mutable nested hassfest/HACS images with reviewed digests and restricted release write access to the final post-validation publication job.

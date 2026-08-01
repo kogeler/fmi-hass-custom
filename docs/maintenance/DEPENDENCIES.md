@@ -82,5 +82,10 @@ CodeQL separately receives `security-events: write` solely to upload its results
 - `make licenses` reports no unknown license. Copyleft packages in the full test graph include the selected GPL-3.0 FMI client and packages brought in by Home Assistant/test tooling; the inventory describes development/test installation and does not relicense this repository.
 - S14 re-ran all three inventories. The runtime-only FMI/geopy closure remains clean, current beta HA 2026.8.0b3 selects fixed Pillow/PyJWT versions, and the stable owner exception remains necessary until those pins reach a stable HA/helper pair.
 - S15 regenerated the supported freeze after introducing file-only pip bootstrap; only `boto3` and `botocore` moved from 1.43.61 to 1.43.62. Dynamic current-channel runs generated 140-package stable and 141-package prerelease freezes, recreated them exactly, passed `pip check`, and passed 204 offline tests in each environment.
+- GitHub's native dependency-review API rejects fork repositories. S15 therefore retains the
+  native action for a future independent repository and audits this fork's complete committed
+  freeze with `.github/scripts/dependency_audit.py`. Its exception file identifies the exact 18
+  unique Pillow/PyJWT advisory IDs accepted for the two Home Assistant-pinned versions; any new
+  finding or stale exception fails the job.
 
 Representative advisory evidence: [Pillow PYSEC-2026-2253](https://osv.dev/vulnerability/PYSEC-2026-2253), [PyJWT PYSEC-2026-179](https://osv.dev/vulnerability/PYSEC-2026-179), and [pip PYSEC-2026-196](https://osv.dev/vulnerability/PYSEC-2026-196). All links and versions in this document were last checked on 2026-08-01.

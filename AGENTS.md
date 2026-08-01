@@ -41,6 +41,8 @@ Run all supported Python and Home Assistant commands through rootless Podman; do
 - Local layout and hassfest validation: `make validate`
 - Prove unexpected network access fails: `make test-network-block`
 - Live tests: `make live` (opt-in and never part of the ordinary suite)
+- Dependency audit with reviewed temporary exceptions: `make audit`
+- Raw dependency vulnerability inventory: `make audit-raw`
 
 The build and lock commands may use package registries. Formatting, linting, typing, ordinary tests, and local validation run with Podman `--network=none`; pytest additionally blocks sockets. `make live` is the only test command with container networking.
 

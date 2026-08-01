@@ -92,6 +92,9 @@ live: dev-build
 	$(CONTAINER_RUN) $(DEV_IMAGE) python -m pytest -o addopts= --strict-config --strict-markers -n 0 -m live
 
 audit: dev-build
+	$(CONTAINER_RUN) $(DEV_IMAGE) python .github/scripts/dependency_audit.py
+
+audit-raw: dev-build
 	$(CONTAINER_RUN) $(DEV_IMAGE) python -m pip_audit --strict
 
 licenses: dev-build

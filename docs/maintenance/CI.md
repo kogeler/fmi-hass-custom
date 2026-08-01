@@ -12,7 +12,7 @@ Last verified: 2026-08-01.
 | `version.yml` | Pull requests; `master` pushes; manual | Require `.version` to increase relative to the exact base tree and validate manifest/changelog synchronization | None |
 | `ci.yml` | Pull requests; `master` pushes; manual; reusable from release | Formatting, Ruff/Pylint, mypy, frozen dependency check, offline HA suite, distribution smoke, 95% coverage, then bounded live FMI probes | None |
 | `validate.yml` | Pull requests; `master` pushes; manual; reusable from release | Version/layout smoke, actionlint, digest-pinned hassfest, and digest-pinned HACS validation | None |
-| `dependency-review.yml` | Pull requests | Reject newly introduced dependencies with Moderate-or-higher advisories | None |
+| `dependency-review.yml` | Pull requests | Use native dependency diff for independent repositories or exact-exception frozen audit for forks | None |
 | `codeql.yml` | Pull requests; `master` pushes; manual | Security-extended CodeQL for Python and GitHub Actions workflow languages | `security-events: write` only for results |
 | `release.yml` | Push to `master` | Re-run version, CI, and validation gates; publish exact-version tag/release | `contents: write` only in final publish job |
 | `compatibility.yml` | Pull requests; `master` pushes; manual | Independently resolve, freeze, recreate, and test the latest stable and latest available prerelease HA graphs | None |
@@ -38,9 +38,14 @@ service/network outage now blocks merge and release by owner decision. No file u
 
 The manual version check compares the selected branch with `master` by default and permits an
 explicit base branch or commit. On a `master` push it compares the pushed commit with
-`github.event.before`, matching the release gate. Dependency review stays PR-only because its
-GitHub dependency diff is PR-specific; PR-body synchronization remains tied to trusted PR metadata
-events, and release publication remains tied exclusively to a version-incrementing `master` push.
+`github.event.before`, matching the release gate. Dependency review stays PR-only. GitHub's
+dependency-diff API returns `403` for fork repositories, so `dependency-review.yml` calls the
+native action only when `github.event.repository.fork` is false. On this fork it installs the
+committed full freeze and runs `.github/scripts/dependency_audit.py`; the helper permits only the
+exact package/version/advisory tuples in `.github/dependency-audit-exceptions.json`, fails on a new
+finding, and also fails when an exception becomes stale. PR-body synchronization remains tied to
+trusted PR metadata events, and release publication remains tied exclusively to a
+version-incrementing `master` push.
 
 `pr-body.yml` is the single isolated `pull_request_target` exception because fork PR tokens on the
 ordinary event cannot update their PR body. It receives no secrets and only `contents: read` plus
@@ -119,6 +124,18 @@ The post-push release version check deliberately fails direct or multi-commit pu
 increase `.version`, but a failed post-push workflow cannot remove a commit already accepted by
 GitHub. Required PR checks and branch protection are therefore the preventive control.
 
+## First Pull-Request Evidence
+
+PR #1 at `ff00b62eeb94875a7729e585a00e9c6f94da2027` exercised every new pull-request
+workflow on 2026-08-01. CI including live FMI, both compatibility jobs, both CodeQL analysis jobs,
+layout, workflow syntax, and hassfest passed. The run exposed four real integration/repository
+gaps: the first-release helper assumed the post-migration manifest path, GitHub dependency review
+does not support forks, a legacy debug script logged precise coordinate-derived data, and HACS
+required Issues plus repository topics. The code gaps received regression fixes. Issues and topics
+`home-assistant`, `hacs`, and `integration` were configured with the owner-authorized `gh` session;
+rerunning only the failed HACS job then passed. The remaining corrected jobs require a new owner
+commit/push before remote confirmation.
+
 ## Owner Verification
 
 After S16 is complete and the finished release branch is merged/pushed to `master`:
@@ -139,8 +156,9 @@ After S16 is complete and the finished release branch is merged/pushed to `maste
 8. Open or update a later test PR and confirm its managed body block matches the first changelog
    section from that PR's exact source SHA while any manual text remains unchanged.
 
-Remote workflow execution, branch settings, topics, and the published Release cannot be proven
-from the unauthenticated local session and remain explicit owner verification steps.
+The initial PR workflows and HACS repository settings are verified as described above. Branch
+protection, Actions token defaults, the post-fix PR rerun, and the published Release remain owner
+verification steps.
 
 Do not merge or push the partial S15 state to `master`: S16 still owns the user guide, final report,
 README restructuring, and final clean verification for the same `1.0.0` release. S15 and S16 may
@@ -164,5 +182,7 @@ bootstrap limitation; PR-body synchronization becomes active after the finished 
   <https://docs.github.com/en/rest/pulls/pulls#update-a-pull-request>
 - CodeQL GitHub Actions queries:
   <https://docs.github.com/en/code-security/reference/code-scanning/codeql/codeql-queries/actions-built-in-queries>
+- GitHub dependency review API and its fork limitation:
+  <https://docs.github.com/en/rest/dependency-graph/dependency-review>
 - Dependabot configuration:
   <https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file>

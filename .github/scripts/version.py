@@ -54,7 +54,11 @@ def _read_version(root: Path) -> Version:
 
 def _read_manifest(root: Path) -> dict[str, object]:
     """Read and validate the integration manifest object."""
-    path = root / "custom_components" / "fmi" / "manifest.json"
+    return _read_manifest_file(root / "custom_components" / "fmi" / "manifest.json")
+
+
+def _read_manifest_file(path: Path) -> dict[str, object]:
+    """Read and validate a manifest at an explicit current or legacy path."""
     try:
         manifest = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as err:
@@ -117,8 +121,12 @@ def _version_from_base_tree(root: Path) -> Version:
     version_path = root / ".version"
     if version_path.is_file():
         return Version.parse(version_path.read_text(encoding="utf-8"), source="base .version")
+
+    manifest_path = root / "custom_components" / "fmi" / "manifest.json"
+    if not manifest_path.is_file():
+        manifest_path = root / "manifest.json"
     try:
-        value = _read_manifest(root)["version"]
+        value = _read_manifest_file(manifest_path)["version"]
     except KeyError as err:
         raise VersionError("base manifest.json has no version") from err
     if not isinstance(value, str):

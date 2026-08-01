@@ -19,6 +19,8 @@ The committed supported freeze uses `pytest-homeassistant-custom-component==0.13
 | Regenerate the complete freeze | `make lock` |
 | Resolve/test latest stable HA | `make compatibility-stable` |
 | Resolve/test latest prerelease HA | `make compatibility-prerelease` |
+| Audit dependencies with reviewed exceptions | `make audit` |
+| Show the raw vulnerability inventory | `make audit-raw` |
 | Build/sync the development image | `make dev-build` |
 | Format | `make format` |
 | Check formatting | `make format-check` |
