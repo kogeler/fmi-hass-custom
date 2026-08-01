@@ -4,6 +4,16 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.0.1 - 2026-08-01
+
+### Added
+
+- Added repository-wide code ownership for `@kogeler`.
+
+### Changed
+
+- Simplified local Podman environment updates by using stable development image and cache-stamp names while keeping Home Assistant and transitive dependency versions in the reviewed requirements freezes.
+
 ## 1.0.0 - 2026-08-01
 
 ### Fixed

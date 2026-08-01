@@ -13,5 +13,5 @@
     "fmi-weather-client==1.0.0",
     "geopy==2.5.0"
   ],
-  "version": "1.0.0"
+  "version": "1.0.1"
 }

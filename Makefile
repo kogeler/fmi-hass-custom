@@ -5,9 +5,10 @@ SHELL := /bin/bash
 
 CONTAINER_ENGINE ?= podman
 PYTHON_IMAGE := docker.io/library/python@sha256:1a3c6dbfd2173971abba880c3cc2ec4643690901f6ad6742d0827bae6cefc925
-LOCK_IMAGE := localhost/fmi-hass-custom-lock:2026.7.4
-DEV_IMAGE := localhost/fmi-hass-custom-dev:2026.7.4
-DEV_STAMP := .cache/podman-dev-2026.7.4.stamp
+LOCAL_IMAGE_PREFIX ?= localhost/fmi-hass-custom
+LOCK_IMAGE ?= $(LOCAL_IMAGE_PREFIX)-lock:local
+DEV_IMAGE ?= $(LOCAL_IMAGE_PREFIX)-dev:local
+DEV_STAMP ?= .cache/podman-dev.stamp
 HASSFEST_IMAGE := ghcr.io/home-assistant/hassfest@sha256:a77f1cf7cfc21ad626ebaae52ecb6131a45ab20223f8c2c0750bfca487aa4f05
 ACTIONLINT_IMAGE := docker.io/rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
 PYTEST_WORKERS ?= 0
