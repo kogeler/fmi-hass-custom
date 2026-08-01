@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from threading import Lock
 from time import monotonic
 from typing import Any
+from xml.parsers.expat import ExpatError
 
 import fmi_weather_client.errors as fmi_erros
 import fmi_weather_client.models as fmi_models
@@ -30,6 +31,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+from requests.exceptions import RequestException
 
 from . import const, utils
 from . import fmi_client as fmi
@@ -39,6 +41,20 @@ PLATFORMS = ["sensor", "weather"]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(const.DOMAIN)  # pylint: disable=invalid-name
 _NOMINATIM_RATE_LOCK = Lock()
 _NOMINATIM_NEXT_REQUEST_AT = 0.0
+_FMI_SOURCE_ERRORS = (
+    fmi_erros.ClientError,
+    fmi_erros.ServerError,
+    RequestException,
+    ET.ParseError,
+    ExpatError,
+    AttributeError,
+    IndexError,
+    KeyError,
+    OSError,
+    OverflowError,
+    TypeError,
+    ValueError,
+)
 
 
 class OptionalSourceError(RuntimeError):
@@ -758,7 +774,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         """Fetch current weather data based on estimation (forecast)."""
         try:
             data = await fmi.async_weather_by_coordinates(self.latitude, self.longitude)
-        except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
+        except _FMI_SOURCE_ERRORS as error:
             self._set_source_availability("forecast current", False, self._fmi_error_detail(error))
         else:
             if data is not None:
@@ -771,7 +787,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             return None
         try:
             data = await fmi.async_observation_by_place(place_name)
-        except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
+        except _FMI_SOURCE_ERRORS as error:
             self._set_source_availability("place observation", False, self._fmi_error_detail(error))
             return None
         if data is None:
@@ -789,7 +805,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             forecast = await fmi.async_forecast_by_coordinates(
                 self.latitude, self.longitude, 1, self.forecast_points
             )
-        except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
+        except _FMI_SOURCE_ERRORS as error:
             self._set_source_availability("forecast", False, self._fmi_error_detail(error))
             return
         if forecast is None or not forecast.forecasts:
@@ -891,7 +907,7 @@ class FMIObservationUpdateCoordinator(FMIDataUpdateCoordinator):
             return None
         try:
             observation = await fmi.async_observation_by_station_id(self.observation_station_id)
-        except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
+        except _FMI_SOURCE_ERRORS as error:
             self._set_source_availability(
                 "station observation", False, self._fmi_error_detail(error)
             )

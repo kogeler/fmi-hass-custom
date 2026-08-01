@@ -4,7 +4,6 @@ import logging
 from datetime import timedelta
 
 LOGGER = logging.getLogger(__package__)
-logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.DEBUG)
 
 DOMAIN = "fmi"
 NAME = "FMI"
@@ -77,10 +76,6 @@ BEST_CONDITION_AVAIL = "available"
 BEST_CONDITION_NOT_AVAIL = "not_available"
 
 # Constants for Lightning strikes
-BOUNDING_BOX_LAT_MIN = 58.406721
-BOUNDING_BOX_LONG_MIN = 15.311937
-BOUNDING_BOX_LAT_MAX = 70.440000
-BOUNDING_BOX_LONG_MAX = 39.262133
 BOUNDING_BOX_HALF_SIDE_KM = 200
 LIGHTNING_LIMIT = 5
 NOMINATIM_REQUEST_INTERVAL_SECONDS = 15.0

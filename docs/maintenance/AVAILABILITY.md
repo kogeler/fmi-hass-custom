@@ -6,7 +6,7 @@ This policy defines how the integration behaves when one FMI data source is unav
 
 ## Current conditions and setup
 
-The primary coordinator requests forecast-backed current weather by coordinates. If that request fails or returns no data, it requests an observation by the config entry's place title. The fallback observation becomes the current weather for the primary weather entity and its current-condition sensors; it does not fabricate forecast data.
+The primary coordinator requests forecast-backed current weather by coordinates. If that request fails or returns no data, it requests an observation by the config entry's place title. Failure includes FMI client/server errors, request-library transport errors, invalid XML/parser output, and malformed external model shapes. The fallback observation becomes the current weather for the primary weather entity and its current-condition sensors; it does not fabricate forecast data.
 
 When an observation station is configured, its coordinator performs the first refresh independently from the primary coordinator. Initial entry setup follows this matrix:
 
@@ -20,7 +20,7 @@ A configured station failure does not disable forecast-backed entities. A primar
 
 ## Forecast and stale data
 
-The forecast collection is independent from current conditions. A forecast error, `None`, or empty result clears the previous collection and exposes an empty forecast while current conditions remain available. The integration does not retain an old forecast without freshness metadata.
+The forecast collection is independent from current conditions. A transport, parser, or validated external-shape error, `None`, or empty result clears the previous collection and exposes an empty forecast while current conditions remain available. The integration does not retain an old forecast without freshness metadata.
 
 If both primary current and place fallback fail after a prior success, the coordinator clears current weather and forecast data and marks its dependent entities unavailable. It does not expose stale current values as available.
 
@@ -30,7 +30,7 @@ A timeout in the primary current/forecast path follows the same stale-data polic
 
 Coordinator entities register only the listener managed by Home Assistant's `CoordinatorEntity` lifecycle. The first entity listener starts periodic refreshes, so an unavailable source can recover without a reload. A later successful refresh restores availability and current/forecast data as applicable. Unload removes entity listeners and the config-entry update listener; reload follows the same independent setup policy.
 
-Source logs are transition-based: one warning when a source becomes unavailable and one informational message when it recovers. Repeated failures in the same outage do not emit the same source warning on every refresh.
+Source logs are transition-based: one warning when a source becomes unavailable and one informational message when it recovers. Repeated failures in the same outage do not emit the same source warning on every refresh. Cancellation and unrelated exception classes are not caught as source availability events.
 
 ## Optional sources
 

@@ -20,17 +20,6 @@ class BoundingBox:
         self.lon_max = lon_max
 
 
-def get_bounding_box_covering_finland():
-    """Bounding box to covert while Finland."""
-    box = BoundingBox()
-    box.lat_min = const.BOUNDING_BOX_LAT_MIN
-    box.lon_min = const.BOUNDING_BOX_LONG_MIN
-    box.lat_max = const.BOUNDING_BOX_LAT_MAX
-    box.lon_max = const.BOUNDING_BOX_LONG_MAX
-
-    return box
-
-
 def get_bounding_box(latitude_in_degrees, longitude_in_degrees, half_side_in_km):
     """Calculate min and max coordinates for bounding box."""
     assert 0 < half_side_in_km

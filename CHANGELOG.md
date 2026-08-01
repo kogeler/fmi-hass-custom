@@ -16,6 +16,7 @@ All notable changes to this project are documented in this file.
 - Prevented polar-day/night crashes with a deterministic daytime fallback for incomplete sun events.
 - Fixed best-time selection across month/year boundaries and made forecast output reject malformed timestamps, unknown symbols, missing fields, and non-finite values without crashing.
 - Corrected weather entity naming under current Home Assistant semantics so fresh daily and observation entities no longer duplicate their device names or generated entity IDs, while retaining their existing unique IDs.
+- Kept transport and malformed-response failures inside their individual FMI source boundaries, preserving place fallback and current weather when only forecast parsing fails, and removed the integration's global logging configuration side effect.
 
 ### Added
 

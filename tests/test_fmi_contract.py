@@ -6,13 +6,16 @@
 from __future__ import annotations
 
 import inspect
+import threading
 from datetime import UTC, datetime
+from unittest.mock import Mock
 from xml.parsers.expat import ExpatError
 
 import fmi_weather_client as fmi
 import pytest
 from fmi_weather_client import models
 from fmi_weather_client.errors import ClientError, ServerError
+from homeassistant.util.loop import protect_loop
 
 from custom_components.fmi import fmi_client as integration_fmi_client
 from tests.helpers.fmi import (
@@ -171,16 +174,120 @@ def test_client_adapter_adds_hourly_gust_without_second_request(monkeypatch) -> 
     assert captured[0]["parameters"] == "Temperature,WindGust,HourlyMaximumGust"
 
 
+@pytest.mark.parametrize(
+    ("parameters", "expected"),
+    [
+        (
+            "Temperature,HourlyMaximumGust",
+            "Temperature,HourlyMaximumGust",
+        ),
+        (
+            "Temperature",
+            "Temperature,HourlyMaximumGust",
+        ),
+    ],
+)
+def test_client_adapter_keeps_one_hourly_gust_parameter(
+    monkeypatch,
+    parameters: str,
+    expected: str,
+) -> None:
+    """Avoid duplicate fields and append the supported gust when no legacy field exists."""
+    captured: list[dict[str, object]] = []
+    parsed = forecast_from_fixture("forecast_normal.json")
+
+    def capture_request(params: dict[str, object]) -> str:
+        captured.append(dict(params))
+        return "synthetic body"
+
+    monkeypatch.setattr(
+        integration_fmi_client.upstream.http,
+        "_create_params",
+        lambda *args, **kwargs: {"parameters": parameters},
+    )
+    monkeypatch.setattr(
+        integration_fmi_client.upstream.http,
+        "_send_request",
+        capture_request,
+    )
+    monkeypatch.setattr(
+        integration_fmi_client,
+        "_parse_forecast_response",
+        lambda body, request_type: parsed,
+    )
+
+    integration_fmi_client._request_by_coordinates(  # noqa: SLF001
+        models.RequestType.FORECAST,
+        60.17,
+        24.94,
+        60,
+        48,
+    )
+
+    assert captured == [{"parameters": expected}]
+
+
+def test_client_adapter_rejects_non_string_parameter_contract(monkeypatch) -> None:
+    """Fail before an HTTP request when the installed client's parameter shape drifts."""
+    send_request = Mock()
+    monkeypatch.setattr(
+        integration_fmi_client.upstream.http,
+        "_create_params",
+        lambda *args, **kwargs: {"parameters": None},
+    )
+    monkeypatch.setattr(integration_fmi_client.upstream.http, "_send_request", send_request)
+
+    with pytest.raises(TypeError, match="non-string WFS parameters"):
+        integration_fmi_client._request_by_coordinates(  # noqa: SLF001
+            models.RequestType.FORECAST,
+            60.17,
+            24.94,
+            60,
+            48,
+        )
+
+    send_request.assert_not_called()
+
+
+def test_hourly_gust_parser_ignores_absent_and_misaligned_fields() -> None:
+    """Return no gusts when the optional field or its aligned value is unavailable."""
+    no_hourly_field = f"""
+        <root xmlns:swe="{integration_fmi_client.SWE_NAMESPACE}">
+          <swe:field name="WindGust" />
+        </root>
+    """
+    missing_aligned_value = f"""
+        <root xmlns:gml="{integration_fmi_client.GML_NAMESPACE}"
+              xmlns:gmlcov="{integration_fmi_client.GMLCOV_NAMESPACE}"
+              xmlns:swe="{integration_fmi_client.SWE_NAMESPACE}">
+          <swe:field name="WindGust" />
+          <swe:field name="HourlyMaximumGust" />
+          <gmlcov:positions>60.17 24.94</gmlcov:positions>
+          <gml:doubleOrNilReasonTupleList>7.0</gml:doubleOrNilReasonTupleList>
+        </root>
+    """
+
+    assert integration_fmi_client._hourly_gusts_by_time(no_hourly_field) == {}  # noqa: SLF001
+    assert integration_fmi_client._hourly_gusts_by_time(missing_aligned_value) == {}  # noqa: SLF001
+
+
 async def test_client_adapter_preserves_weather_and_forecast_timesteps(monkeypatch) -> None:
     """Keep the upstream ten-minute current query and hourly forecast query."""
     calls: list[tuple[object, ...]] = []
+    worker_threads: list[int] = []
+    loop_thread = threading.get_ident()
     parsed = forecast_from_fixture("forecast_normal.json")
 
     def capture_request(*args):
         calls.append(args)
+        worker_threads.append(threading.get_ident())
         return parsed
 
-    monkeypatch.setattr(integration_fmi_client, "_request_by_coordinates", capture_request)
+    monkeypatch.setattr(
+        integration_fmi_client,
+        "_request_by_coordinates",
+        protect_loop(capture_request, loop_thread),
+    )
 
     current = await integration_fmi_client.async_weather_by_coordinates(60.17, 24.94)
     forecast = await integration_fmi_client.async_forecast_by_coordinates(60.17, 24.94, 1, 48)
@@ -191,6 +298,15 @@ async def test_client_adapter_preserves_weather_and_forecast_timesteps(monkeypat
         (models.RequestType.WEATHER, 60.17, 24.94, 10, 4),
         (models.RequestType.FORECAST, 60.17, 24.94, 60, 48),
     ]
+    assert all(thread_id != loop_thread for thread_id in worker_threads)
+
+
+async def test_client_adapter_returns_none_for_empty_current_forecast(monkeypatch) -> None:
+    """Keep the upstream empty-current contract without indexing an absent sample."""
+    empty = models.Forecast("Helsinki", 60.17, 24.94, [])
+    monkeypatch.setattr(integration_fmi_client, "_request_by_coordinates", lambda *args: empty)
+
+    assert await integration_fmi_client.async_weather_by_coordinates(60.17, 24.94) is None
 
 
 def test_observation_and_empty_results_use_real_models() -> None:

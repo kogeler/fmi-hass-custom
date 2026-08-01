@@ -18,6 +18,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from requests.exceptions import RequestException
 
 from custom_components.fmi import FMIDataUpdateCoordinator
 from custom_components.fmi import fmi as fmi_client
@@ -329,6 +330,68 @@ async def test_current_outage_clears_stale_data_and_recovers(
     assert coordinator.last_update_success
     assert coordinator.get_weather() is weather
     assert coordinator.get_forecasts()
+    assert all(state.state != STATE_UNAVAILABLE for state in hass.states.async_all("weather"))
+
+
+async def test_transport_error_uses_place_fallback_and_clears_stale_current(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Keep request-library failures inside the normal source availability policy."""
+    weather = weather_from_fixture("forecast_normal.json")
+    forecast = forecast_from_fixture("forecast_normal.json")
+    fallback = weather_from_fixture("observation.json", "observation")
+    assert weather is not None and fallback is not None
+    transport_error = RequestException("Synthetic connection reset")
+    weather_mock = AsyncMock(side_effect=[weather, transport_error, transport_error])
+    place_mock = AsyncMock(side_effect=[fallback, transport_error])
+    _patch_fmi_sources(
+        monkeypatch,
+        weather=weather_mock,
+        forecast=forecast,
+        place_observation=place_mock,
+    )
+    _patch_sea_level(monkeypatch)
+    entry = _entry(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.last_update_success
+    assert coordinator.get_weather() is fallback
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert not coordinator.last_update_success
+    assert coordinator.get_weather() is None
+    assert coordinator.get_forecasts() == []
+
+
+async def test_malformed_forecast_keeps_current_weather_available(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Treat a forecast parser failure as forecast-only unavailability."""
+    weather = weather_from_fixture("forecast_normal.json")
+    assert weather is not None
+    _patch_fmi_sources(
+        monkeypatch,
+        weather=weather,
+        forecast=ET.ParseError("Synthetic malformed forecast XML"),
+    )
+    _patch_sea_level(monkeypatch)
+    entry = _entry(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    assert coordinator.last_update_success
+    assert coordinator.get_weather() is weather
+    assert coordinator.get_forecasts() == []
     assert all(state.state != STATE_UNAVAILABLE for state in hass.states.async_all("weather"))
 
 
