@@ -31,6 +31,7 @@ All notable changes to this project are documented in this file.
 - Added production pull-request, dependency, CodeQL, event/manual current stable and prerelease compatibility, and release workflows with a mandatory version increase, 95% coverage gate, and required bounded live FMI probes after offline tests.
 - Added automatic PR-body synchronization from the source branch's latest changelog section while preserving manually written PR context.
 - Added a local Home Assistant brand icon and clean-distribution smoke tests for the exact HACS/manual installation tree.
+- Added a focused end-user guide with HACS/manual installation, configuration, upgrade, removal, troubleshooting, and standard Home Assistant dashboard examples.
 
 ### Changed
 

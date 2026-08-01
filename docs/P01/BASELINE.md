@@ -1,6 +1,6 @@
 <!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
 
-# Maintenance Baseline
+# Plan P01 Baseline
 
 ## Snapshot
 

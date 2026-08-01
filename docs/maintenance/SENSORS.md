@@ -2,7 +2,8 @@
 
 # Sensor And Gust Contract
 
-This document defines the S06 behavior for FMI sensor entities, wind-gust availability, and location grouping. It applies to Home Assistant 2026.7.4 and `fmi-weather-client==1.0.0`.
+This document defines the current FMI sensor, wind-gust, entity-naming, and location-grouping
+contracts. It applies to Home Assistant 2026.7.4 and `fmi-weather-client==1.0.0`.
 
 ## Gust Sources
 
@@ -21,7 +22,11 @@ The adapter deliberately isolates the stable client's private parameter and resp
 
 ## Entity And Device Naming
 
-Every sensor now uses `SensorEntity`, `has_entity_name = True`, translated entity descriptions, and a location device. The device identifier remains `(fmi, coordinator.unique_id)`, derived from coordinates rather than display text. The device name is the place resolved by FMI, with the configured name as a setup fallback.
+Every sensor uses `SensorEntity`, `has_entity_name = True`, translated entity descriptions, and a
+location device. The device identifier is `(fmi, coordinator.unique_id)`, where the coordinator ID
+comes from immutable `entity_identity`, never mutable display text. Fresh entries use a random
+coordinate-independent identity; migrated entries retain their original coordinate-derived value.
+The device name is the place resolved by FMI, with the configured name as a setup fallback.
 
 For a fresh English installation at Helsinki, the temperature entity is therefore:
 
@@ -30,18 +35,26 @@ For a fresh English installation at Helsinki, the temperature entity is therefor
 - friendly name: `Helsinki Temperature`;
 - entity ID: `sensor.helsinki_temperature`.
 
-Names with non-ASCII characters and punctuation remain intact as device display names; Home Assistant performs its normal slug conversion for generated entity IDs. Two coordinate entries have different device identifiers and sensor unique IDs even when their sensor types or place labels match.
+Names with non-ASCII characters and punctuation remain intact as device display names; Home
+Assistant performs its normal slug conversion for generated entity IDs. Two entries have different
+device identifiers and sensor unique IDs even when their sensor types or resolved place labels
+match.
 
 Existing unique IDs are unchanged. They retain the v0.6.2 coordinate, configured-name, and English sensor suffix shape so registry customizations remain attached.
 
 ## Conservative Legacy ID Migration
 
-Before adding sensors, S06 looks up each unchanged unique ID in the entity registry. It renames an entry only when its entity ID is exactly the known v0.6.2 generated default such as `sensor.temperature`.
+Before adding sensors, setup looks up each unchanged unique ID in the entity registry. It renames
+an entry only when its entity ID is exactly the known v0.6.2 generated default such as
+`sensor.temperature`.
 
 - A user-customized ID is preserved.
 - An occupied location-aware target is not overwritten.
 - The registry entry and unique ID are updated in place; no entity is deleted or recreated.
-- Ambiguous suffixed defaults such as `sensor.temperature_2` are preserved because current registry data cannot distinguish an automatically allocated suffix from the same user-selected ID. S11's two-entry acceptance fixture proves that these entities retain their internal/unique IDs and acquire the correct location device without guessing. See `MIGRATIONS.md`.
+- Ambiguous suffixed defaults such as `sensor.temperature_2` are preserved because current registry
+  data cannot distinguish an automatically allocated suffix from the same user-selected ID. The
+  two-entry acceptance fixture proves that these entities retain their internal/unique IDs and
+  acquire the correct location device without guessing. See `MIGRATIONS.md`.
 
 ## Sensor Metadata
 
@@ -59,8 +72,6 @@ Static attribution remains the entity attribution rather than being duplicated i
 
 ## References
 
-- Wind-gust availability report and maintainer query evidence, checked 2026-07-31.
-- Sensor location-grouping report, checked 2026-07-31.
 - [FMI current producer parameter metadata](https://opendata.fmi.fi/info?what=qengine), checked 2026-07-31.
 - [FMI WFS examples and parameter guidance](https://en.ilmatieteenlaitos.fi/open-data-manual-wfs-examples-and-guidelines), checked 2026-07-31.
 - [Home Assistant entity naming](https://developers.home-assistant.io/docs/core/entity/), checked 2026-07-31.

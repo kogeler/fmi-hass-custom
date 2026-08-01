@@ -86,12 +86,10 @@ The owner must retain these GitHub settings because they are not stored in the c
 - Actions' default token permission remains read-only; the workflow grants write only to the
   release publication job.
 
-S15 enabled Issues and configured the three listed topics through the owner-authorized `gh`
-session after the first real HACS validation identified both omissions. The failed HACS job passed
-when rerun with no code change. S15 does not publish a release. Complete S16 on the same
-`release/1.0.0` branch before merging it. The first `master` push containing that finished release
-activates the `1.0.0` gate and publication; pushing the release branch itself only runs any
-pull-request checks associated with an open PR.
+Before each release, verify these remote settings and the HACS validation job instead of assuming
+that checkout-local metadata is sufficient. A push to a release branch runs its pull-request checks
+but does not publish; only the version-incrementing `master` push activates the trusted release
+workflow.
 
 ## Authoritative References
 

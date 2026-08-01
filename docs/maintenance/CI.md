@@ -86,10 +86,10 @@ supported lock.
 ## Immutable Dependencies
 
 All external JavaScript actions use full commit SHAs. All executable containers use registry
-digests. Hassfest and HACS are invoked directly from reviewed image digests, removing the mutable
-nested image tags found in S14. Actionlint uses its multi-architecture release digest. Dependabot
-tracks both Python inputs and GitHub Actions references; grouped PRs are limited to non-major
-updates.
+digests. Hassfest and HACS are invoked directly from reviewed image digests so their mutable nested
+image tags cannot bypass repository review. Actionlint uses its multi-architecture release digest.
+Dependabot tracks both Python inputs and GitHub Actions references; grouped PRs are limited to
+non-major updates.
 
 Every repository-authored CI helper is Python under `.github/scripts/`. GitHub API orchestration is
 the single exception to Python-only helper logic: inline bodies of the native, SHA-pinned
@@ -124,29 +124,17 @@ The post-push release version check deliberately fails direct or multi-commit pu
 increase `.version`, but a failed post-push workflow cannot remove a commit already accepted by
 GitHub. Required PR checks and branch protection are therefore the preventive control.
 
-## First Pull-Request Evidence
+## Maintainer Release Verification
 
-PR #1 at `ff00b62eeb94875a7729e585a00e9c6f94da2027` exercised every new pull-request
-workflow on 2026-08-01. CI including live FMI, both compatibility jobs, both CodeQL analysis jobs,
-layout, workflow syntax, and hassfest passed. The run exposed four real integration/repository
-gaps: the first-release helper assumed the post-migration manifest path, GitHub dependency review
-does not support forks, a legacy debug script logged precise coordinate-derived data, and HACS
-required Issues plus repository topics. The code gaps received regression fixes. Issues and topics
-`home-assistant`, `hacs`, and `integration` were configured with the owner-authorized `gh` session;
-rerunning only the failed HACS job then passed. The remaining corrected jobs require a new owner
-commit/push before remote confirmation.
-
-## Owner Verification
-
-After S16 is complete and the finished release branch is merged/pushed to `master`:
+For every release merged or pushed to `master`:
 
 1. Confirm every standalone branch check appears for both the release PR and `master` push, and
    record the exact required-check labels.
 2. Confirm the `master` Release run passes its parallel version, CI/live, and validation gates
    before the publish job starts.
-3. Confirm tag/Release `1.0.0` points to the finished release commit and release notes match the
-   `CHANGELOG.md` section plus full-changelog link.
-4. Add this repository to HACS as a custom Integration and verify `1.0.0` installs to
+3. Confirm the tag and published Release named by `.version` point to the finished release commit
+   and release notes match the corresponding `CHANGELOG.md` section plus full-changelog link.
+4. Add this repository to HACS as a custom Integration and verify the published version installs to
    `<config>/custom_components/fmi/`.
 5. Confirm `Compatibility` ran on the release PR and `master` push, then run it manually from a
    custom branch once; verify both jobs identify the then-current stable/prerelease, create and
@@ -156,19 +144,10 @@ After S16 is complete and the finished release branch is merged/pushed to `maste
 8. Open or update a later test PR and confirm its managed body block matches the first changelog
    section from that PR's exact source SHA while any manual text remains unchanged.
 
-The initial PR workflows and HACS repository settings are verified as described above. Branch
-protection, Actions token defaults, the post-fix PR rerun, and the published Release remain owner
-verification steps.
-
-Do not merge or push the partial S15 state to `master`: S16 still owns the user guide, final report,
-README restructuring, and final clean verification for the same `1.0.0` release. S15 and S16 may
-remain separate commits on the release branch because the gate compares the completed branch with
-the older version on `master`.
-
-The `1.0.0` PR itself cannot use `pr-body.yml` if the workflow is not already present in `master`:
-GitHub loads `pull_request_target` workflows only from the default branch. This is a one-time
-bootstrap limitation; PR-body synchronization becomes active after the finished release reaches
-`master`.
+Branch protection, Actions token defaults, and the published Release remain owner-controlled
+settings. A pull request that introduces `pr-body.yml` cannot use that workflow for its own body:
+GitHub loads `pull_request_target` workflows only from the default branch. Synchronization begins
+with later pull requests after the trusted workflow reaches `master`.
 
 ## Authoritative References
 

@@ -33,7 +33,10 @@ Fresh entries receive a random coordinate-independent identity. A v0.6.2/version
 
 Reconfiguration never changes `entity_identity` or the config-entry unique ID. Duplicate detection therefore compares current coordinates rather than stable IDs.
 
-S11 acceptance tests confirm that exact unsuffixed legacy sensor defaults migrate in place when safe, while ambiguous automatically suffixed IDs, customized IDs, and occupied targets are preserved. Reconfiguration does not guess whether a suffixed ID was generated or customized. The complete rules are in `MIGRATIONS.md`.
+Acceptance tests confirm that exact unsuffixed legacy sensor defaults migrate in place when safe,
+while ambiguous automatically suffixed IDs, customized IDs, and occupied targets are preserved.
+Reconfiguration does not guess whether a suffixed ID was generated or customized. The complete
+rules are in `MIGRATIONS.md`.
 
 ## Failure and privacy rules
 
@@ -46,4 +49,3 @@ S11 acceptance tests confirm that exact unsuffixed legacy sensor defaults migrat
 
 - Home Assistant, "Integrations should have a reconfigure flow": <https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/reconfiguration-flow/> (accessed 2026-07-31)
 - Home Assistant, "Config flow": <https://developers.home-assistant.io/docs/core/integration/config_flow/> (accessed 2026-07-31)
-- Location selection and editing requirement, verified 2026-07-31.

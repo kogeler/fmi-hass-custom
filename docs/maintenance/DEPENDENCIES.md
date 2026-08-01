@@ -1,91 +1,117 @@
 <!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
 
-# Dependency Inventory
+# Dependency Model And Inventory
 
-Inventory date: 2026-07-31; S14 audit refreshed 2026-08-01. Versions were checked against package metadata from PyPI and action metadata from the upstream GitHub repositories. The supported test environment is Home Assistant 2026.7.4 on Python 3.14.2.
+This document explains which dependency files are authoritative, why the supported environment
+uses its current direct selections, and what must be reviewed when they change. Keep it focused on
+the current dependency contract rather than historical before/after reporting.
 
-## Resolution model
+Last verified: 2026-08-01. Supported environment: Home Assistant 2026.7.4 on Python 3.14.2.
 
-- `custom_components/fmi/manifest.json` contains only packages the integration requires and Home Assistant Core does not already guarantee.
-- `requirements-direct.txt` is the reviewed input for the stable Home Assistant test environment and development tools.
-- Root `requirements.txt` is generated only by `make lock` in a clean Podman stage. Its 173 exact entries are the complete `pip freeze` result, not a manually selected subset.
-- `requirements-bootstrap.txt` is the separate exact pip bootstrap freeze because normal `pip freeze` omits pip. Container and workflow commands install it only through `-r`; they contain no inline pip package/version pins.
-- `requirements-compatibility-homeassistant.txt` and `requirements-compatibility-direct.txt` are deliberately unpinned moving-resolution inputs, not locks. The manual workflow resolves the current stable and current prerelease independently, writes each complete transitive graph to `requirements-compatibility-*-resolved.txt` with `pip freeze`, recreates a clean environment from that generated file, and only then runs tests.
+## File Roles
 
-The root 173-package graph does not mix incompatible environments: Home Assistant stable, its matching test helper, integration dependencies, and the lint/type/audit tools all execute in the same supported development/test environment. Compatibility channels are isolated in temporary virtual environments and never mutate the committed supported freeze.
+| File | Ownership |
+|---|---|
+| `custom_components/fmi/manifest.json` | Exact direct runtime requirements not guaranteed by Home Assistant Core |
+| `requirements-direct.txt` | Human-reviewed exact direct selections for the supported development/test environment |
+| `requirements.txt` | Generated complete 173-package `pip freeze`; never edit manually |
+| `requirements-bootstrap.txt` | Exact standalone pip bootstrap selection because normal `pip freeze` omits pip |
+| `requirements-compatibility-homeassistant.txt` | Unpinned Home Assistant channel inputs for moving compatibility resolution |
+| `requirements-compatibility-direct.txt` | Unpinned helper/integration inputs for moving compatibility resolution |
+| `requirements-compatibility-*-resolved.txt` | Ignored per-run full freezes generated and recreated by compatibility checks |
 
-## Runtime and platform selections
+The committed root freeze is one coherent supported environment: Home Assistant stable, its exact
+test helper, integration dependencies, and maintenance tools. Stable and prerelease drift checks
+resolve in isolated temporary environments and never mutate this lock.
 
-| Dependency | Purpose / class | Previous | Newest stable | Selected | License | Compatibility decision and source |
-|---|---|---:|---:|---:|---|---|
-| Python | HA runtime; direct platform | 3.14.2 | 3.14.2 | 3.14.2 | PSF | Home Assistant 2026.7.4 requires Python >=3.14.2. The official slim image remains pinned by multi-architecture digest. [Image](https://hub.docker.com/_/python) |
-| Home Assistant | Test host; direct development | 2026.7.4 | 2026.7.4 | 2026.7.4 | Apache-2.0 | Current stable release; prereleases are excluded from the supported environment. [PyPI](https://pypi.org/project/homeassistant/) |
-| `pytest-homeassistant-custom-component` | HA test harness; direct development | 0.13.348 | 0.13.351 | 0.13.348 | MIT | 0.13.348 pins supported HA 2026.7.4. The moving compatibility environment selected 0.13.351 with current HA prerelease 2026.8.0b3 automatically and passed its recreated suite; prerelease helpers do not replace the supported stable lock. [PyPI](https://pypi.org/project/pytest-homeassistant-custom-component/) |
-| `fmi-weather-client` | FMI API; direct runtime | 0.7.0 | 1.0.0 | 1.0.0 | GPL-3.0 | Exact manifest pin. Public models, errors, and async methods remain compatible. S06 found that 1.0.0 still requests forecast `WindGust`, which FMI returns as NaN for the selected producer; the integration now uses a narrow contract-tested adapter to add `HourlyMaximumGust` to the same request and normalize the existing model. [PyPI](https://pypi.org/project/fmi-weather-client/), [source](https://codeberg.org/saaste/fmi-weather-client) |
-| `geopy` | Reverse geocoding/distance; direct runtime | >=2.1.0 | 2.5.0 | 2.5.0 | MIT | Exact manifest pin because integration modules import it directly. [PyPI](https://pypi.org/project/geopy/) |
-| `python-dateutil` | Legacy time-zone conversion; removed direct runtime | unpinned | 2.9.0.post0 | Test transitive only | Apache-2.0 / BSD-3-Clause | S08 replaced integration imports with Home Assistant's current timezone helpers. It remains in the complete freeze through `freezegun`, selected by the Home Assistant pytest helper. [PyPI](https://pypi.org/project/python-dateutil/) |
-| `async-timeout` | Legacy timeout helper; removed | unpinned / 5.0.1 resolved | 5.0.1 | removed | Apache-2.0 | Replaced by `asyncio.timeout`, available in the supported Python. No installed dependency still requires this package. [PyPI](https://pypi.org/project/async-timeout/) |
-| `requests` | FMI-client/config-flow exception boundary; Core-supplied transitive | >=2.32.4 | 2.34.2 | 2.34.2 | Apache-2.0 | HA 2026.7.4 requires exactly 2.34.2 and the FMI client requires `~=2.32`; it remains transitive rather than a direct input. S09 moved integration-owned lightning/sea-level HTTP to Home Assistant's shared aiohttp session, leaving only the FMI-client exception boundary. [PyPI](https://pypi.org/project/requests/) |
-| `voluptuous` | Config schema; Core-supplied transitive | unpinned | 0.16.0 | 0.15.2 | BSD-3-Clause | Integration imports it, but HA 2026.7.4 guarantees exactly 0.15.2. Selecting 0.16.0 would violate Core metadata. [PyPI](https://pypi.org/project/voluptuous/) |
-| `xmltodict` | FMI XML parser; FMI transitive | >=0.14.2 | 1.0.4 | 1.0.4 | MIT | Not imported by the integration; FMI client 1.0.0 requires `~=1.0`. Removed from direct inputs. [PyPI](https://pypi.org/project/xmltodict/) |
+Every maintained `pip install` in workflows, the Makefile, container recipes, and repository CI
+helpers consumes a requirements or generated constraint file. Do not add inline package names or
+versions.
 
-The FMI 1.0.0 PyPI source distribution was inspected because the upstream Codeberg API returned HTTP 503 during S03. It contains no changelog file. S06 later compared the installed source, current upstream branch, wind-gust availability evidence, and FMI's current producer metadata: the stable client still requests forecast `WindGust`, while the edited Scandinavia producer publishes `HourlyMaximumGust`. `custom_components/fmi/fmi_client.py` is therefore an explicit private-API boundary protected by offline request, parser, field-precedence, and timestep contract tests; it does not add another FMI request.
+## Supported Direct Selections
 
-## Development tools
+| Component | Selected | Role and constraint |
+|---|---:|---|
+| Python | 3.14.2 | Required by Home Assistant 2026.7.4; official slim image is pinned by multi-architecture digest |
+| Home Assistant | 2026.7.4 | Supported runtime/test host; prereleases belong only to moving compatibility checks |
+| `pytest-homeassistant-custom-component` | 0.13.348 | Pins the exact supported Home Assistant release |
+| `fmi-weather-client` | 1.0.0 | Direct GPL-3.0 runtime dependency, exact manifest pin |
+| `geopy` | 2.5.0 | Direct MIT runtime dependency, exact manifest pin |
+| `pip` | 26.2 | Isolated in `requirements-bootstrap.txt` |
+| `ruff` | 0.16.1 | Sole flake8-style linter and formatter |
+| `pylint` | 4.0.6 | Complementary static analysis |
+| `mypy` | 2.3.0 | Type checker; current source tree must remain zero-error |
+| `pip-audit` | 2.10.1 | Vulnerability inventory and exact-exception enforcement |
+| `pip-licenses` | 5.5.5 | Complete resolved license inventory |
 
-| Dependency | Purpose | Previous | Newest stable / selected | License | Source and note |
-|---|---|---:|---:|---|---|
-| `pip` | Container installer | 25.3 from base image | 26.2 | MIT | Selected only in `requirements-bootstrap.txt` and installed from that file in Podman/CI. [PyPI](https://pypi.org/project/pip/) |
-| `mypy` | Type checking | 2.3.0 | 2.3.0 | MIT | Existing 18-error production baseline remains visible; no ignores added. [PyPI](https://pypi.org/project/mypy/) |
-| `pip-audit` | Vulnerability inventory | not present | 2.10.1 | Apache-2.0 | New direct audit tool. [PyPI](https://pypi.org/project/pip-audit/) |
-| `pip-licenses` | License inventory | not present | 5.5.5 | MIT | New direct license tool. [PyPI](https://pypi.org/project/pip-licenses/) |
-| `pylint` | Complementary static analysis | 4.0.6 | 4.0.6 | GPL-2.0-or-later | Continues to pass at 10.00/10. [PyPI](https://pypi.org/project/pylint/) |
-| `ruff` | Formatter and primary linter | 0.16.1 | 0.16.1 | MIT | Ruff remains the sole flake8-style tool. [PyPI](https://pypi.org/project/ruff/) |
+`requests` and `voluptuous` are supplied by Home Assistant's exact graph. `xmltodict` is supplied
+through the FMI client. `python-dateutil` remains test-transitive only. The removed
+`async-timeout` dependency is replaced by `asyncio.timeout` on the supported Python version.
+Do not promote these packages to direct requirements unless the integration starts owning a
+contract that Home Assistant or the FMI client no longer guarantees.
 
-## CI Actions And Images
+The stable FMI client requests `WindGust`, but the selected forecast producer publishes
+`HourlyMaximumGust`. `custom_components/fmi/fmi_client.py` is the explicit private-API adapter that
+adds this field to the same request and maps it by timestamp. It is guarded by request, parser,
+field-precedence, timestep, and one-request contract tests. Do not remove or broaden that boundary
+without rechecking current FMI metadata and upstream client behavior.
 
-All JavaScript action references are immutable commit SHAs. Executable validation/lint containers
-are referenced by immutable registry digest, including the images previously hidden behind mutable
-composite/Docker action tags.
+## Actions And Images
 
-| Action | Purpose | Previous | Newest reviewed | Selected | License | Source / reason |
-|---|---|---|---|---|---|---|
-| `actions/checkout` | Repository checkout | v4.2.2 / `11bd719...` | v7.0.1 | `3d3c42e5aac5ba805825da76410c181273ba90b1` | MIT | Latest release on 2026-07-31. [Releases](https://github.com/actions/checkout/releases) |
-| `actions/github-script` | Exact tag/release publication | not present | v9.0.0 | `3a2844b7e9c422d3c10d287c895573f7108da1b3` | MIT | Current Node 24 release; uses the normal pre-authenticated workflow client. [Release](https://github.com/actions/github-script/releases/tag/v9.0.0) |
-| `actions/dependency-review-action` | Pull-request dependency risk | not present | v5.0.0 | `a1d282b36b6f3519aa1f3fc636f609c47dddb294` | MIT | Current Node 24 release. [Release](https://github.com/actions/dependency-review-action/releases/tag/v5.0.0) |
-| `github/codeql-action` | Python and Actions security analysis | not present | v4.36.0 | `7211b7c8077ea37d8641b6271f6a365a22a5fbfa` | MIT | Current supported v4 release with Actions queries. [Release](https://github.com/github/codeql-action/releases/tag/v4.36.0) |
-| `ghcr.io/home-assistant/hassfest` | HA validation container | mutable nested tag | current image 2026-08-01 | `sha256:a77f1cf7cfc21ad626ebaae52ecb6131a45ab20223f8c2c0750bfca487aa4f05` | Apache-2.0 | Direct digest removes the composite action's mutable nested image. [Package](https://github.com/home-assistant/hassfest/pkgs/container/hassfest) |
-| `ghcr.io/hacs/action` | HACS validation container | mutable nested `main` tag | main image built 2026-07-31 | `sha256:ea472b182558d08e50221c550fc5cdbba9e1bc1efba53f92bc4fed38e7bc56b9` | MIT | Direct digest; OCI revision `0e6b87098f7fb997173d7b5f47063b9901aa41e4`. [Source](https://github.com/hacs/integration) |
-| `docker.io/rhysd/actionlint` | Workflow syntax/static checks | not present | v1.7.12 | `sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667` | MIT | Multi-architecture release image digest. [Release](https://github.com/rhysd/actionlint/releases/tag/v1.7.12) |
+All JavaScript actions use immutable commit SHAs and executable containers use immutable registry
+digests. Dependabot tracks action references, but a maintainer must review release notes,
+permissions, runtime changes, and nested actions/images before accepting an update.
 
-S15 resolved the nested-image finding. Pull-request and validation workflows remain read-only and
-receive no repository secret. Only the final release publication job receives `contents: write`;
-CodeQL separately receives `security-events: write` solely to upload its results.
-
-## Outdated transitive report
-
-`make outdated` reports 24 packages below their individual newest releases. Every item is resolver-controlled rather than an independently selectable direct dependency:
-
-| Constraint owner | Packages reported outdated | Reason not overridden |
+| Action or image | Purpose | Selected reference |
 |---|---|---|
-| Home Assistant/Core closure | `acme`, `astral`, `boto3`, `botocore`, `cryptography`, `pillow`, `PyJWT`, `pyOpenSSL`, `snitun`, `uv`, `voluptuous` | HA 2026.7.4 or an HA dependency selects these versions. Independent overrides make `pip check` fail or create an unsupported Core graph. |
-| HA pytest helper | `aiohasupervisor`, `coverage`, `license-expression`, `numpy`, `pipdeptree`, `pytest`, `pytest-github-actions-annotate-failures`, `syrupy`, `tqdm`, `unidiff` | Helper 0.13.348 pins its tested versions exactly. |
-| Resolver compatibility | `astroid`, `pydantic_core` | Latest versions are outside the selected Pylint/Pydantic constraints. |
-| Stable HA matrix | `pytest-homeassistant-custom-component` | Newer helper releases require Home Assistant 2026.8 prereleases. |
+| `actions/checkout` | Repository checkout | `3d3c42e5aac5ba805825da76410c181273ba90b1` (v7.0.1) |
+| `actions/github-script` | PR metadata and release publication | `3a2844b7e9c422d3c10d287c895573f7108da1b3` (v9.0.0) |
+| `actions/dependency-review-action` | Native dependency diff | `a1d282b36b6f3519aa1f3fc636f609c47dddb294` (v5.0.0) |
+| `github/codeql-action` | Python and Actions security analysis | `7211b7c8077ea37d8641b6271f6a365a22a5fbfa` (v4.36.0) |
+| `ghcr.io/home-assistant/hassfest` | Home Assistant validation | `sha256:a77f1cf7cfc21ad626ebaae52ecb6131a45ab20223f8c2c0750bfca487aa4f05` |
+| `ghcr.io/hacs/action` | HACS validation | `sha256:ea472b182558d08e50221c550fc5cdbba9e1bc1efba53f92bc4fed38e7bc56b9` |
+| `docker.io/rhysd/actionlint` | Workflow syntax and static analysis | `sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667` |
 
-## Vulnerability and license results
+Direct container invocation is intentional for hassfest and HACS: their higher-level actions use
+mutable nested image tags. Only the final release job receives `contents: write`; CodeQL receives
+`security-events: write` solely to upload results.
 
-- The integration-declared dependency closure (`fmi-weather-client`, `geopy`, and their resolved transitives) reports no known vulnerability.
-- The complete HA development/test graph reports 28 advisory rows for two HA-pinned packages: Pillow 12.2.0 (fixed in 12.3.0) and PyJWT 2.12.1 (fixed in 2.13.0). The advisories include High-severity findings. Home Assistant 2026.7.4 requires both affected versions exactly.
-- The repository owner accepted this temporary risk on 2026-07-31 for private testing. The exception is tracked in root `TODO.md`; fixed versions must not be forced over Core's exact metadata.
-- Upgrading the container installer from pip 25.3 to 26.2 removed the installer advisories found in the first audit.
-- `make licenses` reports no unknown license. Copyleft packages in the full test graph include the selected GPL-3.0 FMI client and packages brought in by Home Assistant/test tooling; the inventory describes development/test installation and does not relicense this repository.
-- S14 re-ran all three inventories. The runtime-only FMI/geopy closure remains clean, current beta HA 2026.8.0b3 selects fixed Pillow/PyJWT versions, and the stable owner exception remains necessary until those pins reach a stable HA/helper pair.
-- S15 regenerated the supported freeze after introducing file-only pip bootstrap; only `boto3` and `botocore` moved from 1.43.61 to 1.43.62. Dynamic current-channel runs generated 140-package stable and 141-package prerelease freezes, recreated them exactly, passed `pip check`, and passed 204 offline tests in each environment.
-- GitHub's native dependency-review API rejects fork repositories. S15 therefore retains the
-  native action for a future independent repository and audits this fork's complete committed
-  freeze with `.github/scripts/dependency_audit.py`. Its exception file identifies the exact 18
-  unique Pillow/PyJWT advisory IDs accepted for the two Home Assistant-pinned versions; any new
-  finding or stale exception fails the job.
+## Vulnerabilities, Licenses, And Drift
 
-Representative advisory evidence: [Pillow PYSEC-2026-2253](https://osv.dev/vulnerability/PYSEC-2026-2253), [PyJWT PYSEC-2026-179](https://osv.dev/vulnerability/PYSEC-2026-179), and [pip PYSEC-2026-196](https://osv.dev/vulnerability/PYSEC-2026-196). All links and versions in this document were last checked on 2026-08-01.
+- The integration-declared FMI/geopy dependency closure has no accepted vulnerability exception.
+- Home Assistant 2026.7.4 pins Pillow 12.2.0 and PyJWT 2.12.1 with known advisories. The integration
+  does not import or declare them. The owner-approved private-testing exception is exact by package,
+  version, and advisory ID in `.github/dependency-audit-exceptions.json`; `TODO.md` defines when it
+  must be removed.
+- `make audit` passes only when the complete freeze matches that exact reviewed set. New findings,
+  changed affected versions, and stale exceptions fail. `make audit-raw` intentionally remains
+  nonzero while the upstream pins are vulnerable.
+- `make licenses` must report no unknown license. The full development graph includes copyleft
+  packages selected by the FMI client and Home Assistant tooling; the inventory does not relicense
+  this MIT repository. Review redistribution separately from local/CI installation.
+- `make outdated` is diagnostic. Do not override resolver-controlled transitives independently of
+  their Home Assistant/helper parent merely to reduce the list.
+- Current stable and prerelease checks write independent full freezes, recreate clean environments
+  with `--no-deps`, run `pip check`, verify the selected release channel, and execute the complete
+  offline suite. A generated drift freeze is evidence for one run, not a committed support promise.
+
+## Change Checklist
+
+1. Verify the desired release and constraints from authoritative package/project metadata.
+2. Change `requirements-direct.txt`, `requirements-bootstrap.txt`, or the integration manifest only
+   at the owning boundary; never edit root `requirements.txt` manually.
+3. Run `make lock` for supported direct or transitive changes and review every line of lock drift.
+4. Run `make dev-build`, `make test-full`, `make lint`, `make type-check`, `make validate`,
+   `make audit`, and `make licenses`.
+5. Run both compatibility targets and determine whether a moving-channel failure changes the
+   supported contract or only reports upstream drift.
+6. Update this inventory, `DEVELOPMENT.md`, `COMPATIBILITY_SECURITY.md`, `TODO.md`, and
+   `CHANGELOG.md` when their contracts or accepted risks change.
+
+## Sources
+
+- [Home Assistant on PyPI](https://pypi.org/project/homeassistant/)
+- [`pytest-homeassistant-custom-component` on PyPI](https://pypi.org/project/pytest-homeassistant-custom-component/)
+- [`fmi-weather-client` on PyPI](https://pypi.org/project/fmi-weather-client/)
+- [`fmi-weather-client` source](https://codeberg.org/saaste/fmi-weather-client)
+- [geopy on PyPI](https://pypi.org/project/geopy/)

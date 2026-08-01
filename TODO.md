@@ -30,4 +30,4 @@ Before broader distribution, choose and verify one of these outcomes:
 2. Use an owner-controlled Nominatim instance or proxy.
 3. Add a provider boundary that can be switched without an integration release and remains opt-in.
 
-Evidence: [OSMF Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/) and `docs/maintenance/COMPATIBILITY_SECURITY_AUDIT.md`.
+Evidence: [OSMF Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/) and `docs/maintenance/COMPATIBILITY_SECURITY.md`.

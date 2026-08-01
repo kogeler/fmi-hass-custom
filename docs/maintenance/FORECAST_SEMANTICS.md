@@ -2,7 +2,8 @@
 
 # Forecast Semantics
 
-This document defines how FMI's one-hour point forecast samples are exposed through Home Assistant's hourly and daily weather forecast APIs. It is the S05 contract for correcting daily forecast aggregation.
+This document defines how FMI's one-hour point forecast samples are exposed through Home
+Assistant's hourly and daily weather forecast APIs.
 
 ## Source contracts
 
@@ -76,7 +77,11 @@ Multiple FMI symbols that map to the same Home Assistant condition are equivalen
 
 ## Entity compatibility
 
-Every retained weather entity advertises and implements both hourly and daily forecast methods with their literal granularities. The old `daily_mode` option still creates its legacy extra entity, and its methods are no longer mode-dependent. S11 registry evidence requires preserving that entity: disabling the option leaves its registry/custom ID intact and unavailable, and re-enabling it restores the same record. See `MIGRATIONS.md`.
+Every retained weather entity advertises and implements both hourly and daily forecast methods with
+their literal granularities. The old `daily_mode` option still creates its legacy extra entity,
+and its methods are no longer mode-dependent. The migration contract preserves that entity:
+disabling the option leaves its registry/custom ID intact and unavailable, and re-enabling it
+restores the same record. See `MIGRATIONS.md`.
 
 ## References
 
@@ -84,4 +89,3 @@ Every retained weather entity advertises and implements both hourly and daily fo
 - [Home Assistant forecast-type migration notice](https://developers.home-assistant.io/blog/2023/08/07/weather_entity_forecast_types/), checked 2026-07-31.
 - [FMI WFS examples and timestep guidance](https://en.ilmatieteenlaitos.fi/open-data-manual-wfs-examples-and-guidelines), checked 2026-07-31.
 - [`fmi-weather-client` 1.0.0 source](https://codeberg.org/saaste/fmi-weather-client/src/tag/1.0.0/fmi_weather_client/models.py), checked against the installed package 2026-07-31.
-- Incorrect daily forecast report, checked 2026-07-31.

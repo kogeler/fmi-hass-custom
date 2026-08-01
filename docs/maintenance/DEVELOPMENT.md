@@ -2,9 +2,11 @@
 
 # Development Environment
 
-## Decision
+## Supported Environment
 
-All local commands that depend on the supported Python or Home Assistant version run in rootless Podman. The host currently provides Python 3.13.5, while Home Assistant 2026.7.4 requires Python 3.14.2 or newer, so host execution is not a valid fallback.
+All local commands that depend on the supported Python or Home Assistant version run in rootless
+Podman. Home Assistant 2026.7.4 requires Python 3.14.2 or newer; the host interpreter is never a
+supported fallback even when its version happens to match.
 
 `Containerfile.dev` pins the multi-architecture digest for the official Python 3.14.2 slim image. `requirements-direct.txt` is the reviewed human-maintained dependency source. Root `requirements.txt` is generated from a clean `lock` stage with `python -m pip freeze`, then installed with `--no-deps` in the development image. This is one coherent supported stable HA development/test environment; it does not contain a second beta or compatibility environment.
 
@@ -75,9 +77,21 @@ The compatibility inputs normally remain unpinned. Their generated freezes are p
 not committed support promises; use the workflow/Make logs to diagnose a newly selected package
 before deciding whether the supported direct set and committed root freeze should be upgraded.
 
-Ordinary tests support isolated `pytest-xdist` worker processes through `PYTEST_WORKERS`, for example `2`, `4`, or `auto`; `0` keeps the single-process default. Processes are used instead of threads because Home Assistant tests create per-test event loops and exercise process-global integration state. On the S07 suite, warm-container measurements were 8.871 seconds for `-n 0`, 13.199 seconds for `-n 2`, and 13.586 seconds for `-n 4`, so forcing parallelism would currently slow the suite down. Keep workers opt-in and benchmark again as the suite grows. The live suite and deliberate network-block probe remain sequential.
+Ordinary tests support isolated `pytest-xdist` worker processes through `PYTEST_WORKERS`, for
+example `2`, `4`, or `auto`; `0` keeps the single-process default. Processes are used instead of
+threads because Home Assistant tests create per-test event loops and exercise process-global
+integration state. The 2026-07-31 warm-container benchmark measured 8.871 seconds for `-n 0`,
+13.199 seconds for `-n 2`, and 13.586 seconds for `-n 4`, so forcing parallelism would currently
+slow the suite down. Keep workers opt-in and benchmark again as the suite grows. The live suite and
+deliberate network-block probe remain sequential.
 
-`make audit` checks the complete Home Assistant development/test graph and intentionally remains nonzero while the owner-approved Pillow/PyJWT exception in root `TODO.md` is open. Do not add audit ignores or override Home Assistant's exact package pins to make it green. The separately resolved integration-declared dependency closure had no known vulnerabilities in S03; details and evidence are in `docs/maintenance/DEPENDENCIES.md`.
+`make audit` checks the complete Home Assistant development/test graph against exact reviewed
+package/version/advisory exceptions and passes only when that inventory matches. It also fails when
+an exception becomes stale. `make audit-raw` intentionally remains nonzero while the
+owner-approved Pillow/PyJWT exception in root `TODO.md` is open. Do not add broad audit ignores or
+override Home Assistant's exact package pins to make it green. The separately resolved
+integration-declared dependency closure has no accepted vulnerability exception; details are in
+`DEPENDENCIES.md`.
 
 The HACS validator checks a GitHub ref through the GitHub API and requires the read-only workflow
 token; it cannot validate an uncommitted local working tree anonymously. CI invokes its reviewed
@@ -90,8 +104,7 @@ Ruff is the sole flake8-style linter and the repository formatter. Its configure
 
 ## Layout
 
-S01 moved the integration to `custom_components/fmi/`. Although HACS permits root content with `content_in_root: true`, current hassfest rejected the old checkout because the domain did not match the directory name. The standard layout passes the files to Home Assistant's normal custom-integration loader and avoids test-only import shims.
-
-## Podman storage warning
-
-This host reports that its configured `overlay` driver is overridden by the existing `vfs` storage database. Commands still run rootless with `runc`. S01 does not delete or reset the user's Podman storage to suppress this warning.
+The distributed integration lives in `custom_components/fmi/`. Do not move runtime modules back to
+the repository root or re-enable HACS `content_in_root`: the standard layout is required by the
+current hassfest validation and Home Assistant custom-integration loader, and it avoids test-only
+import shims.

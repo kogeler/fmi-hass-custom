@@ -1,60 +1,52 @@
+<!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
+
 # fmi-hass-custom
 
-`fmi-hass-custom` is a Home Assistant custom component for weather and sensor platform.
-It uses FMI's [open data](https://en.ilmatieteenlaitos.fi/open-data) as a source for
-current and forecasted meteorological data for a given location. Data update frequency
-is hardcoded to 30 minutes.
+`fmi-hass-custom` is a custom Home Assistant integration maintained at
+[github.com/kogeler/fmi-hass-custom](https://github.com/kogeler/fmi-hass-custom). It uses
+[Finnish Meteorological Institute (FMI) Open Data](https://en.ilmatieteenlaitos.fi/open-data)
+to provide current conditions, hourly and daily forecasts, weather sensors, optional station
+observations, lightning data, and sea-level forecasts for a configured location.
 
-## Pre-installation
+Version `1.0.0` supports Home Assistant `2026.7.4`. Moving compatibility checks exercise the
+current stable and prerelease channels as early warnings, but do not create a blanket support
+promise for future releases. This fork is intended for owner testing as a HACS custom repository
+or a manual custom integration, not as an official Home Assistant Core integration.
 
-Follow these instructions if an older manually installed version of the component was in use
+## Main Limitations
 
-    1. Remove all references of the sensor and weather platforms from configuration.yaml
-    2. Restart Home Assistant
-    3. UI references could also be removed (or they could be the markers to correct when the integration is loaded again using steps below)
-    4. Most importantly clear the browser cache where Home Assistant UI is accessed (the new integration may sometimes not show up without this step)
+- Data depends on FMI and network availability. Forecast/current data refresh every 30 minutes;
+  configured station observations refresh every 10 minutes.
+- Only the current stable Home Assistant release is supported and continuously checked. Earlier
+  Home Assistant versions are not covered by the compatibility contract.
+- Changing Home Assistant's Home zone does not move an entry automatically. Use the integration's
+  **Reconfigure** action to change coordinates.
+- Lightning is opt-in and its address enrichment uses the public Nominatim service. This is
+  accepted only for small private deployments until the tracked provider limitation is resolved.
+- Station observations require a valid FMI station ID. Sea-level and lightning sensors can be
+  unavailable where FMI returns no applicable data or an optional external source fails.
 
-## HACS installation
+## Documentation
 
-    1. Install [HACS](https://www.hacs.xyz/)
-    2. Add this repository as a [custom repository](https://www.hacs.xyz/docs/faq/custom_repositories/), type is "Integration"
-    3. Do steps 5-7 from "Manual installation" instructions below
+### Users
 
-## Manual installation
+- [Installation, configuration, upgrades, dashboards, and troubleshooting](docs/USER_GUIDE.md)
+- [Release notes](CHANGELOG.md)
+- [Known limitations and follow-up work](TODO.md)
 
-    1. Using a tool of choice open the directory (folder) for HA configuration (where you find configuration YAML file)
-    2. If `custom_components` directory does not exist, create one
-    3. In the `custom_components` directory create a new folder called "fmi"
-    4. Download all the files from the this repository and place the files in the new directory created.
-       If using `git clone` command, ensure that the local directory is renamed from `fmi-hass-custom` to `fmi`.
-       Either way, all files of the repo/download should be in `<HA configuration location>/custom_components/fmi/`
-    5. Restart Home Assistant
-    6. Install integration from UI (Settings --> Devices & services --> Add integration --> Search for fmi)
-    7. Specify the latitude and longitude (default values are picked from the Home Assistant configuration)
+### Maintainers
 
-## Weather and sensors
-
-In addition to the weather platform, default sensors include different weather conditions (temperature, humidity, wind speed, cloud coverage, etc.),
-"best time of the day" (based on preferences), closest lightning strikes and sea level forecasts.
-Preferences for "best time of the day" can be tweaked by changing the values via UI
-(Settings --> Devices & services --> Integrations --> Finnish Meteorological Institute --> \<weather location\> --> Configure).
-For tracking the weather and sensors of another location follow steps 6-7 of "Manual installation" with the latitude and longitude of the location.
-
-To move an existing entry, open **Settings > Devices & services**, select the FMI integration entry, and choose **Reconfigure**. Enter the new latitude and longitude. FMI validates the location before saving it, then Home Assistant reloads only that entry with the new place data. Existing entity IDs, including user-customized IDs used by automations and dashboards, are preserved. A location already used by another FMI entry cannot be selected.
-
-The integration intentionally does not track Home zone coordinate changes automatically. Run **Reconfigure** when the location should change.
-
-Based on the latitude and longitude, location name is derived by reverse geo-coding. Sensors are then grouped based on the derived location name.
-For example `weather.<place_name>`, `sensor.<place_name>_temperature`, `sensor.<place_name>_humidity`, etc.
-
-Integration options (Settings --> Devices & services --> Integrations --> Finnish Meteorological Institute --> \<weather location\> --> Configure)
-include forecast interval and other weather parameters. These weather parameters are used to
-determine the "Best Time Of The Day". Additionally there is are two options:
-
-- Set "Daily mode" that will provide a view of minimum and maximum temperatures for the forecasts. By default this is set to True.
-- Set "Lightning sensor" to display closes lightning strikes within a bounding box of 500 kilometers. By default this is set to False.
+- [Development environment and commands](docs/maintenance/DEVELOPMENT.md)
+- [CI and release gates](docs/maintenance/CI.md)
+- [HACS repository and release model](docs/maintenance/HACS_RELEASES.md)
+- [Forecast semantics](docs/maintenance/FORECAST_SEMANTICS.md)
+- [Migration guarantees](docs/maintenance/MIGRATIONS.md)
+- [Compatibility, security, and privacy contract](docs/maintenance/COMPATIBILITY_SECURITY.md)
+- [Runtime architecture and invariants](docs/maintenance/RUNTIME.md)
+- [Maintenance plan](plans/P01.md) and [session handoffs](docs/P01/)
+- [License](LICENSE)
 
 ## Maintainer
 
-[@kogeler](https://github.com/kogeler) maintains this fork at
-[github.com/kogeler/fmi-hass-custom](https://github.com/kogeler/fmi-hass-custom).
+[@kogeler](https://github.com/kogeler) maintains this fork. Report integration problems in the
+[canonical repository issue tracker](https://github.com/kogeler/fmi-hass-custom/issues).

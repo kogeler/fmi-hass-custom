@@ -29,8 +29,10 @@ The current stable FMI client models values as numeric wrappers, but the integra
 - empty forecast collections return empty hourly/daily lists;
 - best-condition selection skips incomplete candidates and retains a timezone-aware current timestamp when one is valid.
 
-## Audit Boundary
+## Optional-Source Time Rules
 
-S08 found no remaining day-of-month comparison in the integration. S05's local-day forecast aggregation and S08's best-condition selection use complete dates and current Home Assistant time helpers.
-
-Lightning and sea-level request construction still uses naive `datetime.today()`, and lightning exposes formatted string timestamps. Those paths belong to S09's already-defined timestamp-age, parser-validation, and optional-source hardening work; S08 does not partially change their external contract. S09 must replace the naive preparation with aware UTC operations and validate all exposed optional-source timestamps.
+Lightning and sea-level request windows use Home Assistant's aware UTC clock. Lightning payload
+timestamps must be aware, no later than the current refresh time, and no older than the configured
+inclusive maximum age. Sea-level timestamps must be aware and are normalized to UTC before
+sorting and exposure. Malformed or naive optional-source timestamps make only the owning record or
+source unavailable; they never fall back to host-local time. See `OPTIONAL_SOURCES.md`.

@@ -2,7 +2,8 @@
 
 # Source Availability Policy
 
-This policy defines how the integration behaves when one FMI data source is unavailable. It addresses forecast failures disabling observations and applies to the stable Home Assistant environment selected by the maintenance plan.
+This policy defines how the integration behaves when one FMI data source is unavailable. It is
+the current source-isolation contract for the supported Home Assistant environment.
 
 ## Current conditions and setup
 
@@ -34,6 +35,10 @@ Source logs are transition-based: one warning when a source becomes unavailable 
 
 ## Optional sources
 
-Lightning and sea-level work remains optional to current weather. An exception at either optional update boundary clears only that source and does not fail the primary coordinator. Detailed transport, parsing, freshness, geocoding, and option behavior remains assigned to S09.
+Lightning and sea-level work remains optional to current weather. An exception at either optional
+update boundary clears only that source and does not fail the primary coordinator. Detailed
+transport, parsing, freshness, geocoding, and option behavior is defined in
+`OPTIONAL_SOURCES.md`.
 
-Policy evidence: forecast failure disabling observations report, checked 2026-07-31.
+Verification: `tests/test_availability.py` and `tests/test_lifecycle.py` cover setup matrices,
+source-local failure, stale clearing, transition logs, and recovery.

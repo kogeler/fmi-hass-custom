@@ -14,7 +14,7 @@ The public locations are deliberately unrelated to the repository owner's Home A
 |---|---|---|
 | Southern forecast | Helsinki, `60.17,24.94` | Rounded city-centre coordinates provide a stable southern Finland point inside the edited Scandinavia forecast domain. |
 | Northern forecast | Kilpisjarvi, `69.05,20.79` | Rounded public station-area coordinates exercise high-latitude output near Finland's north-western boundary. FMI's current station table lists Enontekio Kilpisjarvi as an operative weather station at approximately `69.0,20.8`. |
-| Observation | Helsinki Kumpula, `FMISID 101004` | FMI publishes the station identifier and meteorological role; the selected client returned a current observation during S12 verification. |
+| Observation | Helsinki Kumpula, `FMISID 101004` | FMI publishes the station identifier and meteorological role; the selected client returns current observations for this public station. |
 
 ## Commands
 
@@ -81,10 +81,10 @@ No test asserts an exact temperature, condition, precipitation, station reading,
 - `FMI parsing/contract failure` or `LiveContractError`: response/model/service shape, timestamps, values, or ordering drifted. Preserve the failing public metadata and add an offline fixture before adapting code.
 - `Home Assistant setup/exposure failure`: client data did not complete config-entry setup or reach entity/service APIs. Reproduce offline at the coordinator/entity boundary before changing lifecycle behavior.
 
-S15 retains the exact four bounded tests and request budget as the final test step in required
-`ci.yml`. The job uses no secret and runs for pull requests and, through the reusable release gate,
-every `master` push even when version or validation fails. There is no standalone or scheduled live
-workflow. An FMI transport/service outage is now intentionally merge- and release-blocking; use the
+The exact four bounded tests and request budget are the final test step in required `ci.yml`. The
+job uses no secret and runs for pull requests and, through the reusable release gate, every
+`master` push even when version or validation fails. There is no standalone or scheduled live
+workflow. An FMI transport/service outage is intentionally merge- and release-blocking; use the
 failure classification above and re-run once before diagnosing an integration regression.
 
 ## Licence, Attribution, And Privacy
