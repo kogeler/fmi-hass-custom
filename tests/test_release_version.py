@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).parents[1]
+VERSION_FILE = ROOT / ".version"
 VERSION_SCRIPT = ROOT / ".github" / "scripts" / "version.py"
 
 
@@ -158,7 +159,7 @@ def test_repository_metadata_is_release_ready() -> None:
     result = _run(ROOT, "check")
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout == "1.0.0\n"
+    assert result.stdout == VERSION_FILE.read_text(encoding="utf-8")
 
 
 def test_initial_version_increments_legacy_release(tmp_path: Path) -> None:

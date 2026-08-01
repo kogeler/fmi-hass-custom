@@ -14,6 +14,13 @@ supported fallback even when its version happens to match.
 
 The committed supported freeze uses `pytest-homeassistant-custom-component==0.13.348`, which maps exactly to Home Assistant 2026.7.4. Newer helper releases target Home Assistant prereleases and are intentionally excluded from that stable lock; the dynamic compatibility targets discover and test them without changing the supported environment.
 
+Local lock/development images use stable `localhost/fmi-hass-custom-*:local` names. Image names and
+the `.cache/podman-dev.stamp` path deliberately do not duplicate the Home Assistant version. The
+stamp depends on the Containerfile, Makefile, bootstrap file, and complete freeze, so a normal
+dependency update invalidates and rebuilds the environment automatically. `LOCAL_IMAGE_PREFIX`,
+`LOCK_IMAGE`, `DEV_IMAGE`, and `DEV_STAMP` remain overridable Make variables for parallel or custom
+local setups.
+
 ## Commands
 
 | Task | Command |
@@ -66,6 +73,10 @@ To update a direct supported dependency:
 4. Review the direct change and every transitive lock change, run `make dev-build`, `pip check`
    through the image build, the full offline gates, audits, and the manual stable/prerelease
    compatibility targets.
+
+No Makefile image tag or stamp name changes during a Home Assistant dependency update. If the new
+Home Assistant release requires a different Python version, review and update the pinned
+`PYTHON_IMAGE` digest separately before regenerating the freeze.
 
 To refresh only transitives, leave `requirements-direct.txt` unchanged and run `make lock` in the
 clean resolver stage. Review why every transitive moved and run the same verification. Never edit

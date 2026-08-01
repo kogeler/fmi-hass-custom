@@ -66,6 +66,17 @@ def test_pip_installs_use_requirement_files_without_inline_versions() -> None:
     assert "pytest-homeassistant-custom-component==" not in workflows
 
 
+def test_local_image_names_do_not_duplicate_home_assistant_version() -> None:
+    """Dependency files, not local image names, own the supported HA version."""
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+    assert "LOCAL_IMAGE_PREFIX ?= localhost/fmi-hass-custom" in makefile
+    assert "LOCK_IMAGE ?= $(LOCAL_IMAGE_PREFIX)-lock:local" in makefile
+    assert "DEV_IMAGE ?= $(LOCAL_IMAGE_PREFIX)-dev:local" in makefile
+    assert "DEV_STAMP ?= .cache/podman-dev.stamp" in makefile
+    assert "2026.7.4" not in makefile
+
+
 def test_compatibility_resolves_current_channels_and_freezes_before_testing() -> None:
     """Event/manual compatibility jobs recreate moving graphs without release pins."""
     workflow = (WORKFLOWS / "compatibility.yml").read_text(encoding="utf-8")

@@ -28,7 +28,7 @@ Equivalent explicit command in the supported Podman environment:
 
 ```bash
 podman run --rm --userns=keep-id -v "$PWD:/workspace:Z" -w /workspace \
-  localhost/fmi-hass-custom-dev:2026.7.4 \
+  localhost/fmi-hass-custom-dev:local \
   python -m pytest -o addopts= --strict-config --strict-markers -n 0 -m live
 ```
 
@@ -37,7 +37,7 @@ Prove default/offline marker separation:
 ```bash
 make test-fast
 podman run --rm --userns=keep-id -v "$PWD:/workspace:Z" -w /workspace \
-  --network=none localhost/fmi-hass-custom-dev:2026.7.4 \
+  --network=none localhost/fmi-hass-custom-dev:local \
   python -m pytest -q tests/test_live_fmi.py
 ```
 
