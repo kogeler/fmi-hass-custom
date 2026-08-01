@@ -6,7 +6,7 @@ Last verified: 2026-07-31 against Home Assistant 2026.7.4, `fmi-weather-client` 
 
 ## Purpose And Selection
 
-The live suite is a marker-isolated compatibility probe, not an ordinary regression suite. It checks the installed dependency against FMI WFS and then loads the integration through current Home Assistant config-entry, entity-state, entity-registry, and weather forecast-service APIs. The Home Assistant test helper installs a per-test DNS/socket guard independently of pytest's command-line socket option, so the live module narrowly restores real DNS/sockets in an autouse fixture and reinstates the guard during teardown. Default tests remain guarded and offline; the current `verify.yml` explicitly selects the live marker in a separate step after they pass.
+The live suite is a marker-isolated compatibility probe, not part of the ordinary offline pytest selection. It checks the installed dependency against FMI WFS and then loads the integration through current Home Assistant config-entry, entity-state, entity-registry, and weather forecast-service APIs. The Home Assistant test helper installs a per-test DNS/socket guard independently of pytest's command-line socket option, so the live module narrowly restores real DNS/sockets in an autouse fixture and reinstates the guard during teardown. Required `ci.yml` runs the four live tests as a distinct step immediately after the offline coverage gate for every pull request and every `master` release run.
 
 The public locations are deliberately unrelated to the repository owner's Home Assistant configuration:
 
@@ -81,7 +81,11 @@ No test asserts an exact temperature, condition, precipitation, station reading,
 - `FMI parsing/contract failure` or `LiveContractError`: response/model/service shape, timestamps, values, or ordering drifted. Preserve the failing public metadata and add an offline fixture before adapting code.
 - `Home Assistant setup/exposure failure`: client data did not complete config-entry setup or reach entity/service APIs. Reproduce offline at the coordinator/entity boundary before changing lifecycle behavior.
 
-The interim `verify.yml` step follows the workflow's pull-request and default-branch push triggers, is blocking, and does not use `continue-on-error`. This owner-selected S12 arrangement deliberately keeps the probe next to the main tests; S15 owns the final CI trigger, job separation, and upstream-outage policy.
+S15 retains the exact four bounded tests and request budget as the final test step in required
+`ci.yml`. The job uses no secret and runs for pull requests and, through the reusable release gate,
+every `master` push even when version or validation fails. There is no standalone or scheduled live
+workflow. An FMI transport/service outage is now intentionally merge- and release-blocking; use the
+failure classification above and re-run once before diagnosing an integration regression.
 
 ## Licence, Attribution, And Privacy
 

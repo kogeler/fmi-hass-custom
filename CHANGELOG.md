@@ -4,7 +4,7 @@
 
 All notable changes to this project are documented in this file.
 
-## Unreleased
+## 1.0.0 - 2026-08-01
 
 ### Fixed
 
@@ -28,6 +28,9 @@ All notable changes to this project are documented in this file.
 - Added Ruff formatting/linting, coverage, type checking, network-blocking tests, hassfest/HACS validation, and pinned GitHub Actions checks.
 - Added a verified maintenance baseline, dependency/license inventory, session handoffs, and repository guidance for future maintenance work.
 - Added privacy-safe Home Assistant diagnostics with configured coordinates and legacy coordinate-derived identities redacted.
+- Added production pull-request, dependency, CodeQL, event/manual current stable and prerelease compatibility, and release workflows with a mandatory version increase, 95% coverage gate, and required bounded live FMI probes after offline tests.
+- Added automatic PR-body synchronization from the source branch's latest changelog section while preserving manually written PR context.
+- Added a local Home Assistant brand icon and clean-distribution smoke tests for the exact HACS/manual installation tree.
 
 ### Changed
 
@@ -42,9 +45,11 @@ All notable changes to this project are documented in this file.
 - Updated sensors to Home Assistant's current `SensorEntity`, entity-description, device-class, state-class, translated-name, and native-unit conventions while retaining existing unique IDs.
 - Migrated config entries from coordinate-based identifiers to stable internal identities so coordinates and resolved place names can change safely, while conservatively preserving registry/unique IDs, customized or ambiguous suffixed entity IDs, and the optional legacy daily entity.
 - Moved per-entry coordinators and listener cleanup to typed `ConfigEntry.runtime_data` and aligned read-only coordinator platforms with current Home Assistant parallel-update guidance.
+- Made root `.version` the enforced version source for the manifest, changelog section, exact Git tag, and GitHub Release; version `1.0.0` is published automatically only after the `master` quality gates pass.
 
 ### Security
 
 - Upgraded the container and CI installer to pip 26.2 and added vulnerability/license audit commands.
 - Documented a temporary owner-approved exception for Pillow and PyJWT versions pinned by Home Assistant 2026.7.4. The required follow-up is tracked in `TODO.md`.
 - Prevented precise configured coordinates, raw FMI responses, and external exception payloads from reaching integration or dependency logs.
+- Replaced mutable nested hassfest/HACS images with reviewed digests and restricted release write access to the final post-validation publication job.

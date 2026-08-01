@@ -1,0 +1,5 @@
+# Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT.
+# Dynamic compatibility inputs. Intentionally unpinned.
+fmi-weather-client
+geopy
+pytest-homeassistant-custom-component

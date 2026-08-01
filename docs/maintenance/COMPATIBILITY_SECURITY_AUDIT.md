@@ -15,7 +15,7 @@ No critical finding remains. Precise configured coordinates and raw external res
 | Medium | Per-entry coordinators/listener were stored as an untyped nested `hass.data` dictionary rather than the current `ConfigEntry.runtime_data` contract. | Fixed with typed `FMIConfigEntry`/`FMIEntryRuntimeData`; setup, reload, failed unload, multi-entry isolation, migrations, and removal remain covered through public HA lifecycle tests. |
 | Medium | No user-downloadable diagnostics existed, and returning config data naively would reveal latitude, longitude, or the coordinate-derived legacy entity identity. | Fixed with diagnostics that redact all three fields and expose only options, config version, poll cadence, success state, and source booleans. No place, weather model, response payload, entry ID, or unique ID is returned. |
 | Medium, accepted for private testing | Optional lightning address enrichment sends public FMI strike coordinates to the public OSMF Nominatim service on a cache miss. This is periodic application use, which the policy discourages at scale. | It does not send the configured home coordinates, is disabled unless lightning is enabled, caches results, uses one worker, identifies the repository, displays attribution, resolves at most one address per update, and is globally limited to 4 requests/minute. This fits the owner's current single-user testing, not an assumed public user base. `TODO.md` requires removal, a switchable provider, or an owner-controlled service before broader distribution. |
-| Medium, S15-owned | Workflow actions are SHA-pinned and permissions are read-only, but the selected hassfest and HACS actions internally run mutable `ghcr.io/home-assistant/hassfest` and `ghcr.io/hacs/action:main` images. Required CI also lacks dependency automation/review. | Documented for S15, which already owns production CI/CD. The mutable validation containers receive no repository secrets; the HACS job's token is read-only and the repository is public. This is not a stable runtime blocker. |
+| Fixed in S15 | Preliminary hassfest and HACS actions internally selected mutable image tags, and required CI lacked dependency automation/review. | S15 invokes reviewed validation image digests directly, adds actionlint/CodeQL/dependency review/Dependabot, keeps validation read-only, and grants `contents: write` only to the final post-gate release job. |
 | Low | A lightning radius centered exactly at either pole generated latitude/longitude values outside WGS84 request limits. | Fixed by clamping latitude and using the full valid longitude range when a radius reaches a pole or crosses the antimeridian. Core weather remains independent. |
 
 ## Home Assistant Guidance Review
@@ -41,8 +41,8 @@ Documentation-oriented quality rules remain assigned to S16. Branding/tier metad
 |---|---|---|
 | Home Assistant 2026.7.4 / Python 3.14.2 | Supported current stable | Exact frozen environment; complete offline lifecycle/config/entity/migration suite, typing, lint, coverage, layout, and hassfest validation pass. Remote HACS/workflow execution remains an S15 release gate. |
 | Home Assistant 2026.6.x | Not supported/retained | This pre-1.0 maintenance line supports current stable only. No previous-stable claim is made, avoiding an untested compatibility promise. |
-| Home Assistant 2026.8.0b2 / helper 0.13.350 | Informational beta | Matching beta harness installs cleanly and the full offline suite passes. |
-| Home Assistant 2026.8.0b3 / helper 0.13.350 | Informational latest beta | The full offline suite passes after replacing only HA with b3. The helper still requires b2 exactly, so `pip check` correctly reports that harness metadata mismatch; it is not a stable blocker. |
+| Latest Home Assistant stable / compatible current helper | Manual drift check | S15 resolves both without committed version pins, captures the complete graph with `pip freeze`, recreates it, requires clean metadata, and runs the full offline suite. The 2026-08-01 run selected HA 2026.7.4/helper 0.13.348 and passed 204 tests. |
+| Latest Home Assistant prerelease / current helper | Informational drift check | S15 resolves both without committed version pins, independently advances HA to the newest prerelease, recreates the full freeze, and runs the suite. The 2026-08-01 run selected HA 2026.8.0b3/helper 0.13.351, passed `pip check`, and passed 204 tests. A future sole helper-to-HA metadata lag is reported but may remain informational only while the suite passes. |
 
 The v0.6.2 config/registry migration cases run inside the stable and beta suites, covering upgrade behavior as part of the same matrix.
 
@@ -64,9 +64,9 @@ The v0.6.2 config/registry migration cases run inside the stable and beta suites
 ## Workflow Review
 
 - The workflow grants only `contents: read`, defines cancellation concurrency, uses bounded timeouts, pins `actions/checkout` to the current v7.0.1 commit, and pins the Python image by digest.
-- The hassfest/HACS action source references are immutable SHAs and their repository licenses are known. Their internal mutable image references are the S15 finding above.
-- The interim live probe deliberately runs after offline tests in the same blocking workflow, per owner direction. It has no secrets and uses public fixed locations with a documented request budget. S15 owns its final topology.
-- No workflow interpolates pull-request-controlled text into shell commands. Dependency-review, scheduled drift checks, and update automation remain explicit S15 deliverables.
+- Hassfest, HACS, and actionlint execute from reviewed immutable image digests. JavaScript actions remain full-SHA-pinned and are tracked by Dependabot.
+- The bounded live probe runs after offline tests in required pull-request and `master` CI. It has no secrets, uses public fixed locations with a documented request budget, and intentionally blocks the gate on failure.
+- No workflow interpolates pull-request-controlled text into shell commands. Dependency review, manually triggered drift checks, and update automation are implemented in S15.
 
 ## Sources
 
