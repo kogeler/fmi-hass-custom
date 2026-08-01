@@ -2,7 +2,7 @@
 
 # Dependency Inventory
 
-Inventory date: 2026-07-31. Versions were checked against package metadata from PyPI and action metadata from the upstream GitHub repositories. The supported test environment is Home Assistant 2026.7.4 on Python 3.14.2.
+Inventory date: 2026-07-31; S14 audit refreshed 2026-08-01. Versions were checked against package metadata from PyPI and action metadata from the upstream GitHub repositories. The supported test environment is Home Assistant 2026.7.4 on Python 3.14.2.
 
 ## Resolution model
 
@@ -17,7 +17,7 @@ Inventory date: 2026-07-31. Versions were checked against package metadata from 
 |---|---|---:|---:|---:|---|---|
 | Python | HA runtime; direct platform | 3.14.2 | 3.14.2 | 3.14.2 | PSF | Home Assistant 2026.7.4 requires Python >=3.14.2. The official slim image remains pinned by multi-architecture digest. [Image](https://hub.docker.com/_/python) |
 | Home Assistant | Test host; direct development | 2026.7.4 | 2026.7.4 | 2026.7.4 | Apache-2.0 | Current stable release; prereleases are excluded from the supported environment. [PyPI](https://pypi.org/project/homeassistant/) |
-| `pytest-homeassistant-custom-component` | HA test harness; direct development | 0.13.348 | 0.13.350 | 0.13.348 | MIT | 0.13.348 pins HA 2026.7.4. Releases 0.13.349/0.13.350 pin 2026.8 prereleases, so they do not represent the stable support matrix. [PyPI](https://pypi.org/project/pytest-homeassistant-custom-component/) |
+| `pytest-homeassistant-custom-component` | HA test harness; direct development | 0.13.348 | 0.13.350 | 0.13.348 | MIT | 0.13.348 pins HA 2026.7.4. Release 0.13.350 pins HA 2026.8.0b2; current HA beta b3 is one prerelease ahead of its helper, so neither represents the stable support matrix. [PyPI](https://pypi.org/project/pytest-homeassistant-custom-component/) |
 | `fmi-weather-client` | FMI API; direct runtime | 0.7.0 | 1.0.0 | 1.0.0 | GPL-3.0 | Exact manifest pin. Public models, errors, and async methods remain compatible. S06 found that 1.0.0 still requests forecast `WindGust`, which FMI returns as NaN for the selected producer; the integration now uses a narrow contract-tested adapter to add `HourlyMaximumGust` to the same request and normalize the existing model. [PyPI](https://pypi.org/project/fmi-weather-client/), [source](https://codeberg.org/saaste/fmi-weather-client) |
 | `geopy` | Reverse geocoding/distance; direct runtime | >=2.1.0 | 2.5.0 | 2.5.0 | MIT | Exact manifest pin because integration modules import it directly. [PyPI](https://pypi.org/project/geopy/) |
 | `python-dateutil` | Legacy time-zone conversion; removed direct runtime | unpinned | 2.9.0.post0 | Test transitive only | Apache-2.0 / BSD-3-Clause | S08 replaced integration imports with Home Assistant's current timezone helpers. It remains in the complete freeze through `freezegun`, selected by the Home Assistant pytest helper. [PyPI](https://pypi.org/project/python-dateutil/) |
@@ -49,13 +49,15 @@ All action references are immutable commit SHAs. Branch-tip actions do not have 
 | `home-assistant/actions/hassfest` | HA validation | `ab220296...` | master 2026-07-30 | `ab22029681aa532bfe7de5774a9972d67bfbd2c0` | Apache-2.0 | Current master; no stable release tag is used by upstream guidance. [Commit](https://github.com/home-assistant/actions/commit/ab22029681aa532bfe7de5774a9972d67bfbd2c0) |
 | `hacs/action` | HACS validation | `1ebf01c...` | main 2026-06-08 | `1ebf01c408f29afcb6406bd431bc98fd8cbb15aa` | MIT | Current main is newer than latest tag 22.5.0 and was already pinned. [Commit](https://github.com/hacs/action/commit/1ebf01c408f29afcb6406bd431bc98fd8cbb15aa) |
 
+S14 verified the top-level action references remain current and immutable. The selected hassfest composite action nevertheless runs unpinned `ghcr.io/home-assistant/hassfest`, and the selected HACS Docker action declares `ghcr.io/hacs/action:main`. This nested mutability is documented as a Medium supply-chain finding for S15 replacement with digest-pinned execution; current workflow permissions remain `contents: read` and no repository secrets are provided.
+
 ## Outdated transitive report
 
-`make outdated` reports 22 packages below their individual newest releases. Every item is resolver-controlled rather than an independently selectable direct dependency:
+`make outdated` reports 24 packages below their individual newest releases. Every item is resolver-controlled rather than an independently selectable direct dependency:
 
 | Constraint owner | Packages reported outdated | Reason not overridden |
 |---|---|---|
-| Home Assistant/Core closure | `acme`, `astral`, `cryptography`, `pillow`, `PyJWT`, `pyOpenSSL`, `snitun`, `uv`, `voluptuous` | HA 2026.7.4 or an exact HA dependency selects these versions. Independent overrides make `pip check` fail or create an unsupported Core graph. |
+| Home Assistant/Core closure | `acme`, `astral`, `boto3`, `botocore`, `cryptography`, `pillow`, `PyJWT`, `pyOpenSSL`, `snitun`, `uv`, `voluptuous` | HA 2026.7.4 or an HA dependency selects these versions. Independent overrides make `pip check` fail or create an unsupported Core graph. |
 | HA pytest helper | `aiohasupervisor`, `coverage`, `license-expression`, `numpy`, `pipdeptree`, `pytest`, `pytest-github-actions-annotate-failures`, `syrupy`, `tqdm`, `unidiff` | Helper 0.13.348 pins its tested versions exactly. |
 | Resolver compatibility | `astroid`, `pydantic_core` | Latest versions are outside the selected Pylint/Pydantic constraints. |
 | Stable HA matrix | `pytest-homeassistant-custom-component` | Newer helper releases require Home Assistant 2026.8 prereleases. |
@@ -67,5 +69,6 @@ All action references are immutable commit SHAs. Branch-tip actions do not have 
 - The repository owner accepted this temporary risk on 2026-07-31 for private testing. The exception is tracked in root `TODO.md`; fixed versions must not be forced over Core's exact metadata.
 - Upgrading the container installer from pip 25.3 to 26.2 removed the installer advisories found in the first audit.
 - `make licenses` reports no unknown license. Copyleft packages in the full test graph include the selected GPL-3.0 FMI client and packages brought in by Home Assistant/test tooling; the inventory describes development/test installation and does not relicense this repository.
+- S14 re-ran all three inventories. The runtime-only FMI/geopy closure remains clean, current beta HA 2026.8.0b3 selects fixed Pillow/PyJWT versions, and the stable owner exception remains necessary until those pins reach a stable HA/helper pair.
 
-Representative advisory evidence: [Pillow PYSEC-2026-2253](https://osv.dev/vulnerability/PYSEC-2026-2253), [PyJWT PYSEC-2026-179](https://osv.dev/vulnerability/PYSEC-2026-179), and [pip PYSEC-2026-196](https://osv.dev/vulnerability/PYSEC-2026-196). All links and versions in this document were checked on 2026-07-31.
+Representative advisory evidence: [Pillow PYSEC-2026-2253](https://osv.dev/vulnerability/PYSEC-2026-2253), [PyJWT PYSEC-2026-179](https://osv.dev/vulnerability/PYSEC-2026-179), and [pip PYSEC-2026-196](https://osv.dev/vulnerability/PYSEC-2026-196). All links and versions in this document were last checked on 2026-08-01.

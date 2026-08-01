@@ -20,7 +20,7 @@ from homeassistant.util.json import JsonValueType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.fmi import FMIDataUpdateCoordinator
-from custom_components.fmi.const import COORDINATOR, DOMAIN
+from custom_components.fmi.const import DOMAIN
 from custom_components.fmi.weather import FMIWeatherEntity
 
 
@@ -93,7 +93,7 @@ async def test_mocked_config_entry_loads(
 
     forecast_updates: list[list[JsonValueType] | None] = []
     unsubscribe = entity.async_subscribe_forecast("daily", forecast_updates.append)
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     unsubscribe()

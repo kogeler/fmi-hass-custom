@@ -15,11 +15,8 @@ AUX_HTTP_CONNECT_TIMEOUT_SECONDS = 2
 AUX_HTTP_READ_TIMEOUT_SECONDS = 3
 AUX_HTTP_MAX_PAYLOAD_BYTES = 2 * 1024 * 1024
 
-COORDINATOR = "coordinator"
-COORDINATOR_OBSERVATION = "coordinator_observation"
 FORECAST_UPDATE_INTERVAL = timedelta(minutes=30)
 OBSERVATION_UPDATE_INTERVAL = timedelta(minutes=10)
-UNDO_UPDATE_LISTENER = "undo_update_listener"
 
 CONF_FORECAST_DAYS = "forecast_days"
 CONF_MIN_HUMIDITY = "min_relative_humidity"

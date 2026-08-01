@@ -12,8 +12,8 @@ No critical finding was reproduced. One high availability defect and one medium 
 |---|---|---|---|
 | High | Request-library transport failures and malformed FMI responses escaped the source-specific coordinator boundaries. A current failure skipped place fallback and retained stale internal data behind a failed refresh; a forecast-only parse failure made the primary coordinator fail and could put initial setup into retry despite valid current weather. | Failing Home Assistant tests reproduced both paths. The coordinator now classifies the finite set of transport, XML/parser, and external-shape exceptions at current, place, forecast, and station source boundaries. Current fallback/stale clearing and forecast-only degradation now follow `AVAILABILITY.md`. | Fixed |
 | Medium | Importing `const.py` called `logging.basicConfig`, which can change the process-wide root logger when no handler has been configured yet. | An import/reload regression captured the call. The integration now obtains its namespaced logger without configuring Home Assistant's global logging policy. | Fixed |
-| Medium | The selected upstream parser can include full FMI response content in its own error logs after structurally valid XML fails deeper parsing; coordinator debug messages also contain configured coordinates. This is a privacy/diagnostic-output question, not required for the availability fix. | No normal successful update emits coordinates above debug. S14 explicitly owns full log/diagnostic privacy review and must decide whether the dependency logger or integration debug detail needs suppression/redaction. | Deferred to S14 |
-| Low | A lightning bounding box at exactly a geographic pole produces an impractically large longitude span because the parallel radius approaches zero. | Home Assistant accepts pole coordinates, but the impact is isolated to the optional lightning request; core FMI current/forecast data remains available and the option is normally used within Finland. Document or bound this edge if S14 retains worldwide coordinate support. | Documented |
+| Medium | The selected upstream parser can include full FMI response content in its own error logs after structurally valid XML fails deeper parsing; coordinator debug messages also contain configured coordinates. This is a privacy/diagnostic-output question, not required for the availability fix. | S14 removed configured-coordinate debug output, sanitized external error detail, and installed a dependency-logger filter that retains the generic parser error without raw dictionary/XML or coordinate-bearing dependency debug records. | Fixed in S14 |
+| Low | A lightning bounding box at exactly a geographic pole produces an impractically large longitude span because the parallel radius approaches zero. | S14 clamps the latitude and uses the full valid longitude span when the radius reaches a pole or crosses the antimeridian. | Fixed in S14 |
 
 ## Candidate-Risk Disposition
 
@@ -33,8 +33,8 @@ No critical finding was reproduced. One high availability defect and one medium 
 | Global logging configuration | Medium, fixed in S13 | `logging.basicConfig` was reproduced and removed. |
 | Legacy/deprecated weather or sensor APIs | Not reproducible | Current entity classes, native units, forecast methods, and feature flags pass Home Assistant 2026.7.4; the full suite also passes with warnings treated as errors. |
 | Mutable coordinates control identity | Not reproducible after S07/S11 | Stable config/device identity and conservative idempotent registry migration are covered. |
-| Exact coordinates in logs/diagnostics | Medium, S14 owner | Successful normal-level logs are clean; debug and upstream parser failure output require the dedicated privacy audit. |
-| Dependency/runtime graph defect | S14 owner | S03 documented the supported graph and temporary Home Assistant-pinned exceptions; S14 owns the final vulnerability/compatibility refresh. |
+| Exact coordinates in logs/diagnostics | Fixed in S14 | Sentinel-coordinate regressions cover integration debug/error, upstream parser payload logs, config-flow validation, and redacted diagnostics. |
+| Dependency/runtime graph defect | Audited in S14 | The integration runtime closure is clean; the formal owner exception remains limited to two exact stable-HA pins and is fixed in current beta. |
 
 ## Focused Runtime Review
 

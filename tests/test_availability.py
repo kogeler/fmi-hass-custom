@@ -25,8 +25,6 @@ from custom_components.fmi import fmi as fmi_client
 from custom_components.fmi.const import (
     CONF_LIGHTNING,
     CONF_OBSERVATION_STATION,
-    COORDINATOR,
-    COORDINATOR_OBSERVATION,
     DOMAIN,
 )
 from tests.helpers.fmi import forecast_from_fixture, weather_from_fixture
@@ -123,7 +121,7 @@ async def test_observation_by_place_loads_when_forecast_wfs_fails(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
     assert entry.state is ConfigEntryState.LOADED
     assert coordinator.get_weather() is observation
     assert coordinator.get_forecasts() == []
@@ -156,9 +154,9 @@ async def test_station_observation_loads_when_all_forecast_sources_fail(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    domain_data = hass.data[DOMAIN][entry.entry_id]
-    forecast_coordinator = domain_data[COORDINATOR]
-    observation_coordinator = domain_data[COORDINATOR_OBSERVATION]
+    forecast_coordinator = entry.runtime_data.coordinator
+    observation_coordinator = entry.runtime_data.observation_coordinator
+    assert observation_coordinator is not None
     assert entry.state is ConfigEntryState.LOADED
     assert not forecast_coordinator.last_update_success
     assert observation_coordinator.last_update_success
@@ -188,10 +186,11 @@ async def test_forecast_loads_when_station_observation_fails(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    domain_data = hass.data[DOMAIN][entry.entry_id]
     assert entry.state is ConfigEntryState.LOADED
-    assert domain_data[COORDINATOR].last_update_success
-    assert not domain_data[COORDINATOR_OBSERVATION].last_update_success
+    assert entry.runtime_data.coordinator.last_update_success
+    observation_coordinator = entry.runtime_data.observation_coordinator
+    assert observation_coordinator is not None
+    assert not observation_coordinator.last_update_success
     weather_states = hass.states.async_all("weather")
     assert sum(state.state == STATE_UNAVAILABLE for state in weather_states) == 1
     assert sum(state.state != STATE_UNAVAILABLE for state in weather_states) == 1
@@ -211,7 +210,7 @@ async def test_coarse_legacy_interval_preserves_hourly_forecast_source(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
     mocks["forecast"].assert_awaited_once_with(60.17, 24.94, 1, 96)
     assert len(coordinator.get_hourly_forecasts()) == 49
     assert len(coordinator.get_forecasts()) == 17
@@ -237,7 +236,7 @@ async def test_both_current_sources_fail_initial_setup(
     await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.SETUP_RETRY
-    assert entry.entry_id not in hass.data[DOMAIN]
+    assert DOMAIN not in hass.data
     entry.async_cancel_retry_setup()
 
 
@@ -274,7 +273,7 @@ async def test_forecast_clears_stale_data_and_recovers_without_log_spam(
 
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
     assert coordinator.get_forecasts()
 
     await coordinator.async_refresh()
@@ -313,7 +312,7 @@ async def test_current_outage_clears_stale_data_and_recovers(
 
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
 
     await coordinator.async_refresh()
     await hass.async_block_till_done()
@@ -356,7 +355,7 @@ async def test_transport_error_uses_place_fallback_and_clears_stale_current(
 
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
 
     await coordinator.async_refresh()
     await hass.async_block_till_done()
@@ -388,7 +387,7 @@ async def test_malformed_forecast_keeps_current_weather_available(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
     assert coordinator.last_update_success
     assert coordinator.get_weather() is weather
     assert coordinator.get_forecasts() == []
@@ -409,7 +408,7 @@ async def test_primary_timeout_clears_stale_data_and_recovers(
 
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
 
     await coordinator.async_refresh()
     await hass.async_block_till_done()
@@ -444,7 +443,7 @@ async def test_optional_source_failure_does_not_disable_current_weather(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
     assert entry.state is ConfigEntryState.LOADED
     assert coordinator.last_update_success
     assert coordinator.get_weather() is weather
@@ -474,7 +473,7 @@ async def test_lightning_failure_does_not_disable_current_weather(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
     assert entry.state is ConfigEntryState.LOADED
     assert coordinator.last_update_success
     assert coordinator.get_weather() is weather
@@ -500,8 +499,9 @@ async def test_partial_outage_unload_reload_cleans_coordinator_listeners(
 
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    domain_data = hass.data[DOMAIN][entry.entry_id]
-    coordinators = [domain_data[COORDINATOR], domain_data[COORDINATOR_OBSERVATION]]
+    observation_coordinator = entry.runtime_data.observation_coordinator
+    assert observation_coordinator is not None
+    coordinators = [entry.runtime_data.coordinator, observation_coordinator]
 
     for coordinator in coordinators:
         callbacks = [callback for callback, _ in coordinator._listeners.values()]
@@ -511,10 +511,12 @@ async def test_partial_outage_unload_reload_cleans_coordinator_listeners(
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.NOT_LOADED
-    assert entry.entry_id not in hass.data[DOMAIN]
+    assert DOMAIN not in hass.data
     assert all(not coordinator._listeners for coordinator in coordinators)
 
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.LOADED
-    assert hass.data[DOMAIN][entry.entry_id][COORDINATOR_OBSERVATION].last_update_success
+    observation_coordinator = entry.runtime_data.observation_coordinator
+    assert observation_coordinator is not None
+    assert observation_coordinator.last_update_success

@@ -100,7 +100,7 @@ class FMIConfigFlowHandler(config_entries.ConfigFlow, domain=const.DOMAIN):
             except CannotConnectError:
                 errors["base"] = "cannot_connect"
             except InvalidFMIResponseError:
-                const.LOGGER.exception("Unexpected error validating an FMI location")
+                const.LOGGER.error("Unexpected response validating an FMI location")
                 errors["base"] = "unknown"
             else:
                 if _location_is_configured(self.hass, user_input):
@@ -140,7 +140,7 @@ class FMIConfigFlowHandler(config_entries.ConfigFlow, domain=const.DOMAIN):
             except CannotConnectError:
                 errors["base"] = "cannot_connect"
             except InvalidFMIResponseError:
-                const.LOGGER.exception("Unexpected error validating an FMI location")
+                const.LOGGER.error("Unexpected response validating an FMI location")
                 errors["base"] = "unknown"
             else:
                 return self.async_update_and_abort(

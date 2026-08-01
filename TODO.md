@@ -16,4 +16,18 @@ Close this item when a stable Home Assistant release and its matching `pytest-ho
 3. Run `make audit`, the full offline suite, and `make validate`.
 4. Remove the temporary exception from `docs/maintenance/DEPENDENCIES.md` and the S03 handoff only after the full audit passes.
 
-Evidence checked 2026-07-31: [Pillow advisory](https://osv.dev/vulnerability/PYSEC-2026-2253), [PyJWT advisory](https://osv.dev/vulnerability/PYSEC-2026-179), and the installed Home Assistant 2026.7.4 package metadata.
+Evidence rechecked 2026-08-01: [Pillow advisory](https://osv.dev/vulnerability/PYSEC-2026-2253), [PyJWT advisory](https://osv.dev/vulnerability/PYSEC-2026-179), and Home Assistant 2026.7.4/2026.8.0b3 package metadata. The beta pins the fixed releases, but stable does not yet.
+
+## Replace public Nominatim before broader distribution
+
+- Status: `ACCEPTED_PRIVATE_TESTING`; reviewed 2026-08-01.
+- Optional lightning enrichment sends public FMI strike coordinates, not configured home coordinates, to OSMF's public Nominatim service. It is cached, single-threaded, attributed, identified by User-Agent, limited to one lookup per update, and globally limited to 4 requests/minute.
+- OSMF discourages periodic app traffic at scale and requires applications to be able to switch services. The current owner-only test deployment is deliberately small, but the implementation is not a foundation for an assumed public user base.
+
+Before broader distribution, choose and verify one of these outcomes:
+
+1. Remove reverse-geocoded address enrichment and retain a local/public FMI-data fallback.
+2. Use an owner-controlled Nominatim instance or proxy.
+3. Add a provider boundary that can be switched without an integration release and remains opt-in.
+
+Evidence: [OSMF Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/) and `docs/maintenance/COMPATIBILITY_SECURITY_AUDIT.md`.

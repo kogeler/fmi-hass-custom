@@ -25,7 +25,6 @@ from custom_components.fmi import fmi as fmi_client
 from custom_components.fmi.const import (
     CONF_ENTITY_IDENTITY,
     CONF_LIGHTNING_MAX_AGE,
-    COORDINATOR,
     DOMAIN,
     LIGHTNING_MAX_AGE_DEFAULT_MINUTES,
     LIGHTNING_MAX_AGE_MAX_MINUTES,
@@ -571,7 +570,7 @@ async def test_loaded_reconfigure_preserves_custom_entity_and_loads_new_place(
     await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.LOADED
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
     assert (coordinator.latitude, coordinator.longitude) == (61.5, 23.76)
     assert coordinator.get_current_place() == "Tampere"
     customized = registry.async_get("sensor.outdoor_custom_temperature")

@@ -31,9 +31,9 @@ from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from . import FMIDataUpdateCoordinator, const, utils
+from . import FMIConfigEntry, FMIDataUpdateCoordinator, const, utils
 
-PARALLEL_UPDATES = 1
+PARALLEL_UPDATES = 0
 
 CONDITION_SEVERITY = {
     "clear-night": 0,
@@ -50,26 +50,24 @@ CONDITION_SEVERITY = {
 }
 
 
-async def async_setup_entry(hass, config_entry, async_add_entities):
+async def async_setup_entry(hass, config_entry: FMIConfigEntry, async_add_entities):
     """Add an FMI weather entity from a config_entry."""
+    _ = hass
     name = config_entry.data[CONF_NAME]
     daily_mode = config_entry.options.get(const.CONF_DAILY_MODE, False)
     station_id = bool(config_entry.options.get(const.CONF_OBSERVATION_STATION, 0))
 
-    domain_data = hass.data[const.DOMAIN][config_entry.entry_id]
-
-    coordinator = domain_data[const.COORDINATOR]
+    coordinator = config_entry.runtime_data.coordinator
 
     entity_list = [FMIWeatherEntity(name, coordinator)]
     if daily_mode:
         entity_list.append(FMIWeatherEntity(name, coordinator, daily_mode=True))
     if station_id:
-        try:
-            coordinator = domain_data.get(const.COORDINATOR_OBSERVATION)
-            if coordinator is not None:
-                entity_list.append(FMIWeatherEntity(name, coordinator, station_id=station_id))
-        except (KeyError, AttributeError) as error:
-            const.LOGGER.error("Unable to setup observation object! ERROR: %s", error)
+        observation_coordinator = config_entry.runtime_data.observation_coordinator
+        if observation_coordinator is not None:
+            entity_list.append(
+                FMIWeatherEntity(name, observation_coordinator, station_id=station_id)
+            )
 
     async_add_entities(entity_list, False)
 

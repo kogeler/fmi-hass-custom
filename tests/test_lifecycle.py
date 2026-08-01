@@ -41,8 +41,6 @@ from custom_components.fmi.const import (
     CONF_FORECAST_DAYS,
     CONF_LIGHTNING,
     CONF_OBSERVATION_STATION,
-    COORDINATOR,
-    COORDINATOR_OBSERVATION,
     DOMAIN,
 )
 from tests.helpers.fmi import forecast_from_fixture, weather_from_fixture
@@ -296,7 +294,7 @@ async def test_options_reload_adds_and_removes_optional_entities_once(
     assert len(entry.update_listeners) == 1
     assert hass.states.get("sensor.helsinki_lightning_strikes") is None
     assert hass.states.get("weather.helsinki_daily") is None
-    old_coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    old_coordinator = entry.runtime_data.coordinator
     registry = er.async_get(hass)
     main_registry_entry = registry.async_get("weather.helsinki")
     assert main_registry_entry is not None
@@ -324,7 +322,7 @@ async def test_options_reload_adds_and_removes_optional_entities_once(
         len([state for state in hass.states.async_all() if state.entity_id == "weather.helsinki"])
         == 1
     )
-    enabled_coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    enabled_coordinator = entry.runtime_data.coordinator
 
     await _configure_options(
         hass,
@@ -368,7 +366,7 @@ async def test_reload_unload_and_remove_do_not_duplicate_lifecycle_state(
     temperature = registry.async_get("sensor.helsinki_temperature")
     assert temperature is not None
     registry_id = temperature.id
-    old_coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    old_coordinator = entry.runtime_data.coordinator
     assert len(entry.update_listeners) == 1
 
     assert await hass.config_entries.async_reload(entry.entry_id)
@@ -383,13 +381,13 @@ async def test_reload_unload_and_remove_do_not_duplicate_lifecycle_state(
     assert len(hass.states.async_all("sensor")) == len(
         {state.entity_id for state in hass.states.async_all("sensor")}
     )
-    reloaded_coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    reloaded_coordinator = entry.runtime_data.coordinator
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.NOT_LOADED
-    assert entry.entry_id not in hass.data[DOMAIN]
+    assert DOMAIN not in hass.data
     assert not reloaded_coordinator._listeners
     assert not entry.update_listeners
     unloaded_state = hass.states.get("sensor.helsinki_temperature")
@@ -406,7 +404,7 @@ async def test_reload_unload_and_remove_do_not_duplicate_lifecycle_state(
     await hass.async_block_till_done()
 
     assert hass.config_entries.async_get_entry(entry.entry_id) is None
-    assert entry.entry_id not in hass.data[DOMAIN]
+    assert DOMAIN not in hass.data
     assert hass.states.get("sensor.helsinki_temperature") is None
 
 
@@ -422,7 +420,7 @@ async def test_failed_platform_unload_retains_loaded_entry_data(
     entry = _entry(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
     original_unload = hass.config_entries.async_unload_platforms
     monkeypatch.setattr(
         hass.config_entries,
@@ -434,7 +432,7 @@ async def test_failed_platform_unload_retains_loaded_entry_data(
     await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.FAILED_UNLOAD
-    assert hass.data[DOMAIN][entry.entry_id][COORDINATOR] is coordinator
+    assert entry.runtime_data.coordinator is coordinator
     assert len(entry.update_listeners) == 1
 
     monkeypatch.setattr(hass.config_entries, "async_unload_platforms", original_unload)
@@ -467,7 +465,8 @@ async def test_observation_no_data_or_timeout_recovers_through_weather_entity(
     observation_state = hass.states.get("weather.fmi_observation")
     assert observation_state is not None
     assert observation_state.state == STATE_UNAVAILABLE
-    observation_coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR_OBSERVATION]
+    observation_coordinator = entry.runtime_data.observation_coordinator
+    assert observation_coordinator is not None
 
     await observation_coordinator.async_refresh()
     await hass.async_block_till_done()
@@ -586,7 +585,7 @@ async def test_two_locations_fail_and_recover_independently(
     tampere_state = hass.states.get("sensor.tampere_temperature")
     assert helsinki_state is not None and helsinki_state.state != STATE_UNAVAILABLE
     assert tampere_state is not None and tampere_state.state != STATE_UNAVAILABLE
-    tampere_coordinator = hass.data[DOMAIN][tampere_entry.entry_id][COORDINATOR]
+    tampere_coordinator = tampere_entry.runtime_data.coordinator
 
     failed_locations.add((61.5, 23.76))
     await tampere_coordinator.async_refresh()
@@ -622,7 +621,7 @@ async def test_wind_direction_updates_cover_public_compass_states(
     entry = _entry(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
 
     for degrees, expected in [
         (-1.0, STATE_UNAVAILABLE),
@@ -685,5 +684,5 @@ async def test_best_condition_rejects_each_out_of_range_forecast(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
     assert coordinator.best_state == BEST_CONDITION_NOT_AVAIL

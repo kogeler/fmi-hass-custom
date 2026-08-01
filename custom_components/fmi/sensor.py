@@ -22,7 +22,6 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
@@ -31,7 +30,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 from homeassistant.util import slugify
 
-from . import FMIDataUpdateCoordinator, const, utils
+from . import FMIConfigEntry, FMIDataUpdateCoordinator, const, utils
 
 
 class SensorType(enum.IntEnum):
@@ -190,7 +189,7 @@ SEA_LEVEL_DESCRIPTION = FMISensorEntityDescription(
 )
 # pylint: enable=unexpected-keyword-arg
 
-PARALLEL_UPDATES = 1
+PARALLEL_UPDATES = 0
 
 
 def _sensor_unique_id(
@@ -228,15 +227,13 @@ def _async_migrate_legacy_entity_ids(
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: FMIConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up FMI sensors for a config entry."""
     name = config_entry.data[ha_const.CONF_NAME]
     lightning_mode = config_entry.options.get(const.CONF_LIGHTNING, False)
-    coordinator: FMIDataUpdateCoordinator = hass.data[const.DOMAIN][config_entry.entry_id][
-        const.COORDINATOR
-    ]
+    coordinator = config_entry.runtime_data.coordinator
 
     _async_migrate_legacy_entity_ids(hass, coordinator, name)
     entity_list: list[_BaseSensorClass] = [

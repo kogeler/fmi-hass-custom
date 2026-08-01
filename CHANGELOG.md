@@ -15,6 +15,7 @@ All notable changes to this project are documented in this file.
 - Added a validated location reconfigure flow that reloads the moved entry while preserving config, device, and entity identity, including customized entity IDs.
 - Prevented polar-day/night crashes with a deterministic daytime fallback for incomplete sun events.
 - Fixed best-time selection across month/year boundaries and made forecast output reject malformed timestamps, unknown symbols, missing fields, and non-finite values without crashing.
+- Kept optional lightning bounding boxes inside valid WGS84 limits at the geographic poles and across the antimeridian.
 - Corrected weather entity naming under current Home Assistant semantics so fresh daily and observation entities no longer duplicate their device names or generated entity IDs, while retaining their existing unique IDs.
 - Kept transport and malformed-response failures inside their individual FMI source boundaries, preserving place fallback and current weather when only forecast parsing fails, and removed the integration's global logging configuration side effect.
 
@@ -26,6 +27,7 @@ All notable changes to this project are documented in this file.
 - Added bounded live FMI dependency and Home Assistant probes for southern/northern forecasts, station observations, dashboard-facing entity/forecast output, and daily precipitation semantics.
 - Added Ruff formatting/linting, coverage, type checking, network-blocking tests, hassfest/HACS validation, and pinned GitHub Actions checks.
 - Added a verified maintenance baseline, dependency/license inventory, session handoffs, and repository guidance for future maintenance work.
+- Added privacy-safe Home Assistant diagnostics with configured coordinates and legacy coordinate-derived identities redacted.
 
 ### Changed
 
@@ -39,8 +41,10 @@ All notable changes to this project are documented in this file.
 - Updated weather forecasts to Home Assistant's separate hourly/daily API with UTC timestamps and complete one-hour FMI source data; the deprecated forecast property was removed.
 - Updated sensors to Home Assistant's current `SensorEntity`, entity-description, device-class, state-class, translated-name, and native-unit conventions while retaining existing unique IDs.
 - Migrated config entries from coordinate-based identifiers to stable internal identities so coordinates and resolved place names can change safely, while conservatively preserving registry/unique IDs, customized or ambiguous suffixed entity IDs, and the optional legacy daily entity.
+- Moved per-entry coordinators and listener cleanup to typed `ConfigEntry.runtime_data` and aligned read-only coordinator platforms with current Home Assistant parallel-update guidance.
 
 ### Security
 
 - Upgraded the container and CI installer to pip 26.2 and added vulnerability/license audit commands.
 - Documented a temporary owner-approved exception for Pillow and PyJWT versions pinned by Home Assistant 2026.7.4. The required follow-up is tracked in `TODO.md`.
+- Prevented precise configured coordinates, raw FMI responses, and external exception payloads from reaching integration or dependency logs.

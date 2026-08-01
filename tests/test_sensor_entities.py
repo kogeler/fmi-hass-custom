@@ -27,7 +27,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.fmi import FMIDataUpdateCoordinator
 from custom_components.fmi import fmi as fmi_client
-from custom_components.fmi.const import COORDINATOR, DOMAIN
+from custom_components.fmi.const import DOMAIN
 from custom_components.fmi.sensor import (
     LIGHTNING_DESCRIPTION,
     SEA_LEVEL_DESCRIPTION,
@@ -353,7 +353,7 @@ async def test_sensor_availability_recovers_with_coordinator(
 
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
     state = hass.states.get("sensor.helsinki_temperature")
     assert state is not None and state.state != STATE_UNAVAILABLE
 

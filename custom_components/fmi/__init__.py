@@ -61,6 +61,18 @@ class OptionalSourceError(RuntimeError):
     """Report a classified optional-source transport or payload failure."""
 
 
+@dataclass(slots=True)
+class FMIEntryRuntimeData:
+    """Runtime state owned by one FMI config entry."""
+
+    coordinator: FMIDataUpdateCoordinator
+    observation_coordinator: FMIObservationUpdateCoordinator | None
+    undo_update_listener: Callable[[], None]
+
+
+type FMIConfigEntry = ConfigEntry[FMIEntryRuntimeData]
+
+
 def _reserve_nominatim_request() -> bool:
     """Reserve one process-wide public Nominatim request without blocking a worker."""
     global _NOMINATIM_NEXT_REQUEST_AT  # pylint: disable=global-statement
@@ -126,7 +138,7 @@ def config_entry_unique_id(entry_id: str) -> str:
     return f"fmi:{entry_id}"
 
 
-async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+async def async_migrate_entry(hass: HomeAssistant, config_entry: FMIConfigEntry) -> bool:
     """Migrate coordinate identity while retaining all existing entity unique IDs."""
     if config_entry.version > const.CONFIG_ENTRY_VERSION:
         return False
@@ -159,12 +171,11 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up configured FMI."""
-    _ = config
-    hass.data.setdefault(const.DOMAIN, {})
+    _ = hass, config
     return True
 
 
-async def async_setup_entry(hass, config_entry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, config_entry: FMIConfigEntry) -> bool:
     """Set up FMI as config entry."""
     websession = async_get_clientsession(hass)
 
@@ -187,25 +198,24 @@ async def async_setup_entry(hass, config_entry) -> bool:
 
     undo_listener = config_entry.add_update_listener(update_listener)
 
-    hass.data[const.DOMAIN][config_entry.entry_id] = {
-        const.COORDINATOR: coordinator,
-        const.COORDINATOR_OBSERVATION: coordinator_observation,
-        const.UNDO_UPDATE_LISTENER: undo_listener,
-    }
+    config_entry.runtime_data = FMIEntryRuntimeData(
+        coordinator=coordinator,
+        observation_coordinator=coordinator_observation,
+        undo_update_listener=undo_listener,
+    )
 
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     return True
 
 
-async def async_unload_entry(hass, config_entry):
+async def async_unload_entry(hass: HomeAssistant, config_entry: FMIConfigEntry) -> bool:
     """Unload an FMI config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS)
     if not unload_ok:
         return False
 
-    hass.data[const.DOMAIN][config_entry.entry_id][const.UNDO_UPDATE_LISTENER]()
-    hass.data[const.DOMAIN].pop(config_entry.entry_id)
+    config_entry.runtime_data.undo_update_listener()
 
     return True
 
@@ -219,7 +229,7 @@ async def _async_first_refresh(coordinator: DataUpdateCoordinator) -> bool:
     return coordinator.last_update_success
 
 
-async def update_listener(hass, config_entry):
+async def update_listener(hass: HomeAssistant, config_entry: FMIConfigEntry) -> None:
     """Update FMI listener."""
     await hass.config_entries.async_reload(config_entry.entry_id)
 
@@ -275,8 +285,8 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
-        session,
-        config_entry,
+        session: ClientSession,
+        config_entry: FMIConfigEntry,
         update_interval=const.FORECAST_UPDATE_INTERVAL,
         unique_id_add="",
         name="",
@@ -294,9 +304,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         )
         self.unique_id = str(identity) + unique_id_add
 
-        self.logger.debug(f"Using latitude: {latitude} and longitude: {longitude}")
-
-        _options: dict = config_entry.options
+        _options = config_entry.options
 
         self.time_step = int(_options.get(CONF_OFFSET, const.FORECAST_OFFSET[0]))
         self.forecast_points = int(_options.get(const.CONF_FORECAST_DAYS, const.DAYS_DEFAULT)) * 24
@@ -352,7 +360,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
         name = name if name else const.DOMAIN
 
-        self.logger.debug(f"FMI {name}: Data will be updated every {update_interval} min")
+        self.logger.debug("FMI %s: data will be updated every %s", name, update_interval)
 
         super().__init__(
             hass, self.logger, config_entry=config_entry, name=name, update_interval=update_interval
@@ -382,6 +390,11 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
     def lightning_data(self, value: list[FMILightningStruct] | None) -> None:
         """Replace lightning data, clearing stale values on failures."""
         self._lightning_state.data = value
+
+    @property
+    def source_availability(self) -> dict[str, bool]:
+        """Return a copy of source health suitable for sanitized diagnostics."""
+        return dict(self._source_available)
 
     def get_observation(self) -> fmi_models.Weather | None:
         """Return the current observation data."""
@@ -425,12 +438,11 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
     @staticmethod
     def _fmi_error_detail(error: Exception) -> str:
-        """Return useful FMI error details because upstream exceptions stringify empty."""
+        """Classify an FMI error without exposing request or response content."""
         status_code = getattr(error, "status_code", None)
-        message = getattr(error, "message", None) or getattr(error, "body", None) or str(error)
         if status_code is None:
-            return message
-        return f"HTTP {status_code}: {message}"
+            return type(error).__name__
+        return f"HTTP {status_code}"
 
     @staticmethod
     def _finite_weather_value(source_data: object, name: str) -> float | None:
@@ -542,7 +554,10 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             )
             location = result.address if result is not None else fallback
         except (AttributeError, GeocoderServiceError, TypeError, ValueError) as error:
-            self.logger.warning("Unable to reverse geocode %s: %s", fallback, error)
+            self.logger.warning(
+                "Unable to reverse geocode a lightning location: %s",
+                type(error).__name__,
+            )
             location = fallback
 
         self._lightning_state.geocode_cache[coordinates] = location
@@ -730,7 +745,9 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         except TimeoutError as error:
             raise OptionalSourceError(f"{source} request timed out") from error
         except AiohttpClientError as error:
-            raise OptionalSourceError(f"{source} transport error: {error}") from error
+            raise OptionalSourceError(
+                f"{source} transport error: {type(error).__name__}"
+            ) from error
         if len(payload) > const.AUX_HTTP_MAX_PAYLOAD_BYTES:
             raise OptionalSourceError(f"{source} response exceeds size limit")
         if not payload.strip():
@@ -826,7 +843,8 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             await update_func()
         except Exception as error:  # pylint: disable=broad-exception-caught
             setattr(self, data_attribute, None)
-            self._set_source_availability(source, False, str(error) or type(error).__name__)
+            detail = str(error) if isinstance(error, OptionalSourceError) else type(error).__name__
+            self._set_source_availability(source, False, detail)
             return
         self._set_source_availability(
             source,
@@ -884,8 +902,8 @@ class FMIObservationUpdateCoordinator(FMIDataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
-        session,
-        config_entry,
+        session: ClientSession,
+        config_entry: FMIConfigEntry,
         update_interval=const.OBSERVATION_UPDATE_INTERVAL,
     ):
 

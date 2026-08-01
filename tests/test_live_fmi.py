@@ -42,8 +42,6 @@ from custom_components.fmi.const import (
     CONF_ENTITY_IDENTITY,
     CONF_FORECAST_DAYS,
     CONF_OBSERVATION_STATION,
-    COORDINATOR,
-    COORDINATOR_OBSERVATION,
     DOMAIN,
 )
 from tests.helpers.live_fmi import (
@@ -325,8 +323,9 @@ async def test_home_assistant_live_entity_and_forecast_contract(
         60.0,
     )
 
-    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
-    observation_coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR_OBSERVATION]
+    coordinator = entry.runtime_data.coordinator
+    observation_coordinator = entry.runtime_data.observation_coordinator
+    assert observation_coordinator is not None
     current_sample = validate_model_weather(
         coordinator.get_weather(),
         "Home Assistant current source",

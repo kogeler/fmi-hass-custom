@@ -21,29 +21,37 @@ class BoundingBox:
 
 
 def get_bounding_box(latitude_in_degrees, longitude_in_degrees, half_side_in_km):
-    """Calculate min and max coordinates for bounding box."""
+    """Calculate a finite WGS84 bounding box, including at either pole."""
     assert 0 < half_side_in_km
     assert -90.0 <= latitude_in_degrees <= 90.0
     assert -180.0 <= longitude_in_degrees <= 180.0
 
-    lat = math.radians(latitude_in_degrees)
-    lon = math.radians(longitude_in_degrees)
-
     radius = 6371
     # Radius of the parallel at given latitude
-    parallel_radius = radius * math.cos(lat)
+    parallel_radius = radius * math.cos(math.radians(latitude_in_degrees))
 
-    lat_min = lat - half_side_in_km / radius
-    lat_max = lat + half_side_in_km / radius
-    lon_min = lon - half_side_in_km / parallel_radius
-    lon_max = lon + half_side_in_km / parallel_radius
-    rad2deg = math.degrees
+    lat_delta = math.degrees(half_side_in_km / radius)
+    lat_min = max(-90.0, latitude_in_degrees - lat_delta)
+    lat_max = min(90.0, latitude_in_degrees + lat_delta)
+    if lat_min == -90.0 or lat_max == 90.0 or abs(parallel_radius) < 1e-9:
+        lon_min, lon_max = -180.0, 180.0
+    else:
+        lon_delta = math.degrees(half_side_in_km / parallel_radius)
+        if (
+            lon_delta >= 180.0
+            or longitude_in_degrees - lon_delta < -180.0
+            or longitude_in_degrees + lon_delta > 180.0
+        ):
+            lon_min, lon_max = -180.0, 180.0
+        else:
+            lon_min = longitude_in_degrees - lon_delta
+            lon_max = longitude_in_degrees + lon_delta
 
     box = BoundingBox()
-    box.lat_min = rad2deg(lat_min)
-    box.lon_min = rad2deg(lon_min)
-    box.lat_max = rad2deg(lat_max)
-    box.lon_max = rad2deg(lon_max)
+    box.lat_min = lat_min
+    box.lon_min = lon_min
+    box.lat_max = lat_max
+    box.lon_max = lon_max
 
     return box
 

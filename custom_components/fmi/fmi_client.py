@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
@@ -18,6 +19,41 @@ GML_NAMESPACE = "http://www.opengis.net/gml/3.2"
 GMLCOV_NAMESPACE = "http://www.opengis.net/gmlcov/1.0"
 SWE_NAMESPACE = "http://www.opengis.net/swe/2.0"
 FORECAST_GUST_PARAMETER = "HourlyMaximumGust"
+
+
+class _UpstreamPrivacyFilter(logging.Filter):
+    """Drop dependency records that contain coordinates or full FMI responses."""
+
+    _fmi_privacy_filter = True
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if (
+            record.name == "fmi_weather_client.http"
+            and record.msg == "GET request to %s. Parameters: %s"
+        ):
+            return False
+        if record.name != "fmi_weather_client.parsers.forecast":
+            return True
+        if record.msg == "Received place: %s (%d, %d)":
+            return False
+        if not isinstance(record.msg, str):
+            return False
+        return not record.msg.lstrip().startswith("<")
+
+
+def _install_upstream_privacy_filters() -> None:
+    """Install idempotent filters on the two dependency loggers with private data."""
+    for logger_name in (
+        "fmi_weather_client.http",
+        "fmi_weather_client.parsers.forecast",
+    ):
+        logger = logging.getLogger(logger_name)
+        if any(getattr(item, "_fmi_privacy_filter", False) for item in logger.filters):
+            continue
+        logger.addFilter(_UpstreamPrivacyFilter())
+
+
+_install_upstream_privacy_filters()
 
 async_observation_by_place = upstream.async_observation_by_place
 async_observation_by_station_id = upstream.async_observation_by_station_id
