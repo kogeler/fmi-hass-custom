@@ -8,10 +8,12 @@
 to provide current conditions, hourly and daily forecasts, weather sensors, optional station
 observations, lightning data, and sea-level forecasts for a configured location.
 
-Version `1.0.0` supports Home Assistant `2026.7.4`. Moving compatibility checks exercise the
-current stable and prerelease channels as early warnings, but do not create a blanket support
-promise for future releases. This fork is intended for owner testing as a HACS custom repository
-or a manual custom integration, not as an official Home Assistant Core integration.
+Check the [latest published GitHub Release](https://github.com/kogeler/fmi-hass-custom/releases/latest)
+for the current integration version and its release notes. The minimum Home Assistant version is
+declared in `hacs.json` for each release. Moving compatibility checks exercise the current stable
+and prerelease channels as early warnings, but do not create a blanket support promise for future
+releases. This fork is intended for owner testing as a HACS custom repository or a manual custom
+integration, not as an official Home Assistant Core integration.
 
 ## Main Limitations
 
@@ -31,6 +33,7 @@ or a manual custom integration, not as an official Home Assistant Core integrati
 ### Users
 
 - [Installation, configuration, upgrades, dashboards, and troubleshooting](docs/USER_GUIDE.md)
+- [Current release and release notes](https://github.com/kogeler/fmi-hass-custom/releases/latest)
 - [Release notes](CHANGELOG.md)
 - [Known limitations and follow-up work](TODO.md)
 
@@ -43,7 +46,6 @@ or a manual custom integration, not as an official Home Assistant Core integrati
 - [Migration guarantees](docs/maintenance/MIGRATIONS.md)
 - [Compatibility, security, and privacy contract](docs/maintenance/COMPATIBILITY_SECURITY.md)
 - [Runtime architecture and invariants](docs/maintenance/RUNTIME.md)
-- [Maintenance plan](plans/P01.md) and [session handoffs](docs/P01/)
 - [License](LICENSE)
 
 ## Maintainer

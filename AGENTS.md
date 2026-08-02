@@ -6,8 +6,9 @@
 
 This repository contains the `fmi` custom integration for Home Assistant. It exposes FMI current
 weather, hourly/daily forecasts, forecast-backed sensors, optional station observations,
-lightning, and sea-level data. Release `1.0.0` supports the current stable Home Assistant line
-declared in `hacs.json`; do not infer support for older releases or an official Core quality tier.
+lightning, and sea-level data. The latest published release supports the current stable Home
+Assistant line declared in `hacs.json`; do not infer support for older releases or an official Core
+quality tier. Read the current project version from `.version`, never from copied documentation.
 
 Preserve user configuration, unique IDs, entity registry records, and customized entity IDs.
 Do not refactor for its own sake. Every behavior or structural change needs a documented
@@ -20,8 +21,10 @@ correctness, compatibility, testability, migration, security, privacy, or valida
 - `docs/USER_GUIDE.md`: end-user installation, configuration, and dashboard guidance.
 - `docs/maintenance/`: current technical contracts for future maintenance; never store plan
   progress, session reports, or before/after summaries here.
-- `plans/P01.md` and `docs/P01/`: completed implementation plan, baseline, decisions, verification,
-  and historical handoffs. Use these only when the reason or history of a current contract matters.
+- `plans/P01/`: completed implementation plan (`PLAN.md`), baseline, decisions, verification, and
+  historical handoffs. Use these only when the reason or history of a current contract matters.
+- `plans/P02/`: planned location-selection work (`PLAN.md`), its S00-verified baseline, and future
+  execution reports, following the same self-contained layout as P01.
 - `.github/scripts/` and `.github/workflows/`: tested Python CI helpers and GitHub Actions policy.
 - `.version`: only human-maintained release version; the manifest is a synchronized mirror.
 
@@ -139,8 +142,8 @@ reset, stash, overwrite, or reformat unrelated work. Do not run Git operations t
 hardware token, interactive credentials, or authenticated SSH. Do not commit; the owner commits.
 
 For follow-up maintenance, current code, tests, and the owning `docs/maintenance/` contract are the
-sources of truth. Use `plans/P01.md` and `docs/P01/` only to understand historical decisions and
-verification; do not extend them as a tracker for unrelated future work. A new implementation plan
+sources of truth. Use `plans/*` only to understand historical decisions and verification; do
+not extend it as a tracker for unrelated future work. A new implementation plan
 gets its own plan/handoff namespace and must be corrected immediately when verified reality differs.
 Record only notable release-level changes in `CHANGELOG.md`. New human-authored files use
 `Copyright (c) 2026 kogeler` and `SPDX-License-Identifier: MIT` where comments are supported.

@@ -31,3 +31,20 @@ Before broader distribution, choose and verify one of these outcomes:
 3. Add a provider boundary that can be switched without an integration release and remains opt-in.
 
 Evidence: [OSMF Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/) and `docs/maintenance/COMPATIBILITY_SECURITY.md`.
+
+## Implement user-friendly FMI location selection
+
+- Status: `PLANNED`.
+- Execute the independent [P02 implementation plan](plans/P02/PLAN.md), with its verified baseline
+  and session reports stored alongside the plan under `plans/P02/`.
+- Replace visible latitude/longitude entry in initial setup and reconfiguration with two normal
+  paths: a Home-defaulted Home Assistant map selector, and FMI place-name search followed by map
+  confirmation.
+- Preserve the existing stored coordinate shape, immutable identity, registry records, customized
+  entity IDs, duplicate-location checks, lifecycle behavior, and coordinate privacy.
+- Country/city catalogs, observation-station selection, third-party forward geocoding, automatic
+  Home zone tracking, and a separate manual coordinate form are outside P02.
+
+Close this item only after every P02 session and requirement is `DONE`, the complete verification
+matrix passes, current documentation matches the implemented behavior, and the final P02 report is
+saved in the self-contained `plans/P02/` plan directory.

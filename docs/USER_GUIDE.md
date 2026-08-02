@@ -2,17 +2,21 @@
 
 # FMI Custom Integration User Guide
 
-This guide covers release `1.0.0` of the FMI custom integration for Home Assistant `2026.7.4`.
+This guide applies to the
+[latest published GitHub Release](https://github.com/kogeler/fmi-hass-custom/releases/latest).
+Check that page before installation or upgrade for the current version, release notes, and source
+archives. The minimum Home Assistant version is declared in `hacs.json` within that release.
 Current stable and prerelease compatibility checks detect upcoming changes, but do not promise
-support for every future release. The integration needs internet access to FMI. HACS is
-recommended but not required.
+support for every future release. The integration needs internet access to FMI. HACS is recommended
+but not required.
 
 ## Install With HACS
 
 1. Install and configure [HACS](https://www.hacs.xyz/docs/use/) for your Home Assistant system.
 2. Open HACS, use the top-right menu, and select **Custom repositories**.
 3. Enter `https://github.com/kogeler/fmi-hass-custom`, select **Integration**, and add it.
-4. Open the FMI repository in HACS, select **Download**, and choose release `1.0.0`.
+4. Open the FMI repository in HACS, select **Download**, and choose the newest published version.
+   Confirm it against the [latest GitHub Release](https://github.com/kogeler/fmi-hass-custom/releases/latest).
 5. Restart Home Assistant.
 6. Open **Settings > Devices & services > Add integration**, search for **Finnish Meteorological
    Institute**, and enter a name, latitude, and longitude.
@@ -22,7 +26,8 @@ entries.
 
 ## Install Manually
 
-1. Download the `1.0.0` source archive from this repository's GitHub Release.
+1. Open the [latest GitHub Release](https://github.com/kogeler/fmi-hass-custom/releases/latest)
+   and download its **Source code** archive.
 2. Stop Home Assistant or make sure no integration files are being updated.
 3. Copy the archive's complete `custom_components/fmi/` directory to
    `<Home Assistant config>/custom_components/fmi/`. The resulting path must contain
@@ -43,10 +48,10 @@ Create and download a Home Assistant backup before an upgrade.
 - **Manual:** replace the complete `custom_components/fmi/` directory with the directory from the
   new release archive, then restart Home Assistant. Do not remove the integration entry first.
 
-Upgrading from the older `0.6.2` integration migrates config and registry identity in place.
-Existing unique IDs and customized entity IDs are retained. Some exact legacy generated sensor
-IDs can be renamed to a location-aware default when that target is free; ambiguous, customized,
-or conflicting IDs are left unchanged.
+Upgrading from the legacy integration line migrates config and registry identity in place.
+Existing unique IDs and customized entity IDs are retained. Some exact legacy generated sensor IDs
+can be renamed to a location-aware default when that target is free; ambiguous, customized, or
+conflicting IDs are left unchanged.
 
 ## Configure
 
