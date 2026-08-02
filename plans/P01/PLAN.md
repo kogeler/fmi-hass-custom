@@ -15,13 +15,13 @@
 Keep this file at the canonical repository path:
 
 ```text
-plans/P01.md
+plans/P01/PLAN.md
 ```
 
 For the first Codex session, use this prompt:
 
 ```text
-Read plans/P01.md in full. Execute Session S00 only.
+Read plans/P01/PLAN.md in full. Execute Session S00 only.
 Follow the session protocol, update the session tracker in that file, create the
 required handoff, and stop after S00 is complete. Do not start S01.
 ```
@@ -29,7 +29,7 @@ required handoff, and stop after S00 is complete. Do not start S01.
 For every later session, use this prompt:
 
 ```text
-Read AGENTS.md and plans/P01.md in full. Inspect git status,
+Read AGENTS.md and plans/P01/PLAN.md in full. Inspect git status,
 the latest commits, and the previous session handoff. Execute exactly the next
 session whose status is NOT_STARTED and whose prerequisites are DONE. Update the
 tracker and write the required handoff. Do not start a later session.
@@ -38,7 +38,7 @@ tracker and write the required handoff. Do not start a later session.
 To request a specific session:
 
 ```text
-Read AGENTS.md and plans/P01.md in full. Execute Session SXX
+Read AGENTS.md and plans/P01/PLAN.md in full. Execute Session SXX
 only, provided that all of its prerequisites are DONE. Update the tracker and
 write the required handoff. Do not perform work assigned to another session.
 ```
@@ -239,7 +239,7 @@ If an official Core integration now owns the same domain, stop and mark the plan
 - Latest stable `fmi-weather-client` remains `1.0.0`, requires Python `>=3.10`, and publishes Python 3.10 through 3.14 classifiers.
 - Home Assistant Core's `dev` tree contains no `homeassistant/components/fmi` integration, so no domain conflict blocks this plan.
 - HACS documentation still explicitly permits a root-content integration when `hacs.json` sets `"content_in_root": true`; hassfest/HACS execution against this repository remains assigned to S01.
-- Full baseline evidence, dependency versions, command results, and authoritative source links are archived in `docs/P01/BASELINE.md`.
+- Full baseline evidence, dependency versions, command results, and authoritative source links are archived in `plans/P01/BASELINE.md`.
 
 S14 refreshed release metadata on 2026-08-01: stable remains `2026.7.4`, while the latest beta advanced to `2026.8.0b3`; helper 0.13.350 still pins beta b2. The supported stable selection is unchanged.
 
@@ -480,23 +480,23 @@ A session is not `DONE` unless its acceptance criteria pass, its handoff exists,
 
 | ID | Session | Prerequisites | Status | Started UTC | Completed UTC | Commit(s) | Handoff / notes |
 |---|---|---|---|---|---|---|---|
-| S00 | Bootstrap, refresh baseline, and create initial `AGENTS.md` | None | DONE | 2026-07-31T06:44:16Z | 2026-07-31T06:55:14Z | `389c67901085efe6b53bee1474a2f89bfab20867` | `docs/P01/S00.md` |
-| S01 | Reproducible development/test environment and validation skeleton | S00 | DONE | 2026-07-31T06:59:13Z | 2026-07-31T08:09:34Z | `b4fb80808884cdd746714829d1616c4160b94c91` | `docs/P01/S01.md`; committed with S02 |
-| S02 | FMI fixture corpus, contract boundary, and characterization tests | S01 | DONE | 2026-07-31T08:10:37Z | 2026-07-31T08:34:20Z | `b4fb80808884cdd746714829d1616c4160b94c91` | `docs/P01/S02.md`; committed with S01 |
-| S03 | Upgrade all dependencies and adapt to newest stable FMI client | S02 | DONE | 2026-07-31T09:41:16Z | 2026-07-31T10:24:24Z | `eb073830b03b80922d607c855f5b4e440d10e217` | `docs/P01/S03.md`; temporary HA-pinned vulnerability exception tracked in `TODO.md` |
-| S04 | Coordinator/setup resilience and forecast-outage availability regression | S03 | DONE | 2026-07-31T10:36:22Z | 2026-07-31T11:02:16Z | `ad0c997ea70f2316195808347501de4b4e8f58ea` | `docs/P01/S04.md` |
-| S05 | Correct hourly/daily forecast semantics and incorrect daily forecast regression | S04 | DONE | 2026-07-31T11:23:32Z | 2026-07-31T12:04:36Z | `796d41659c443479dbfeaeef3ed4ca909aca7a7f` | `docs/P01/S05.md` |
-| S06 | Sensor/entity correctness: wind gusts and location grouping | S05 | DONE | 2026-07-31T12:18:37Z | 2026-07-31T13:00:14Z | `2feec86aacb11b07ff6fbd2997175910599b12a4` | `docs/P01/S06.md` |
-| S07 | Location reconfigure flow and location reconfiguration requirement | S06 | DONE | 2026-07-31T13:50:06Z | 2026-07-31T14:34:00Z | `6044660889856200ad7f8be6a60cdc3f6206969b` | `docs/P01/S07.md`; includes measured opt-in pytest worker support |
-| S08 | Polar sun, time boundaries, and missing-data robustness; polar sunrise/sunset regression | S07 | DONE | 2026-07-31T14:57:20Z | 2026-07-31T15:28:08Z | `1bff418b8641772ae2e29745fcd9db6e872a720a` | `docs/P01/S08.md`; suggested commit: `S08: harden time and missing-data handling` |
-| S09 | Lightning/sea-level hardening and lightning maximum-age enhancement | S08 | DONE | 2026-07-31T15:52:25Z | 2026-07-31T16:36:18Z | `033c574507734941aac7cc30a27ce4e8954d0c0c` | `docs/P01/S09.md`; suggested commit: `S09: harden optional weather sources` |
-| S10 | Full Home Assistant config/lifecycle integration tests | S09 | DONE | 2026-07-31T17:10:34Z | 2026-07-31T17:46:29Z | `f6e4caf3fee1f51d0e314bcd74ce674b0d92c37b` | `docs/P01/S10.md`; suggested commit: `S10: complete Home Assistant lifecycle coverage` |
-| S11 | Registry migration, stable identity, and multi-entry tests | S10 | DONE | 2026-07-31T18:11:42Z | 2026-07-31T18:42:51Z | `45961ff83fb917e602640295ff1762560b95814b` | `docs/P01/S11.md`; suggested commit: `S11: prove registry-safe migrations` |
-| S12 | Live FMI end-to-end test suite and CI probe | S11 | DONE | 2026-07-31T19:25:24Z | 2026-07-31T20:12:03Z | `a944ecd34ad3ba25a60439099447fa6a6cf00c6c` | `docs/P01/S12.md`; suggested commit: `S12: add bounded live FMI probes` |
-| S13 | Evidence-based critical runtime correctness audit and fixes | S12 | DONE | 2026-08-01T04:57:49Z | 2026-08-01T05:26:49Z | `c919057c6ddc39283bd88ba75bdf061b55ea9159` | `docs/P01/S13.md`; suggested commit: `S13: harden FMI runtime failure boundaries` |
-| S14 | Home Assistant compatibility, dependency, security, and privacy audit | S13 | DONE | 2026-08-01T05:44:29Z | 2026-08-01T06:34:06Z | `0143cd2f6741d6a55ce96b8710ad3eecadd82ce4` | `docs/P01/S14.md`; suggested commit: `S14: harden HA compatibility and diagnostics` |
-| S15 | Production CI/CD, HACS validation, and release verification | S14 | DONE | 2026-08-01T09:25:09Z | 2026-08-01T12:22:26Z | `ff00b62eeb94875a7729e585a00e9c6f94da2027`; `f90707fc3efaa3063e922c9f64e9f671f002ab3c` | `docs/P01/S15.md`; all 12 PR checks passed at the final SHA |
-| S16 | Documentation, final verification, and final `AGENTS.md` | S15 | DONE | 2026-08-01T12:36:37Z | 2026-08-01T13:18:15Z | `OWNER_TO_COMMIT` | `docs/P01/S16.md`; suggested commit: `S16: finalize documentation and release verification` |
+| S00 | Bootstrap, refresh baseline, and create initial `AGENTS.md` | None | DONE | 2026-07-31T06:44:16Z | 2026-07-31T06:55:14Z | `389c67901085efe6b53bee1474a2f89bfab20867` | `plans/P01/S00.md` |
+| S01 | Reproducible development/test environment and validation skeleton | S00 | DONE | 2026-07-31T06:59:13Z | 2026-07-31T08:09:34Z | `b4fb80808884cdd746714829d1616c4160b94c91` | `plans/P01/S01.md`; committed with S02 |
+| S02 | FMI fixture corpus, contract boundary, and characterization tests | S01 | DONE | 2026-07-31T08:10:37Z | 2026-07-31T08:34:20Z | `b4fb80808884cdd746714829d1616c4160b94c91` | `plans/P01/S02.md`; committed with S01 |
+| S03 | Upgrade all dependencies and adapt to newest stable FMI client | S02 | DONE | 2026-07-31T09:41:16Z | 2026-07-31T10:24:24Z | `eb073830b03b80922d607c855f5b4e440d10e217` | `plans/P01/S03.md`; temporary HA-pinned vulnerability exception tracked in `TODO.md` |
+| S04 | Coordinator/setup resilience and forecast-outage availability regression | S03 | DONE | 2026-07-31T10:36:22Z | 2026-07-31T11:02:16Z | `ad0c997ea70f2316195808347501de4b4e8f58ea` | `plans/P01/S04.md` |
+| S05 | Correct hourly/daily forecast semantics and incorrect daily forecast regression | S04 | DONE | 2026-07-31T11:23:32Z | 2026-07-31T12:04:36Z | `796d41659c443479dbfeaeef3ed4ca909aca7a7f` | `plans/P01/S05.md` |
+| S06 | Sensor/entity correctness: wind gusts and location grouping | S05 | DONE | 2026-07-31T12:18:37Z | 2026-07-31T13:00:14Z | `2feec86aacb11b07ff6fbd2997175910599b12a4` | `plans/P01/S06.md` |
+| S07 | Location reconfigure flow and location reconfiguration requirement | S06 | DONE | 2026-07-31T13:50:06Z | 2026-07-31T14:34:00Z | `6044660889856200ad7f8be6a60cdc3f6206969b` | `plans/P01/S07.md`; includes measured opt-in pytest worker support |
+| S08 | Polar sun, time boundaries, and missing-data robustness; polar sunrise/sunset regression | S07 | DONE | 2026-07-31T14:57:20Z | 2026-07-31T15:28:08Z | `1bff418b8641772ae2e29745fcd9db6e872a720a` | `plans/P01/S08.md`; suggested commit: `S08: harden time and missing-data handling` |
+| S09 | Lightning/sea-level hardening and lightning maximum-age enhancement | S08 | DONE | 2026-07-31T15:52:25Z | 2026-07-31T16:36:18Z | `033c574507734941aac7cc30a27ce4e8954d0c0c` | `plans/P01/S09.md`; suggested commit: `S09: harden optional weather sources` |
+| S10 | Full Home Assistant config/lifecycle integration tests | S09 | DONE | 2026-07-31T17:10:34Z | 2026-07-31T17:46:29Z | `f6e4caf3fee1f51d0e314bcd74ce674b0d92c37b` | `plans/P01/S10.md`; suggested commit: `S10: complete Home Assistant lifecycle coverage` |
+| S11 | Registry migration, stable identity, and multi-entry tests | S10 | DONE | 2026-07-31T18:11:42Z | 2026-07-31T18:42:51Z | `45961ff83fb917e602640295ff1762560b95814b` | `plans/P01/S11.md`; suggested commit: `S11: prove registry-safe migrations` |
+| S12 | Live FMI end-to-end test suite and CI probe | S11 | DONE | 2026-07-31T19:25:24Z | 2026-07-31T20:12:03Z | `a944ecd34ad3ba25a60439099447fa6a6cf00c6c` | `plans/P01/S12.md`; suggested commit: `S12: add bounded live FMI probes` |
+| S13 | Evidence-based critical runtime correctness audit and fixes | S12 | DONE | 2026-08-01T04:57:49Z | 2026-08-01T05:26:49Z | `c919057c6ddc39283bd88ba75bdf061b55ea9159` | `plans/P01/S13.md`; suggested commit: `S13: harden FMI runtime failure boundaries` |
+| S14 | Home Assistant compatibility, dependency, security, and privacy audit | S13 | DONE | 2026-08-01T05:44:29Z | 2026-08-01T06:34:06Z | `0143cd2f6741d6a55ce96b8710ad3eecadd82ce4` | `plans/P01/S14.md`; suggested commit: `S14: harden HA compatibility and diagnostics` |
+| S15 | Production CI/CD, HACS validation, and release verification | S14 | DONE | 2026-08-01T09:25:09Z | 2026-08-01T12:22:26Z | `ff00b62eeb94875a7729e585a00e9c6f94da2027`; `f90707fc3efaa3063e922c9f64e9f671f002ab3c` | `plans/P01/S15.md`; all 12 PR checks passed at the final SHA |
+| S16 | Documentation, final verification, and final `AGENTS.md` | S15 | DONE | 2026-08-01T12:36:37Z | 2026-08-01T13:18:15Z | `OWNER_TO_COMMIT` | `plans/P01/S16.md`; suggested commit: `S16: finalize documentation and release verification` |
 
 ---
 
@@ -547,7 +547,7 @@ Every session must follow this protocol.
    ```
 
 4. Update relevant work/decision tables in this plan.
-5. Write `docs/P01/SXX.md` using the template in Section 13.
+5. Write `plans/P01/SXX.md` using the template in Section 13.
 6. Do not create a commit. Add one concise suggested commit message beginning with `SXX:` to the handoff and report it to the repository owner.
 7. Record `OWNER_TO_COMMIT`, the completion time, and the handoff path in the tracker. Replace it with the owner-created SHA in a later session when known.
 8. Mark the session `DONE` only when all exit criteria pass.
@@ -580,7 +580,7 @@ Create durable project memory and replace planning assumptions with a verified r
    - latest direct development/test dependencies already used by the repo;
    - current FMI Open Data WFS documentation, terms, limits, and changelog.
 5. Check whether Home Assistant Core now contains an official integration with domain `fmi`.
-6. Create `docs/P01/BASELINE.md` containing:
+6. Create `plans/P01/BASELINE.md` containing:
    - base commit and date;
    - repository tree and approximate module responsibilities;
    - current install layout;
@@ -590,7 +590,7 @@ Create durable project memory and replace planning assumptions with a verified r
    - commands that currently work or fail;
    - known gaps and risks;
    - authoritative source links with access dates.
-7. Create `docs/P01/`.
+7. Create `plans/P01/`.
 8. Create an initial root-level **uppercase** `AGENTS.md`. Codex automatically discovers `AGENTS.md`; do not use lowercase `agents.md` as the primary file on a case-sensitive filesystem.
 9. Keep initial `AGENTS.md` concise and include:
    - project purpose;
@@ -606,7 +606,7 @@ Create durable project memory and replace planning assumptions with a verified r
 ### Verification
 
 - Confirm `AGENTS.md` is nonempty, under Codex's project instruction size limit, and located at the Git root.
-- Confirm repository links and descriptive report names in `docs/P01/BASELINE.md` are current.
+- Confirm repository links and descriptive report names in `plans/P01/BASELINE.md` are current.
 - Run the existing repository validation commands without changing their configuration; record success/failure exactly.
 - Run `git diff --check`.
 
@@ -673,7 +673,7 @@ Create a reproducible local developer environment and the smallest useful automa
    - apply Ruff formatting and safe fixes to the repository;
    - make both `make format-check` and `make lint` pass;
    - retain factual flake8 references only in historical S00/baseline evidence.
-12. Store this maintenance plan at `plans/P01.md` and update every active repository reference to its canonical path.
+12. Store this maintenance plan at `plans/P01/PLAN.md` and update every active repository reference to its canonical path.
 
 ### Verification
 
@@ -1479,7 +1479,7 @@ Produce a release-ready maintenance result, finalize durable agent instructions,
    - copy-ready examples for typical Home Assistant dashboards using standard weather/entity cards, including current conditions, hourly/daily forecasts, observations, and optional lightning/sea-level sensors;
    - a note that dashboard YAML must be adjusted to the entity IDs in the user's own registry.
 3. Create or update `CHANGELOG.md` with a `1.0.0` release-candidate entry mapping fixes to lightning maximum-age enhancement, wind-gust availability regression, sensor location-grouping regression, incorrect daily forecast regression, location reconfiguration requirement, forecast-outage availability regression, and polar sunrise/sunset regression, plus confirmed audit fixes.
-4. Keep plan-specific completion evidence in `plans/P01.md` and `docs/P01/`, and keep
+4. Keep plan-specific completion evidence in `plans/P01/PLAN.md` and `plans/P01/`, and keep
    `docs/maintenance/` limited to current technical contracts. Do not create a final-plan report in
    the maintenance reference directory. Ensure every maintenance file is described in root
    `AGENTS.md` with its ownership and intended use.
@@ -1530,7 +1530,7 @@ Produce a release-ready maintenance result, finalize durable agent instructions,
 
 ## 13. Handoff template
 
-Each session must create `docs/P01/SXX.md` with this structure:
+Each session must create `plans/P01/SXX.md` with this structure:
 
 ```markdown
 # Session SXX Handoff
@@ -1595,16 +1595,16 @@ Codex must add rows for material architecture, semantics, migration, support, or
 | D007 | S01 | 2026-07-31 | Use Ruff as the sole flake8-style linter and formatter with `E`, `F`, `I`, `UP`, `B`, and `ASYNC`; retain Pylint as a complementary check | Keep the former flake8 fatal subset; run Ruff alongside flake8; drop Pylint | The broader Ruff selection exposed import, modernization, and bugbear findings, supports both safe fixes and formatting, and now passes with no active legacy dependency, configuration, or command; Pylint continues to pass at 10.00/10 | `docs/maintenance/DEVELOPMENT.md`; `b4fb80808884cdd746714829d1616c4160b94c91` |
 | D008 | S02 | 2026-07-31 | Use compact synthetic fixture specifications that build the installed client's real models, plus a narrow async fake for the three consumed client methods | Store raw live FMI captures; use `SimpleNamespace` throughout tests; add a production wrapper before an upgrade requires it | Synthetic values avoid owner-coordinate/license risk, generated hourly series stay reviewable, real `NamedTuple` models expose dependency-shape changes, and the fake provides deterministic client/server failures without production refactoring | `tests/helpers/fmi.py`; `tests/fixtures/fmi/README.md`; `b4fb80808884cdd746714829d1616c4160b94c91` |
 | D009 | S03 | 2026-07-31 | Keep Home Assistant 2026.7.4's exact Pillow/PyJWT pins and track their current High-severity advisories as a temporary owner-approved exception | Override Home Assistant metadata with fixed packages; target a Home Assistant prerelease; stop all maintenance work | The integration neither imports nor declares these packages and its manifest closure audits cleanly; overriding exact Core pins makes the environment inconsistent, while the owner explicitly accepted the temporary risk for private testing until stable Home Assistant updates | `TODO.md`; `docs/maintenance/DEPENDENCIES.md`; `eb073830b03b80922d607c855f5b4e440d10e217` |
-| D010 | S04 | 2026-07-31 | Load an entry when either the primary current source (including place fallback) or a configured station succeeds, while keeping forecast and optional-source availability independent | Require the forecast-backed coordinator to succeed; treat any configured station failure as fatal; retain stale forecast data | Independent coordinators preserve usable observations during a WFS incident; explicit stale-data clearing and transition-only logging make outages and automatic recovery visible without presenting old data as current | `docs/maintenance/AVAILABILITY.md`; `tests/test_availability.py`; `docs/P01/S04.md`; `ad0c997ea70f2316195808347501de4b4e8f58ea` |
+| D010 | S04 | 2026-07-31 | Load an entry when either the primary current source (including place fallback) or a configured station succeeds, while keeping forecast and optional-source availability independent | Require the forecast-backed coordinator to succeed; treat any configured station failure as fatal; retain stale forecast data | Independent coordinators preserve usable observations during a WFS incident; explicit stale-data clearing and transition-only logging make outages and automatic recovery visible without presenting old data as current | `docs/maintenance/AVAILABILITY.md`; `tests/test_availability.py`; `plans/P01/S04.md`; `ad0c997ea70f2316195808347501de4b4e8f58ea` |
 | D011 | S05 | 2026-07-31 | Retain the complete one-hour FMI series and derive separate UTC hourly and local-calendar daily forecasts with documented deterministic aggregation; preserve the legacy optional daily entity until S11 migration evidence exists | Aggregate the configured coarse FMI timestep; make another daily request; remove the legacy entity immediately | `Precipitation1h` cannot be totaled from a coarse series, a second request would amplify load/failure paths, and Home Assistant requires separate hourly/daily methods with UTC timestamps. Keeping the legacy entity avoids silently removing an existing unique ID while its methods become semantically correct. | `docs/maintenance/FORECAST_SEMANTICS.md`; `tests/test_forecast_characterization.py`; `tests/test_setup.py`; `796d41659c443479dbfeaeef3ed4ca909aca7a7f` |
 | D012 | S06 | 2026-07-31 | Add `HourlyMaximumGust` to the stable client's existing forecast/current request and normalize it by timestamp into the existing model; keep observation calls unchanged | Leave gust unavailable; add a second WFS request; vendor/fork the GPL client; substitute ordinary wind speed | FMI publishes the hourly field for the selected forecast producer while the client's requested `WindGust` is NaN. The narrow adapter restores data with one request, preserves the exact client pin and observation semantics, and is guarded by offline private-boundary contracts. | `docs/maintenance/SENSORS.md`; `tests/test_fmi_contract.py`; `2feec86aacb11b07ff6fbd2997175910599b12a4` |
 | D013 | S06 | 2026-07-31 | Use translated entity descriptions and coordinate-identified location devices while preserving unique IDs; migrate only exact legacy generated entity IDs when the target is free | Change unique IDs; rename every old ID heuristically; leave fresh sensors ungrouped | Current Home Assistant naming derives location-aware IDs from device and entity context. Exact-match migration improves known defaults without risking customized IDs, target collisions, or entity recreation; ambiguous histories remain assigned to S11. | `docs/maintenance/SENSORS.md`; `tests/test_sensor_entities.py`; `2feec86aacb11b07ff6fbd2997175910599b12a4` |
-| D014 | Owner/S07 | 2026-07-31 | Prepare the maintenance release as version `1.0.0`, provide a separate concise end-user guide with installation, configuration, and typical dashboard examples, and reduce README to a project overview, main limitations, and structured documentation index | Recommend a version only at S16; keep all user instructions embedded in the contributor-oriented README; duplicate full instructions in both files | The owner selected the public release version and requires a practical adoption path for testing this fork in Home Assistant without duplicated or conflicting documentation. S15 owns metadata verification and S16 owns the guide and README restructuring; none of these deliverables is pulled into earlier implementation sessions. | `plans/P01.md`; `6044660889856200ad7f8be6a60cdc3f6206969b` |
+| D014 | Owner/S07 | 2026-07-31 | Prepare the maintenance release as version `1.0.0`, provide a separate concise end-user guide with installation, configuration, and typical dashboard examples, and reduce README to a project overview, main limitations, and structured documentation index | Recommend a version only at S16; keep all user instructions embedded in the contributor-oriented README; duplicate full instructions in both files | The owner selected the public release version and requires a practical adoption path for testing this fork in Home Assistant without duplicated or conflicting documentation. S15 owns metadata verification and S16 owns the guide and README restructuring; none of these deliverables is pulled into earlier implementation sessions. | `plans/P01/PLAN.md`; `6044660889856200ad7f8be6a60cdc3f6206969b` |
 | D004 | S07 | 2026-07-31 | Store an immutable `entity_identity`, migrate version-1 entries by retaining their original `latitude:longitude` entity/device identity, and move config-entry unique IDs to `fmi:<entry_id>` when collision-free | Rewrite all entity unique IDs to a new UUID; keep coordinates as live identity; recreate the entry after a move | Preserving the legacy entity identity keeps registry entries, automations, dashboards, and customized IDs intact while coordinates/title/device name change. Fresh entries use a random coordinate-independent identity. Duplicate checks compare mutable coordinates, and config-ID collisions retain the safe legacy config ID. | `docs/maintenance/RECONFIGURATION.md`; `tests/test_config_flow.py`; `6044660889856200ad7f8be6a60cdc3f6206969b` |
 | D015 | S07 | 2026-07-31 | Expose process-parallel pytest through `PYTEST_WORKERS` while retaining the measured-faster single-process default | Force `auto`, two, or four workers; add shared-thread execution; parallelize live/network probes | Warm-container wall time increased from 8.871 seconds with `-n 0` to 13.199 seconds with `-n 2` and 13.586 seconds with `-n 4`; pytest-only time was 3.40 versus 6.34 seconds. Xdist still gives a safe opt-in as the suite grows, while process isolation respects Home Assistant event-loop/global-state boundaries. | `Makefile`; `docs/maintenance/DEVELOPMENT.md`; `6044660889856200ad7f8be6a60cdc3f6206969b` |
 | D016 | S08 | 2026-07-31 | Use Home Assistant local time and complete dates; fall back to daytime clear when sun events are indeterminate; normalize invalid FMI values to unavailable | Use host `date.today()`/`tzlocal()`; distinguish polar day/night without sufficient events; invent an unknown condition; retain direct `python-dateutil` | The Polar sunrise/sunset regression reproduces optional sun events, tests expose month-end day arithmetic and malformed external values, and Home Assistant provides the authoritative configured timezone. The policy avoids crashes and false conditions while preserving aware UTC forecast output. | `docs/maintenance/TIME_AND_MISSING_DATA.md`; `tests/test_time_and_missing_data.py`; `1bff418b8641772ae2e29745fcd9db6e872a720a` |
 | D005 | S09 | 2026-07-31 | Configure maximum lightning age as an inclusive 1-1440 minute option with a lazy 1440-minute default for existing entries | Use hours; choose a shorter default; require a config-entry version migration; omit age filtering | Minutes give precise, clear UI semantics; 1440 minutes preserves the former one-day query window; lazy defaulting avoids rewriting existing entries; an exact inclusive boundary is deterministic and covered offline | `docs/maintenance/OPTIONAL_SOURCES.md`; `tests/test_auxiliary_payloads.py`; `tests/test_config_flow.py`; `033c574507734941aac7cc30a27ce4e8954d0c0c` |
-| D017 | S10 | 2026-07-31 | Model each location's main weather as its device's unnamed primary entity, the daily forecast as a named sub-entity, and station observations as the unnamed primary entity of a separate observation device | Keep explicit full entity names that current Home Assistant prefixes with the device name; remove device grouping; change unique IDs | Home Assistant-level setup reproduced duplicated observation names and generated IDs. Current entity naming semantics produce concise fresh IDs and names when device context owns the location label; all existing unique IDs remain unchanged for registry preservation, with upgrade cases retained for S11 acceptance tests. | `custom_components/fmi/weather.py`; `tests/test_lifecycle.py`; `docs/P01/S10.md`; `f6e4caf3fee1f51d0e314bcd74ce674b0d92c37b` |
+| D017 | S10 | 2026-07-31 | Model each location's main weather as its device's unnamed primary entity, the daily forecast as a named sub-entity, and station observations as the unnamed primary entity of a separate observation device | Keep explicit full entity names that current Home Assistant prefixes with the device name; remove device grouping; change unique IDs | Home Assistant-level setup reproduced duplicated observation names and generated IDs. Current entity naming semantics produce concise fresh IDs and names when device context owns the location label; all existing unique IDs remain unchanged for registry preservation, with upgrade cases retained for S11 acceptance tests. | `custom_components/fmi/weather.py`; `tests/test_lifecycle.py`; `plans/P01/S10.md`; `f6e4caf3fee1f51d0e314bcd74ce674b0d92c37b` |
 | D018 | S11 | 2026-07-31 | Preserve every legacy internal/unique ID; rename only exact unsuffixed generated sensor defaults when the location target is free, and preserve ambiguous suffixes, custom IDs, and occupied targets | Rename all suffix-shaped IDs; keep every generic sensor ID; replace registry entries with new location identities | v0.6.2 source plus current registry tests show no provenance field that distinguishes an automatic `_2` suffix from the same user-selected ID. Exact defaults are unambiguous; all other histories remain functional through unchanged IDs and acquire the correct preserved device identity. | `docs/maintenance/MIGRATIONS.md`; `tests/fixtures/fmi/registry_v062.json`; `tests/test_migrations.py`; `45961ff83fb917e602640295ff1762560b95814b` |
 | D019 | S11 | 2026-07-31 | Retain the optional legacy daily weather entity and its registry/custom ID across option disable/re-enable | Delete it as redundant; disable it permanently during migration; redirect references to the main weather entity | Home Assistant has no general registry migration that rewrites dashboard/entity references. The fixture proves the existing daily record can remain unavailable while disabled and reattach unchanged when enabled, avoiding silent orphaning. | `docs/maintenance/MIGRATIONS.md`; `tests/test_migrations.py`; `45961ff83fb917e602640295ff1762560b95814b` |
 | D020 | S12 | 2026-07-31 | Probe rounded Helsinki and Kilpisjarvi forecasts plus Helsinki Kumpula `FMISID 101004` at dependency and Home Assistant levels with a 6-request nominal and 10-request maximum budget; invoke the live marker after offline tests in the existing blocking `verify.yml` job until S15 decides final CI topology | Use owner coordinates; keep a separate manual/scheduled workflow now; probe only raw client objects; include optional lightning/sea-level/geocoding; use parallel workers or unbounded retries | Current FMI documentation and metadata identify the WFS limits, public station/location data, stored-query surface, and CC BY 4.0 terms. The selected points cover southern/high-latitude output; the station returned current data; the full live run proved dashboard-facing units, availability, timestamps, and precipitation semantics while remaining a tiny fraction of published limits. The owner prefers one verification workflow for the S12 interim; S15 retains the planned CI policy review. | `docs/maintenance/LIVE_TESTS.md`; `tests/test_live_fmi.py`; `.github/workflows/verify.yml`; `a944ecd34ad3ba25a60439099447fa6a6cf00c6c` |
@@ -1618,7 +1618,7 @@ Codex must add rows for material architecture, semantics, migration, support, or
 | D028 | S15 | 2026-08-01 | Keep one committed full freeze for the supported stable dev/test environment, a separate bootstrap freeze, and runtime-generated full freezes for independently resolved current stable/prerelease drift checks; require file-only pip installs | Split lint/type/test tools into duplicate large locks; commit a beta lock that immediately becomes stale; pass package pins directly in workflows; test a resolver environment without recreating it | The 173-package lock is one coherent supported environment rather than multiple HA channels. A moving compatibility check cannot simultaneously be a committed reproducible lock, so dedicated unpinned direct inputs select the current channels, `pip freeze` records each actual graph, and a clean venv proves that graph before tests. File-only install policy keeps versions reviewable and eliminates workflow-local pins. | `requirements*.txt`; `.github/scripts/compatibility.py`; `tests/test_ci_policy.py`; `docs/maintenance/DEPENDENCIES.md`; `ff00b62eeb94875a7729e585a00e9c6f94da2027` |
 | D029 | S15 | 2026-08-01 | Retain native GitHub dependency review for independent repositories but use a full-freeze pip-audit with exact package/version/advisory exceptions on forks | Leave the permanently failing native action; skip dependency risk checks on forks; ignore whole vulnerable packages or all future advisories | The first PR proved GitHub's dependency-diff endpoint returns `403` for forks. The fallback audits the same complete supported freeze, accepts only the 18 currently reviewed advisory tuples forced by HA 2026.7.4, and fails for a new finding, changed package version, or stale exception. This preserves a blocking dependency-risk signal without pretending the native API is available. | `.github/workflows/dependency-review.yml`; `.github/scripts/dependency_audit.py`; `.github/dependency-audit-exceptions.json`; `tests/test_dependency_audit.py`; `f90707fc3efaa3063e922c9f64e9f671f002ab3c` |
 | D030 | S16 | 2026-08-01 | Keep README as the concise project/support/index entry point and make one linked user guide authoritative for installation, configuration, upgrades, dashboards, troubleshooting, removal, and privacy | Duplicate complete user instructions in README; leave adoption guidance distributed across historical maintenance documents | A single owner avoids conflicting procedures while README still exposes purpose, capabilities, limitations, maintainer, and every durable document. Dashboard examples use standard Home Assistant cards and explicitly require each user to substitute registry IDs. | `README.md`; `docs/USER_GUIDE.md`; `OWNER_TO_COMMIT` |
-| D031 | S16 | 2026-08-01 | Reserve `docs/maintenance/` for current agent-consumable technical contracts and keep plan baseline/progress/final evidence under `docs/P01/` | Keep a final-plan report and historical baseline beside current runtime guidance; duplicate the handoff evidence in maintenance documents | Future agents need a stable map of current ownership and invariants, while the plan/handoffs already preserve chronology and verification. Separating them prevents stale session narrative from being mistaken for current behavior. | `AGENTS.md`; `docs/maintenance/`; `docs/P01/BASELINE.md`; `docs/P01/S16.md`; `OWNER_TO_COMMIT` |
+| D031 | S16 | 2026-08-01 | Reserve `docs/maintenance/` for current agent-consumable technical contracts and keep plan baseline/progress/final evidence under `plans/P01/` | Keep a final-plan report and historical baseline beside current runtime guidance; duplicate the handoff evidence in maintenance documents | Future agents need a stable map of current ownership and invariants, while the plan/handoffs already preserve chronology and verification. Separating them prevents stale session narrative from being mistaken for current behavior. | `AGENTS.md`; `docs/maintenance/`; `plans/P01/BASELINE.md`; `plans/P01/S16.md`; `OWNER_TO_COMMIT` |
 
 ---
 

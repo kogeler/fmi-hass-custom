@@ -28,7 +28,7 @@ skip_covered = true
 [tool.ruff]
 line-length = 100
 target-version = "py314"
-exclude = ["plans/P01.md"]
+extend-exclude = ["plans/*/PLAN.md"]
 
 [tool.ruff.lint]
 select = ["ASYNC", "B", "E", "F", "I", "UP"]

@@ -46,6 +46,13 @@ The first command copies `.version` into the manifest. The second proves that `.
 manifest, and the matching `CHANGELOG.md` section agree. CI executes the same Python helper from
 `.github/scripts/version.py`.
 
+Do not copy the current numeric project version into `README.md`, `docs/USER_GUIDE.md`,
+`AGENTS.md`, installation commands, or similar current-facing prose. Those documents link to the
+[latest published GitHub Release](https://github.com/kogeler/fmi-hass-custom/releases/latest),
+which is authoritative for users. Concrete project versions belong only in `.version`, its
+generated manifest mirror, dated changelog history, Git tags/releases, and tests or historical
+records that explicitly exercise a version contract.
+
 ## Change And Release Contract
 
 Every pull request to `master`, including documentation and Dependabot changes, must:
@@ -64,7 +71,7 @@ requires the reusable CI and Home Assistant/HACS validation workflows. Only afte
 does its final job receive `contents: write` and call full-SHA-pinned `actions/github-script`.
 The action creates both:
 
-- a lightweight tag named exactly like `.version`, for example `1.0.0`;
+- a lightweight tag named exactly like `.version`, in `X.Y.Z` form;
 - a published GitHub Release with the same title and tag.
 
 The release body contains only the matching version section from `CHANGELOG.md`, followed by a
