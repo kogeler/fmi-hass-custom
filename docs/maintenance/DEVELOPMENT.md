@@ -2,17 +2,23 @@
 
 # Development Environment
 
-## Supported Environment
+## Reference Environment
 
-All local commands that depend on the supported Python or Home Assistant version run in rootless
-Podman. Home Assistant 2026.7.4 requires Python 3.14.2 or newer; the host interpreter is never a
-supported fallback even when its version happens to match.
+All local commands that depend on the selected Python or Home Assistant version run in rootless
+Podman. The Home Assistant 2026.8.1 reference uses Python 3.14.2; the host interpreter is never a
+fallback even when its version happens to match.
 
-`Containerfile.dev` pins the multi-architecture digest for the official Python 3.14.2 slim image. `requirements-direct.txt` is the reviewed human-maintained dependency source. Root `requirements.txt` is generated from a clean `lock` stage with `python -m pip freeze`, then installed with `--no-deps` in the development image. This is one coherent supported stable HA development/test environment; it does not contain a second beta or compatibility environment.
+`Containerfile.dev` pins the multi-architecture digest for the official Python 3.14.2 slim image. `requirements-direct.txt` is the reviewed human-maintained dependency source. Root `requirements.txt` is generated from a clean `lock` stage with `python -m pip freeze`, then installed with `--no-deps` in the development image. This is one coherent stable HA development/test reference; it does not contain a second beta or compatibility environment and does not define the HACS installation floor.
 
 `requirements-bootstrap.txt` is the separate exact bootstrap freeze used to upgrade pip before any other installation. Normal `pip freeze` omits pip, so keeping this one-package environment separate makes the bootstrap version reviewable without embedding it in Containerfiles or workflows. Every maintained `pip install` consumes a requirements or generated constraint file; package names and versions are not passed directly by CI, Make, container recipes, or CI helpers.
 
-The committed supported freeze uses `pytest-homeassistant-custom-component==0.13.348`, which maps exactly to Home Assistant 2026.7.4. Newer helper releases target Home Assistant prereleases and are intentionally excluded from that stable lock; the dynamic compatibility targets discover and test them without changing the supported environment.
+The committed reference freeze uses `pytest-homeassistant-custom-component==0.13.355`, which maps exactly to Home Assistant 2026.8.1. Newer helper releases target Home Assistant prereleases and are intentionally excluded from that stable lock; the dynamic compatibility targets discover and test them without changing the reference environment.
+
+Concrete Home Assistant and helper versions are dependency inputs and lock inventory, not test
+assertions or runtime conditions. The suite establishes compatibility by exercising behavior.
+`hacs.json` separately declares the oldest installable Home Assistant release and is not updated
+during a routine reference-lock refresh; raise it only for a reproduced interface or runtime
+incompatibility as defined in `HACS_RELEASES.md`.
 
 Local lock/development images use stable `localhost/fmi-hass-custom-*:local` names. Image names and
 the `.cache/podman-dev.stamp` path deliberately do not duplicate the Home Assistant version. The
@@ -50,9 +56,13 @@ Build, lock, and compatibility commands may access package registries. Formattin
 
 ## Dependency Update Process
 
+For a new Home Assistant stable release, follow the complete discovery, lock, audit, verification,
+and release-decision procedure in `HA_RELEASE_MAINTENANCE.md`. The rules below describe the generic
+dependency mechanics used by that runbook and by non-HA dependency updates.
+
 The repository has three dependency-file roles:
 
-- `requirements-direct.txt` contains reviewed exact direct selections for the supported stable
+- `requirements-direct.txt` contains reviewed exact direct selections for the reference stable
   development/test environment. Root `requirements.txt` is its generated complete transitive
   `pip freeze`.
 - `requirements-bootstrap.txt` is the separate exact pip bootstrap environment. It has no
@@ -62,7 +72,7 @@ The repository has three dependency-file roles:
   drift checks. Each run generates a separate ignored
   `requirements-compatibility-*-resolved.txt` full freeze and recreates it before testing.
 
-To update a direct supported dependency:
+To update a direct reference dependency:
 
 1. Verify the current stable release and its constraints from the authoritative project/package
    metadata.
@@ -73,6 +83,10 @@ To update a direct supported dependency:
 4. Review the direct change and every transitive lock change, run `make dev-build`, `pip check`
    through the image build, the full offline gates, audits, and the manual stable/prerelease
    compatibility targets.
+
+Do not copy the newly selected Home Assistant or helper version into tests, runtime code, image
+names, or `hacs.json`. The dependency files already record the exact graph. The HACS minimum changes
+only when functional evidence shows that the existing floor can no longer run the integration.
 
 No Makefile image tag or stamp name changes during a Home Assistant dependency update. If the new
 Home Assistant release requires a different Python version, review and update the pinned
@@ -98,11 +112,12 @@ deliberate network-block probe remain sequential.
 
 `make audit` checks the complete Home Assistant development/test graph against exact reviewed
 package/version/advisory exceptions and passes only when that inventory matches. It also fails when
-an exception becomes stale. `make audit-raw` intentionally remains nonzero while the
-owner-approved Pillow/PyJWT exception in root `TODO.md` is open. Do not add broad audit ignores or
-override Home Assistant's exact package pins to make it green. The separately resolved
-integration-declared dependency closure has no accepted vulnerability exception; details are in
-`DEPENDENCIES.md`.
+an exception becomes stale. Home Assistant 2026.8.1 currently pins a vulnerable cryptography
+release; root `TODO.md` records the owner-approved exact temporary exception and upstream removal
+trigger. `make audit-raw` intentionally remains nonzero until upstream fixes the pin. Do not add
+broad audit ignores or override Home Assistant's exact package pins to make it green. The separately
+resolved integration-declared dependency closure has no accepted vulnerability exception; details
+are in `DEPENDENCIES.md`.
 
 The HACS validator checks a GitHub ref through the GitHub API and requires the read-only workflow
 token; it cannot validate an uncommitted local working tree anonymously. CI invokes its reviewed

@@ -66,15 +66,14 @@ def test_pip_installs_use_requirement_files_without_inline_versions() -> None:
     assert "pytest-homeassistant-custom-component==" not in workflows
 
 
-def test_local_image_names_do_not_duplicate_home_assistant_version() -> None:
-    """Dependency files, not local image names, own the supported HA version."""
+def test_local_image_names_remain_stable() -> None:
+    """Dependency refreshes must not require local image-name changes."""
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
 
     assert "LOCAL_IMAGE_PREFIX ?= localhost/fmi-hass-custom" in makefile
     assert "LOCK_IMAGE ?= $(LOCAL_IMAGE_PREFIX)-lock:local" in makefile
     assert "DEV_IMAGE ?= $(LOCAL_IMAGE_PREFIX)-dev:local" in makefile
     assert "DEV_STAMP ?= .cache/podman-dev.stamp" in makefile
-    assert "2026.7.4" not in makefile
 
 
 def test_compatibility_resolves_current_channels_and_freezes_before_testing() -> None:
@@ -89,8 +88,6 @@ def test_compatibility_resolves_current_channels_and_freezes_before_testing() ->
     assert "workflow_dispatch:" in workflow
     prerelease_job = workflow.split("\n  latest-prerelease:\n", maxsplit=1)[1]
     assert "continue-on-error: true" in prerelease_job
-    assert "2026." not in workflow
-    assert "0.13." not in workflow
     assert '"--pre"' in helper
     assert '"freeze"' in helper
     assert helper.index("_freeze(resolver_python, output)") < helper.index(

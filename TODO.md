@@ -2,21 +2,32 @@
 
 # Maintenance TODO
 
-## Replace vulnerable Home Assistant-pinned packages
+## Resolve vulnerable Home Assistant-pinned cryptography
 
-- Status: `BLOCKED_UPSTREAM`; temporary risk accepted by the repository owner on 2026-07-31.
-- Home Assistant 2026.7.4 requires `pillow==12.2.0` and `PyJWT==2.12.1` exactly. Current High-severity advisories are fixed in Pillow 12.3.0 and PyJWT 2.13.0.
-- The FMI integration does not import or declare either package. Its manifest dependency closure passes `pip-audit`; the affected packages enter the development/test environment through Home Assistant Core.
-- Do not override Home Assistant's exact pins locally. Doing so makes `pip check` fail and tests an environment that Home Assistant does not support.
+- Status: `BLOCKED_UPSTREAM`; temporary risk accepted by the repository owner on 2026-08-08.
+- Home Assistant 2026.8.1 requires `cryptography==48.0.1` exactly. The raw audit reports
+  `PYSEC-2026-3552`, `PYSEC-2026-3553`, and `PYSEC-2026-3554`; fixing the complete set requires
+  cryptography 50.0.0.
+- The FMI integration does not import or declare cryptography. Its manifest dependency closure
+  remains clean; the package enters the complete development/test environment through Home
+  Assistant Core.
+- Do not override Home Assistant's exact pin locally. It conflicts with Home Assistant and
+  pyOpenSSL constraints, makes `pip check` fail, and tests an unsupported environment.
+- The owner-approved private-testing exception is exact by package, version, and advisory ID in
+  `.github/dependency-audit-exceptions.json`. New findings, changed affected versions, and stale
+  exceptions remain blocking.
+- The earlier Pillow/PyJWT exceptions are removed because Home Assistant now selects Pillow 12.3.0
+  and PyJWT 2.13.0, which pass the current raw audit.
 
-Close this item when a stable Home Assistant release and its matching `pytest-homeassistant-custom-component` release select fixed versions:
+After an upstream fix, update the Home Assistant/helper pair, regenerate the complete freeze, and
+require `make audit-raw`, `make audit`, the full offline suite, and `make validate` to pass before
+removing this item. The raw audit intentionally remains nonzero while the upstream pin is
+vulnerable; the policy audit passes only for the exact accepted finding set.
 
-1. Update the Home Assistant/helper pair in `requirements-direct.txt`.
-2. Run `make lock` and `make dev-build`.
-3. Run `make audit-raw`; after it reports no findings, remove the matching entries from `.github/dependency-audit-exceptions.json`.
-4. Run `make audit`, the full offline suite, and `make validate`, then remove the temporary exception from `docs/maintenance/DEPENDENCIES.md`. The policy audit intentionally fails when an exception becomes stale.
-
-Evidence rechecked 2026-08-01: [Pillow advisory](https://osv.dev/vulnerability/PYSEC-2026-2253), [PyJWT advisory](https://osv.dev/vulnerability/PYSEC-2026-179), and Home Assistant 2026.7.4/2026.8.0b3 package metadata. The beta pins the fixed releases, but stable does not yet.
+Evidence rechecked 2026-08-08: [PKCS#7 advisory](https://osv.dev/vulnerability/PYSEC-2026-3552),
+[certificate path-building advisory](https://osv.dev/vulnerability/PYSEC-2026-3553),
+[name-constraints advisory](https://osv.dev/vulnerability/PYSEC-2026-3554), Home Assistant 2026.8.1
+package metadata, and the open [Home Assistant cryptography 50.0.0 update](https://github.com/home-assistant/core/pull/178496).
 
 ## Replace public Nominatim before broader distribution
 

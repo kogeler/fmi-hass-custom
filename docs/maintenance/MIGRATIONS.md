@@ -2,7 +2,7 @@
 
 # Config And Registry Migrations
 
-Last verified: 2026-07-31 against Home Assistant 2026.7.4 and the local v0.6.2 tag.
+Last verified: 2026-08-08 against Home Assistant 2026.8.1 and the local v0.6.2 tag.
 
 ## Supported source state
 

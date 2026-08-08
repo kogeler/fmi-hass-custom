@@ -6,16 +6,22 @@ This document defines the current support and protection boundaries for maintain
 when the supported Home Assistant line, dependency graph, external services, diagnostics, logging,
 or CI trust model changes. Keep historical audit narrative outside this current contract.
 
-Last verified: 2026-08-01.
+Last verified: 2026-08-08.
 
 ## Support Matrix
 
 | Environment | Contract |
 |---|---|
-| Home Assistant 2026.7.4 / Python 3.14.2 | Supported release environment. The committed full freeze and complete lifecycle/config/entity/migration suite target this pair. |
-| Latest Home Assistant stable | Required moving compatibility signal. It resolves, freezes, recreates, and tests the current published stable graph without changing the supported lock. A pass is evidence for that run, not a permanent future-version promise. |
-| Latest Home Assistant prerelease | Informational moving signal. Upstream beta or helper metadata lag may fail without blocking the supported release. |
-| Home Assistant 2026.6 and older | Not supported or retained. Do not claim compatibility without a separate reproduced environment and explicit policy change. |
+| Home Assistant 2026.8.1 / Python 3.14.2 | Reproducible release reference. The committed full freeze and complete lifecycle/config/entity/migration suite target this pair; it is not the HACS installation floor. |
+| HACS installation floor | The value in `hacs.json` is retained until a reproduced integration or runtime incompatibility requires raising it. A routine reference-lock refresh is not such evidence. |
+| Latest Home Assistant stable | Required moving compatibility signal. It resolves, freezes, recreates, and tests the current published stable graph without changing the reference lock. A pass is evidence for that run, not a permanent future-version promise. |
+| Latest Home Assistant prerelease | Informational moving signal. No newer installable prerelease is a successful explicit skip; a real beta or helper failure remains visible without blocking the supported release. |
+
+Compatibility claims come from functional lifecycle, configuration, entity, migration, and source
+tests. Tests and runtime code must not encode concrete Home Assistant, test-helper, or minimum
+version assertions. Exact reference versions live in the reviewed direct requirements and generated
+full freeze; the independently maintained HACS floor may be raised only for a demonstrated broken
+contract, with regression evidence and documented user impact.
 
 This is a HACS custom integration. It does not claim an official Home Assistant Core quality tier.
 The selected FMI client is not fully async; its synchronous work must remain executor-isolated as
@@ -53,9 +59,9 @@ defined in `RUNTIME.md`.
 
 ## Accepted Constraints
 
-- Home Assistant 2026.7.4 pins Pillow 12.2.0 and PyJWT 2.12.1 with known advisories. The integration
-  neither imports nor declares them. Exact package/version/advisory exceptions are allowed only by
-  `.github/dependency-audit-exceptions.json`; `TODO.md` defines the upstream removal trigger.
+- Home Assistant 2026.8.1 pins cryptography 48.0.1 with three known advisories. The integration
+  neither imports nor declares it. The owner-approved private-testing exception is exact by
+  package, version, and advisory ID; `TODO.md` records the upstream removal trigger.
 - Public Nominatim usage is accepted only for the owner's small private deployment. It is disabled
   unless lightning is enabled, cached, attributed, limited to one lookup per update, and globally
   bounded to four requests/minute. Before broader distribution, follow the provider/removal work in
@@ -65,9 +71,9 @@ defined in `RUNTIME.md`.
 
 ## Dependency And Workflow Security
 
-- `make audit` passes only when the full supported freeze matches the exact reviewed exception set;
-  new findings and stale exceptions fail. `make audit-raw` remains nonzero while upstream pins are
-  vulnerable. `make licenses` must report no unknown license.
+- `make audit` passes only when the full reference freeze matches the exact reviewed exception set;
+  new findings and stale exceptions fail. `make audit-raw` remains nonzero while the upstream
+  cryptography pin is vulnerable. `make licenses` must report no unknown license.
 - The integration-declared FMI/geopy runtime closure has no accepted vulnerability exception.
 - Workflows use read-only permissions by default, full-SHA action references, immutable container
   digests, bounded timeouts, and cancellation for superseded runs.

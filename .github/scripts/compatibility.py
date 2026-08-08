@@ -20,6 +20,10 @@ class CompatibilityError(RuntimeError):
     """Raised when a compatibility environment violates its channel contract."""
 
 
+class CompatibilityUnavailable(CompatibilityError):
+    """Raised when an informational compatibility channel has no candidate."""
+
+
 def _run(
     command: list[str],
     *,
@@ -63,13 +67,23 @@ def _is_prerelease(version: str) -> bool:
     return any(marker in normalized for marker in ("a", "b", "rc", "dev"))
 
 
-def _assert_channel(python: str, channel: str) -> str:
+def _assert_channel(
+    python: str,
+    channel: str,
+    *,
+    allow_unavailable: bool = False,
+) -> str:
     """Require the resolver result to match the requested stable/prerelease channel."""
     version = _distribution_version(python, HOME_ASSISTANT)
     prerelease = _is_prerelease(version)
     if channel == "stable" and prerelease:
         raise CompatibilityError(f"stable resolution selected prerelease Home Assistant {version}")
     if channel == "prerelease" and not prerelease:
+        if allow_unavailable:
+            raise CompatibilityUnavailable(
+                "no newer installable Home Assistant prerelease is available; "
+                f"the resolver selected stable {version}"
+            )
         raise CompatibilityError(f"no current Home Assistant prerelease was selected: {version}")
     return version
 
@@ -122,6 +136,7 @@ def _resolve(
     for requirement in (bootstrap, homeassistant, direct):
         if not requirement.is_file():
             raise CompatibilityError(f"requirements input is missing: {requirement}")
+    output.unlink(missing_ok=True)
 
     with tempfile.TemporaryDirectory(prefix=f"fmi-{channel}-") as temporary:
         root = Path(temporary)
@@ -148,7 +163,11 @@ def _resolve(
             _install(resolver_python, "--upgrade", "-r", str(direct))
             _install(resolver_python, "--upgrade", "--pre", "-r", str(homeassistant))
 
-        resolved_version = _assert_channel(resolver_python, channel)
+        resolved_version = _assert_channel(
+            resolver_python,
+            channel,
+            allow_unavailable=channel == "prerelease",
+        )
         _freeze(resolver_python, output)
 
         venv.EnvBuilder(with_pip=True).create(runner)
@@ -191,6 +210,9 @@ def main() -> int:
             direct=args.direct.resolve(),
             output=args.output.resolve(),
         )
+    except CompatibilityUnavailable as error:
+        print(f"Informational compatibility check skipped: {error}")
+        return 0
     except (CompatibilityError, OSError, subprocess.CalledProcessError) as error:
         print(f"compatibility error: {error}", file=sys.stderr)
         return 1
