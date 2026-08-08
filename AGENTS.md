@@ -6,9 +6,10 @@
 
 This repository contains the `fmi` custom integration for Home Assistant. It exposes FMI current
 weather, hourly/daily forecasts, forecast-backed sensors, optional station observations,
-lightning, and sea-level data. The latest published release supports the current stable Home
-Assistant line declared in `hacs.json`; do not infer support for older releases or an official Core
-quality tier. Read the current project version from `.version`, never from copied documentation.
+lightning, and sea-level data. The `homeassistant` value in `hacs.json` is the installation floor,
+not the current test target; preserve it unless a reproduced integration incompatibility requires
+raising it. Do not infer an official Core quality tier. Read the current project version from
+`.version`, never from copied documentation.
 
 Preserve user configuration, unique IDs, entity registry records, and customized entity IDs.
 Do not refactor for its own sake. Every behavior or structural change needs a documented
@@ -42,6 +43,7 @@ executed.
 | `DEPENDENCIES.md` | Requirement-file ownership, selected versions, action/image pins, vulnerability/license policy, or lock changes |
 | `DEVELOPMENT.md` | Podman environment, Make targets, dependency regeneration, xdist policy, formatting, linting, or repository layout |
 | `FORECAST_SEMANTICS.md` | Hourly/daily schema, timestamps, local-day grouping, precipitation, aggregation, or condition precedence |
+| `HA_RELEASE_MAINTENANCE.md` | New HA stable releases, reference-lock refreshes, verification, or release/no-release decisions |
 | `HACS_RELEASES.md` | HACS layout/discovery, `.version`, manifest synchronization, changelog rules, tags, releases, or remote settings |
 | `LIVE_TESTS.md` | Public live locations, request budget, network marker isolation, assertions, or failure classification |
 | `MIGRATIONS.md` | Config-entry versioning, registry migration, legacy IDs, collisions, daily entity retention, or upgrade fixtures |
@@ -120,7 +122,7 @@ coordinates. Follow `docs/maintenance/MIGRATIONS.md` and `RECONFIGURATION.md`.
 
 ## Dependencies And Releases
 
-`requirements-direct.txt` is the reviewed direct input for the supported environment; root
+`requirements-direct.txt` is the reviewed direct input for the reference environment; root
 `requirements.txt` is a generated complete `pip freeze` and must not be hand-edited.
 `requirements-bootstrap.txt` isolates pip. Moving compatibility inputs stay unpinned and generate
 separate per-run freezes. Every automated `pip install` consumes a requirements/constraint file,
@@ -128,12 +130,14 @@ never inline package names or versions. Follow `docs/maintenance/DEVELOPMENT.md`
 review both vulnerability and license results. Support, privacy, and accepted-risk boundaries are
 in `docs/maintenance/COMPATIBILITY_SECURITY.md`.
 
-Every PR to `master` must increment `.version`, synchronize the manifest, and add the matching
-dated changelog section. Required CI includes offline coverage, bounded live FMI, validation,
-dependency risk, CodeQL, current stable compatibility, and version comparison; prerelease
-compatibility is informational. A successful version-incrementing `master` push publishes the tag
-and GitHub Release only after trusted repeated gates. Do not publish manually. See
-`docs/maintenance/CI.md` and `HACS_RELEASES.md`.
+Release-bearing PRs to `master` must increment `.version`, synchronize the manifest, and add the
+matching dated changelog section. A Home Assistant reference-only refresh that meets every
+maintenance-only condition in `HA_RELEASE_MAINTENANCE.md` leaves the version unchanged and records
+notable work under `Unreleased`; the owner manually bypasses only the version-increment check.
+Required CI otherwise includes offline coverage, bounded live FMI, validation, dependency risk,
+CodeQL, and current stable compatibility; prerelease compatibility is informational. A successful
+version-incrementing `master` push publishes the tag and GitHub Release only after trusted repeated
+gates. Do not publish manually. See `docs/maintenance/CI.md` and `HACS_RELEASES.md`.
 
 ## Working Protocol
 
@@ -145,8 +149,9 @@ For follow-up maintenance, current code, tests, and the owning `docs/maintenance
 sources of truth. Use `plans/*` only to understand historical decisions and verification; do
 not extend it as a tracker for unrelated future work. A new implementation plan
 gets its own plan/handoff namespace and must be corrected immediately when verified reality differs.
-Record only notable release-level changes in `CHANGELOG.md`. New human-authored files use
-`Copyright (c) 2026 kogeler` and `SPDX-License-Identifier: MIT` where comments are supported.
+Record only notable release-level or unreleased HA-reference maintenance changes in
+`CHANGELOG.md`. New human-authored files use `Copyright (c) 2026 kogeler` and
+`SPDX-License-Identifier: MIT` where comments are supported.
 
 Work is done only when the requested behavior is implemented and documented, relevant offline and
 Home Assistant tests pass, format/lint/type checks do not regress, migrations and privacy remain

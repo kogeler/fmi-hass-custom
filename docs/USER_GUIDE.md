@@ -24,6 +24,26 @@ but not required.
 Repeat the last step to configure another location. The same coordinates cannot be used by two
 entries.
 
+### Switch From Another FMI Repository
+
+Create and download a Home Assistant backup before changing the repository source. Do not delete
+the FMI entry under **Settings > Devices & services**: that entry owns the existing configuration,
+devices, and entity-registry records.
+
+If the previous FMI source was added to HACS as a custom repository:
+
+1. Open HACS, use the top-right menu, and select **Custom repositories**.
+2. Remove the previous FMI repository URL from that list.
+3. Add `https://github.com/kogeler/fmi-hass-custom` with type **Integration**.
+4. Open the FMI repository in HACS and select **Download** or **Redownload** for the newest
+   published release.
+5. Restart Home Assistant.
+
+This changes the repository from which HACS installs `custom_components/fmi/`; it does not create a
+new Home Assistant integration. The fork retains the `fmi` domain and migrates existing config and
+registry state in place, including customized entity IDs. If HACS removes the old downloaded files
+during the switch, complete the fork download before restarting Home Assistant.
+
 ## Install Manually
 
 1. Open the [latest GitHub Release](https://github.com/kogeler/fmi-hass-custom/releases/latest)

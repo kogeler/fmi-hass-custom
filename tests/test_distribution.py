@@ -23,16 +23,13 @@ CURRENT_FACING_DOCS = (
 )
 
 
-def test_hacs_release_metadata_and_brand() -> None:
-    """Keep the HACS repository metadata aligned with the supported release."""
+def test_hacs_repository_metadata_and_brand() -> None:
+    """Validate version-independent HACS metadata and the distributed brand."""
     hacs = json.loads((ROOT / "hacs.json").read_text(encoding="utf-8"))
 
-    assert hacs == {
-        "name": "FMI",
-        "country": "FI",
-        "homeassistant": "2026.7.4",
-        "render_readme": True,
-    }
+    assert hacs["name"] == "FMI"
+    assert hacs["country"] == "FI"
+    assert hacs["render_readme"] is True
 
     icon_path = INTEGRATION / "brand" / "icon.png"
     with Image.open(icon_path) as icon:

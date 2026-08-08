@@ -19,12 +19,12 @@ Last verified: 2026-08-01.
 
 Quality, version, validation, dependency-review, and CodeQL workflows use `pull_request`; they
 receive neither repository secrets nor a write token. Checkout credentials are not persisted.
-Required jobs install the complete committed supported graph with `--no-deps` and run `pip check`.
+Required jobs install the complete committed reference graph with `--no-deps` and run `pip check`.
 The event-driven and manually triggered compatibility jobs instead detect resolver drift: neither
 workflow job contains an HA, test-helper, FMI-client, geopy, or pip version. Stable compatibility
 fails its workflow and is a recommended required PR check. Prerelease compatibility uses job-level
 `continue-on-error` so an upstream beta can report a visible failure without blocking the
-supported stable release contract.
+reference stable release contract.
 
 The CI job keeps the ordinary coverage suite deterministic and socket-blocked, then runs the four
 bounded `live` probes as a separate final step with no secrets. CI, validation, CodeQL,
@@ -81,7 +81,7 @@ constraint files. It resolves in a temporary venv, writes the complete transitiv
 the generated freeze with `--no-deps`, verifies the requested release channel and dependency
 metadata, and runs pytest only in that recreated environment. Generated drift freezes are ignored
 locally because their purpose is to describe that single run, not to replace the committed
-supported lock.
+reference lock.
 
 ## Immutable Dependencies
 
@@ -123,6 +123,12 @@ purpose are deliberately separate from code quality gates.
 The post-push release version check deliberately fails direct or multi-commit pushes that do not
 increase `.version`, but a failed post-push workflow cannot remove a commit already accepted by
 GitHub. Required PR checks and branch protection are therefore the preventive control.
+
+`HA_RELEASE_MAINTENANCE.md` defines the sole unchanged-version exception: an owner-approved Home
+Assistant reference-only refresh with no distributed integration, HACS-floor, or manifest runtime
+requirement change. The owner manually bypasses only **Version increment** after every other gate
+passes. Its expected post-push version failure blocks publication; do not suppress or generalize
+that failure because the same enforcement protects normal release-bearing changes.
 
 ## Maintainer Release Verification
 

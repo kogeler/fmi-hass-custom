@@ -2,7 +2,7 @@
 
 # HACS Repository And Releases
 
-Last verified: 2026-08-01.
+Last verified: 2026-08-08.
 
 ## What HACS Installs
 
@@ -28,6 +28,25 @@ and a normal GitHub source archive contains everything HACS needs.
 The repository can be added in HACS as a custom repository with category **Integration** and
 repository URL `https://github.com/kogeler/fmi-hass-custom`. Inclusion in HACS's default catalog
 is a different, optional process; a custom repository does not require default-catalog approval.
+
+## Home Assistant Minimum
+
+The `homeassistant` value in `hacs.json` is an installation floor, not the current development or
+test target. Preserve it during routine Home Assistant, test-helper, and dependency-lock updates.
+A successful test run against a newer Home Assistant release proves compatibility with that tested
+environment; it does not prove that the previous minimum stopped working.
+
+Raise the floor only after reproducing a real incompatibility at the existing minimum, such as an
+integration API or Python runtime contract that the integration must use and the older release does
+not provide. Document the broken behavior, regression coverage, user impact, and release change.
+Do not raise it merely to mirror the newest stable release or the versions selected in
+`requirements-direct.txt`.
+
+Tests and runtime code must not assert concrete Home Assistant, test-helper, or HACS-minimum version
+numbers. Offline and Home Assistant tests establish functional compatibility; the HACS validator
+checks the metadata contract. Exact development/test selections belong in
+`requirements-direct.txt` and the generated `requirements.txt` graph, while `hacs.json` remains the
+single declaration of the installation floor.
 
 ## Version Source
 
@@ -55,12 +74,19 @@ records that explicitly exercise a version contract.
 
 ## Change And Release Contract
 
-Every pull request to `master`, including documentation and Dependabot changes, must:
+A release-bearing pull request to `master` must:
 
 1. Increase `.version` above the exact target commit's version.
 2. Run `make version-sync` so the committed manifest mirror matches.
 3. Add a non-empty `## X.Y.Z - YYYY-MM-DD` section to `CHANGELOG.md`.
 4. Pass the dedicated **Version increment** workflow as well as normal CI/validation.
+
+A Home Assistant reference-only refresh is the narrow exception. When integration code and other
+HACS-installed user-facing files, the `hacs.json` installation floor, and manifest runtime
+requirements are all unchanged, follow `HA_RELEASE_MAINTENANCE.md`: retain `.version` and the
+manifest version mirror, put notable notes under `Unreleased`, and do not publish an identical
+integration payload. The owner manually bypasses only the expected version-increment failure; all
+other gates remain mandatory.
 
 The first `.version` release compares against the legacy manifest version `0.6.2`. Later releases
 compare against the base tree's `.version`. Two checkouts are used so the version helper does not
@@ -81,6 +107,9 @@ moving the tag or rewriting the release.
 
 HACS uses the tag name of the latest published GitHub Release as the remote version and offers
 recent releases to users. A tag without a published Release is not sufficient for this behavior.
+An unchanged-version maintenance push fails both the standalone version workflow and the release
+workflow's version job, so it never reaches publication; its `Unreleased` notes remain for the next
+release-bearing change.
 
 ## Remote Repository Settings
 

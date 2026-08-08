@@ -19,8 +19,9 @@ integration, not as an official Home Assistant Core integration.
 
 - Data depends on FMI and network availability. Forecast/current data refresh every 30 minutes;
   configured station observations refresh every 10 minutes.
-- Only the current stable Home Assistant release is supported and continuously checked. Earlier
-  Home Assistant versions are not covered by the compatibility contract.
+- The committed reference graph and the moving current-stable graph are continuously checked. The
+  installation floor remains the value in `hacs.json` until a real integration incompatibility
+  requires raising it.
 - Changing Home Assistant's Home zone does not move an entry automatically. Use the integration's
   **Reconfigure** action to change coordinates.
 - Lightning is opt-in and its address enrichment uses the public Nominatim service. This is
@@ -39,6 +40,7 @@ integration, not as an official Home Assistant Core integration.
 
 ### Maintainers
 
+- [Home Assistant release maintenance](docs/maintenance/HA_RELEASE_MAINTENANCE.md)
 - [Development environment and commands](docs/maintenance/DEVELOPMENT.md)
 - [CI and release gates](docs/maintenance/CI.md)
 - [HACS repository and release model](docs/maintenance/HACS_RELEASES.md)

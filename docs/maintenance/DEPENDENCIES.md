@@ -2,39 +2,45 @@
 
 # Dependency Model And Inventory
 
-This document explains which dependency files are authoritative, why the supported environment
+This document explains which dependency files are authoritative, why the reference environment
 uses its current direct selections, and what must be reviewed when they change. Keep it focused on
 the current dependency contract rather than historical before/after reporting.
 
-Last verified: 2026-08-01. Supported environment: Home Assistant 2026.7.4 on Python 3.14.2.
+Last verified: 2026-08-08. Reference environment: Home Assistant 2026.8.1 on Python 3.14.2.
 
 ## File Roles
 
 | File | Ownership |
 |---|---|
 | `custom_components/fmi/manifest.json` | Exact direct runtime requirements not guaranteed by Home Assistant Core |
-| `requirements-direct.txt` | Human-reviewed exact direct selections for the supported development/test environment |
-| `requirements.txt` | Generated complete 173-package `pip freeze`; never edit manually |
+| `requirements-direct.txt` | Human-reviewed exact direct selections for the reference development/test environment |
+| `requirements.txt` | Generated complete 174-package `pip freeze`; never edit manually |
 | `requirements-bootstrap.txt` | Exact standalone pip bootstrap selection because normal `pip freeze` omits pip |
 | `requirements-compatibility-homeassistant.txt` | Unpinned Home Assistant channel inputs for moving compatibility resolution |
 | `requirements-compatibility-direct.txt` | Unpinned helper/integration inputs for moving compatibility resolution |
 | `requirements-compatibility-*-resolved.txt` | Ignored per-run full freezes generated and recreated by compatibility checks |
 
-The committed root freeze is one coherent supported environment: Home Assistant stable, its exact
-test helper, integration dependencies, and maintenance tools. Stable and prerelease drift checks
-resolve in isolated temporary environments and never mutate this lock.
+The committed root freeze is one coherent, reproducible reference environment: Home Assistant
+stable, its exact test helper, integration dependencies, and maintenance tools. It records what CI
+installs; it does not define the HACS installation floor. Stable and prerelease drift checks resolve
+in isolated temporary environments and never mutate this lock.
+
+Tests validate behavior and dependency-policy structure, not concrete Home Assistant or helper
+version strings. Do not copy selected versions into test assertions or runtime code. The reviewed
+direct input and generated full freeze are the version inventory; `hacs.json` independently owns
+the minimum user-installable Home Assistant release.
 
 Every maintained `pip install` in workflows, the Makefile, container recipes, and repository CI
 helpers consumes a requirements or generated constraint file. Do not add inline package names or
 versions.
 
-## Supported Direct Selections
+## Reference Direct Selections
 
 | Component | Selected | Role and constraint |
 |---|---:|---|
-| Python | 3.14.2 | Required by Home Assistant 2026.7.4; official slim image is pinned by multi-architecture digest |
-| Home Assistant | 2026.7.4 | Supported runtime/test host; prereleases belong only to moving compatibility checks |
-| `pytest-homeassistant-custom-component` | 0.13.348 | Pins the exact supported Home Assistant release |
+| Python | 3.14.2 | Required by Home Assistant 2026.8.1; official slim image is pinned by multi-architecture digest |
+| Home Assistant | 2026.8.1 | Reproducible runtime/test reference; not the HACS installation floor |
+| `pytest-homeassistant-custom-component` | 0.13.355 | Recreates the selected Home Assistant test environment |
 | `fmi-weather-client` | 1.0.0 | Direct GPL-3.0 runtime dependency, exact manifest pin |
 | `geopy` | 2.5.0 | Direct MIT runtime dependency, exact manifest pin |
 | `pip` | 26.2 | Isolated in `requirements-bootstrap.txt` |
@@ -79,13 +85,13 @@ mutable nested image tags. Only the final release job receives `contents: write`
 ## Vulnerabilities, Licenses, And Drift
 
 - The integration-declared FMI/geopy dependency closure has no accepted vulnerability exception.
-- Home Assistant 2026.7.4 pins Pillow 12.2.0 and PyJWT 2.12.1 with known advisories. The integration
-  does not import or declare them. The owner-approved private-testing exception is exact by package,
-  version, and advisory ID in `.github/dependency-audit-exceptions.json`; `TODO.md` defines when it
-  must be removed.
-- `make audit` passes only when the complete freeze matches that exact reviewed set. New findings,
-  changed affected versions, and stale exceptions fail. `make audit-raw` intentionally remains
-  nonzero while the upstream pins are vulnerable.
+- Home Assistant 2026.8.1 pins cryptography 48.0.1 with three known advisories. The integration does
+  not import or declare it. The owner-approved private-testing exception is exact by package,
+  version, and advisory ID in `.github/dependency-audit-exceptions.json`; `TODO.md` defines the
+  upstream removal trigger.
+- `make audit` passes only when the complete freeze matches the exact reviewed exception set. New
+  findings, changed affected versions, and stale exceptions fail. `make audit-raw` intentionally
+  remains nonzero while the upstream cryptography pin is vulnerable.
 - `make licenses` must report no unknown license. The full development graph includes copyleft
   packages selected by the FMI client and Home Assistant tooling; the inventory does not relicense
   this MIT repository. Review redistribution separately from local/CI installation.
@@ -97,6 +103,9 @@ mutable nested image tags. Only the final release job receives `contents: write`
 
 ## Change Checklist
 
+Use `HA_RELEASE_MAINTENANCE.md` for the complete new-Home-Assistant-release flow and its explicit
+release/no-release decision. For other dependency changes:
+
 1. Verify the desired release and constraints from authoritative package/project metadata.
 2. Change `requirements-direct.txt`, `requirements-bootstrap.txt`, or the integration manifest only
    at the owning boundary; never edit root `requirements.txt` manually.
@@ -105,7 +114,9 @@ mutable nested image tags. Only the final release job receives `contents: write`
    `make audit`, and `make licenses`.
 5. Run both compatibility targets and determine whether a moving-channel failure changes the
    supported contract or only reports upstream drift.
-6. Update this inventory, `DEVELOPMENT.md`, `COMPATIBILITY_SECURITY.md`, `TODO.md`, and
+6. Do not raise the `hacs.json` minimum unless a reproduced integration incompatibility requires
+   it; a newer reference lock alone is not evidence that older installations are incompatible.
+7. Update this inventory, `DEVELOPMENT.md`, `COMPATIBILITY_SECURITY.md`, `TODO.md`, and
    `CHANGELOG.md` when their contracts or accepted risks change.
 
 ## Sources

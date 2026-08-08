@@ -3,7 +3,7 @@
 # Sensor And Gust Contract
 
 This document defines the current FMI sensor, wind-gust, entity-naming, and location-grouping
-contracts. It applies to Home Assistant 2026.7.4 and `fmi-weather-client==1.0.0`.
+contracts. It applies to Home Assistant 2026.8.1 and `fmi-weather-client==1.0.0`.
 
 ## Gust Sources
 

@@ -4,6 +4,20 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+### Changed
+
+- Updated the reproducible development and test reference to Home Assistant 2026.8.1 with its matching test helper and regenerated complete dependency freeze, while retaining the existing HACS minimum because no functional incompatibility was found.
+- Retained version-free latest-stable and prerelease CI compatibility resolution because it already selects and tests the current Home Assistant channels independently of the reference lock.
+- Removed concrete Home Assistant and test-helper version assertions from repository tests; compatibility is established by behavior, while exact selections remain in the reviewed dependency inputs and generated freeze.
+- Documented a repeatable Home Assistant stable-release maintenance flow that keeps reference-only updates unreleased until the distributed integration contract changes.
+- Clarified how to switch HACS from another FMI repository to this fork without deleting the existing Home Assistant integration entry or registry state.
+
+### Security
+
+- Removed the Pillow and PyJWT vulnerability exceptions after Home Assistant selected their fixed releases, and documented an exact temporary exception for the vulnerable cryptography release still pinned by Home Assistant.
+
 ## 1.0.1 - 2026-08-01
 
 ### Added

@@ -1,36 +1,14 @@
 {
   "exceptions": [
     {
-      "package": "pillow",
-      "version": "12.2.0",
+      "package": "cryptography",
+      "version": "48.0.1",
       "vulnerabilities": [
-        "PYSEC-2026-2253",
-        "PYSEC-2026-2254",
-        "PYSEC-2026-2255",
-        "PYSEC-2026-2256",
-        "PYSEC-2026-2257",
-        "PYSEC-2026-3451",
-        "PYSEC-2026-3452",
-        "PYSEC-2026-3453",
-        "PYSEC-2026-3454",
-        "PYSEC-2026-3493",
-        "PYSEC-2026-3494",
-        "PYSEC-2026-3495",
-        "PYSEC-2026-3496"
+        "PYSEC-2026-3552",
+        "PYSEC-2026-3553",
+        "PYSEC-2026-3554"
       ],
-      "reason": "Temporary Home Assistant 2026.7.4 exact pin tracked in TODO.md"
-    },
-    {
-      "package": "pyjwt",
-      "version": "2.12.1",
-      "vulnerabilities": [
-        "PYSEC-2026-175",
-        "PYSEC-2026-176",
-        "PYSEC-2026-177",
-        "PYSEC-2026-178",
-        "PYSEC-2026-179"
-      ],
-      "reason": "Temporary Home Assistant 2026.7.4 exact pin tracked in TODO.md"
+      "reason": "Temporary Home Assistant 2026.8.1 exact pin tracked in TODO.md"
     }
   ]
 }

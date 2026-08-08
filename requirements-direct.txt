@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 
 # Home Assistant stable test harness. Newer helper releases target HA prereleases.
-homeassistant==2026.7.4
-pytest-homeassistant-custom-component==0.13.348
+homeassistant==2026.8.1
+pytest-homeassistant-custom-component==0.13.355
 
 # Direct runtime requirements not supplied as Home Assistant Core requirements.
 fmi-weather-client==1.0.0
