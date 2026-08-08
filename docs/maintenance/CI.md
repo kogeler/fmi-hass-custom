@@ -26,6 +26,12 @@ fails its workflow and is a recommended required PR check. Prerelease compatibil
 `continue-on-error` so an upstream beta can report a visible failure without blocking the
 reference stable release contract.
 
+When no newer installable Home Assistant prerelease exists, the prerelease resolver reports an
+explicit informational skip and exits successfully without writing a resolved freeze. This is not a
+compatibility failure. Once a prerelease is available, dependency resolution, environment
+recreation, `pip check`, channel verification, and the full offline suite remain mandatory; a real
+failure stays visible under the job-level non-blocking policy.
+
 The CI job keeps the ordinary coverage suite deterministic and socket-blocked, then runs the four
 bounded `live` probes as a separate final step with no secrets. CI, validation, CodeQL,
 compatibility, and version workflows all run directly for pull requests and `master` pushes and
@@ -71,17 +77,19 @@ trusted release jobs.
 `compatibility.yml` has two independent jobs. `Latest Home Assistant stable` resolves the newest
 non-prerelease HA first, temporarily constrains that exact resolver result, and selects the newest
 test helper and integration dependencies compatible with it. `Latest Home Assistant prerelease`
-selects the newest published HA prerelease independently of the helper's possibly lagging exact HA
-metadata. It permits only that single helper-to-HA metadata mismatch; every other `pip check`
-failure remains fatal, and the test suite must pass.
+attempts to select the newest installable HA prerelease independently of the helper's possibly
+lagging exact HA metadata. If none is newer than stable, it stops with the successful informational
+skip described above. When it selects a prerelease, it permits only that single helper-to-HA
+metadata mismatch; every other `pip check` failure remains fatal, and the test suite must pass.
 
 Both jobs use `.github/scripts/compatibility.py`. The helper installs only from requirement or
-constraint files. It resolves in a temporary venv, writes the complete transitive result using
-`pip freeze` to `requirements-compatibility-*-resolved.txt`, creates a second empty venv, installs
-the generated freeze with `--no-deps`, verifies the requested release channel and dependency
-metadata, and runs pytest only in that recreated environment. Generated drift freezes are ignored
-locally because their purpose is to describe that single run, not to replace the committed
-reference lock.
+constraint files. For each available target, it resolves in a temporary venv, writes the complete
+transitive result using `pip freeze` to `requirements-compatibility-*-resolved.txt`, creates a
+second empty venv, installs the generated freeze with `--no-deps`, verifies the requested release
+channel and dependency metadata, and runs pytest only in that recreated environment. It removes a
+previous output before resolution so a skipped prerelease cannot leave stale evidence. Generated
+drift freezes are ignored locally because their purpose is to describe that single run, not to
+replace the committed reference lock.
 
 ## Immutable Dependencies
 
@@ -143,8 +151,9 @@ For every release merged or pushed to `master`:
 4. Add this repository to HACS as a custom Integration and verify the published version installs to
    `<config>/custom_components/fmi/`.
 5. Confirm `Compatibility` ran on the release PR and `master` push, then run it manually from a
-   custom branch once; verify both jobs identify the then-current stable/prerelease, create and
-   reinstall their separate full freezes, and use no secrets.
+   custom branch once. Verify stable creates and reinstalls its full freeze. Verify prerelease does
+   the same when a newer installable candidate exists, or reports a successful explicit skip when
+   none exists. Both jobs must use no secrets.
 6. Confirm the bounded live step ran after offline coverage on both the release PR and `master` run.
 7. Enable the recommended branch ruleset and keep the repository Actions default token read-only.
 8. Open or update a later test PR and confirm its managed body block matches the first changelog

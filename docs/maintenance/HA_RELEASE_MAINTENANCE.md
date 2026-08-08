@@ -42,8 +42,9 @@ change alone is not a user-facing FMI release and is not evidence that the HACS 
 6. Run the complete verification set: `make format-check`, `make lint`, `make type-check`,
    `make test-full`, `make test-network-block`, `make validate`, `make licenses`, and `make live`.
    Run `make compatibility-stable` again for the final graph. Run
-   `make compatibility-prerelease` as an informational signal; absence or breakage of an upstream
-   prerelease does not block the stable refresh unless it exposes a current contract failure.
+   `make compatibility-prerelease` as an informational signal. Absence of a newer installable
+   prerelease produces a successful explicit skip; an actual prerelease failure remains visible but
+   does not block the stable refresh unless it exposes a current contract failure.
 7. Update the current inventory and only the maintenance contracts actually reverified, including
    `DEPENDENCIES.md`, `DEVELOPMENT.md`, `COMPATIBILITY_SECURITY.md`, relevant behavior documents,
    `TODO.md`, and `CHANGELOG.md`. A verification date means the stated command or behavior was

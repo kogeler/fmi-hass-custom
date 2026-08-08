@@ -97,9 +97,11 @@ mutable nested image tags. Only the final release job receives `contents: write`
   this MIT repository. Review redistribution separately from local/CI installation.
 - `make outdated` is diagnostic. Do not override resolver-controlled transitives independently of
   their Home Assistant/helper parent merely to reduce the list.
-- Current stable and prerelease checks write independent full freezes, recreate clean environments
-  with `--no-deps`, run `pip check`, verify the selected release channel, and execute the complete
-  offline suite. A generated drift freeze is evidence for one run, not a committed support promise.
+- Current stable and available prerelease checks write independent full freezes, recreate clean
+  environments with `--no-deps`, run `pip check`, verify the selected release channel, and execute
+  the complete offline suite. When no newer installable prerelease exists, that informational check
+  succeeds without producing a freeze. A generated drift freeze is evidence for one run, not a
+  committed support promise.
 
 ## Change Checklist
 

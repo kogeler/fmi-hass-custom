@@ -15,7 +15,7 @@ Last verified: 2026-08-08.
 | Home Assistant 2026.8.1 / Python 3.14.2 | Reproducible release reference. The committed full freeze and complete lifecycle/config/entity/migration suite target this pair; it is not the HACS installation floor. |
 | HACS installation floor | The value in `hacs.json` is retained until a reproduced integration or runtime incompatibility requires raising it. A routine reference-lock refresh is not such evidence. |
 | Latest Home Assistant stable | Required moving compatibility signal. It resolves, freezes, recreates, and tests the current published stable graph without changing the reference lock. A pass is evidence for that run, not a permanent future-version promise. |
-| Latest Home Assistant prerelease | Informational moving signal. Upstream beta or helper metadata lag may fail without blocking the supported release. |
+| Latest Home Assistant prerelease | Informational moving signal. No newer installable prerelease is a successful explicit skip; a real beta or helper failure remains visible without blocking the supported release. |
 
 Compatibility claims come from functional lifecycle, configuration, entity, migration, and source
 tests. Tests and runtime code must not encode concrete Home Assistant, test-helper, or minimum
