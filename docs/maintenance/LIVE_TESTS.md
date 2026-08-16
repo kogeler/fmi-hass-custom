@@ -2,7 +2,8 @@
 
 # Live FMI Tests
 
-Last verified: 2026-08-08 against Home Assistant 2026.8.1, `fmi-weather-client` 1.0.0, and the current FMI WFS documentation/metadata.
+Live suite last verified: 2026-08-16 against Home Assistant 2026.8.1 and
+`fmi-weather-client` 1.0.0. FMI WFS documentation/metadata last reviewed: 2026-08-08.
 
 ## Purpose And Selection
 
@@ -69,7 +70,9 @@ The Home Assistant probe additionally requires:
 - expected Home Assistant temperature/pressure units and an available temperature sensor;
 - non-empty hourly and daily forecast service payloads with aware ordered timestamps;
 - finite, broadly plausible values exposed to dashboards;
-- each daily precipitation value to equal the sum of matching hourly values under the configured `Europe/Helsinki` local-day rule;
+- each daily precipitation value to equal the sum of matching hourly values under the configured
+  `Europe/Helsinki` local-day rule, within the exact maximum error introduced when Home Assistant
+  independently rounds every hourly value and the daily total to two decimal places;
 - at most four live calls during setup.
 
 No test asserts an exact temperature, condition, precipitation, station reading, place label, or forecast length.

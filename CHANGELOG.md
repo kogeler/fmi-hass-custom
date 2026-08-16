@@ -16,6 +16,10 @@ All notable changes to this project are documented in this file.
 - Made the informational prerelease compatibility job skip successfully when no newer installable Home Assistant prerelease exists, while retaining failures for actual prerelease regressions.
 - Made the `master` release workflow finish successfully without repeating release gates when `.version` already has a published stable GitHub Release with its exact lightweight tag still attached to the recorded release commit.
 
+### Fixed
+
+- Prevented valid live daily-precipitation checks from failing when Home Assistant independently rounds hourly values and their daily total for forecast service responses.
+
 ### Security
 
 - Removed the Pillow and PyJWT vulnerability exceptions after Home Assistant selected their fixed releases, and documented an exact temporary exception for the vulnerable cryptography release still pinned by Home Assistant.
