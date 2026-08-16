@@ -28,7 +28,7 @@ def test_no_github_actions_workflow_is_scheduled() -> None:
 
 
 def test_live_fmi_is_required_after_offline_tests_for_pr_and_master() -> None:
-    """PRs and every master release run execute bounded live probes before success."""
+    """PRs and release-bearing master runs execute bounded live probes before success."""
     ci = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
     release = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
 
@@ -45,9 +45,46 @@ def test_live_fmi_is_required_after_offline_tests_for_pr_and_master() -> None:
         0
     ]
     assert "uses: ./.github/workflows/ci.yml" in ci_release_job
-    assert "needs:" not in ci_release_job
+    assert "needs: release-state" in ci_release_job
+    assert "if: needs.release-state.outputs.release_required == 'true'" in ci_release_job
     assert "push:" in release
     assert "- master" in release
+
+
+def test_release_workflow_skips_gates_for_an_existing_release() -> None:
+    """An already published current version makes maintenance pushes successful no-ops."""
+    release = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
+
+    state_job = release.split("\n  release-state:\n", maxsplit=1)[1].split(
+        "\n  version:\n", maxsplit=1
+    )[0]
+    assert "github.rest.repos.getContent" in state_job
+    assert 'path: ".version"' in state_job
+    assert "ref: context.sha" in state_job
+    assert "github.rest.repos.getReleaseByTag" in state_job
+    assert "github.rest.git.getRef" in state_job
+    assert "tag.data.object.type" in state_job
+    assert "tag.data.object.sha !== existing.data.target_commitish" in state_job
+    assert "has no matching Git tag" in state_job
+    assert 'core.setOutput("release_required", "false")' in state_job
+    assert 'core.setOutput("release_required", "true")' in state_job
+    assert "existing.data.draft" in state_job
+    assert "existing.data.prerelease" in state_job
+
+    for job, next_job in (
+        ("version", "ci"),
+        ("ci", "validate"),
+        ("validate", "publish"),
+    ):
+        body = release.split(f"\n  {job}:\n", maxsplit=1)[1].split(
+            f"\n  {next_job}:\n", maxsplit=1
+        )[0]
+        assert "needs: release-state" in body
+        assert "if: needs.release-state.outputs.release_required == 'true'" in body
+
+    publish = release.split("\n  publish:\n", maxsplit=1)[1]
+    assert "- release-state" in publish
+    assert "if: needs.release-state.outputs.release_required == 'true'" in publish
 
 
 def test_pip_installs_use_requirement_files_without_inline_versions() -> None:

@@ -92,24 +92,31 @@ The first `.version` release compares against the legacy manifest version `0.6.2
 compare against the base tree's `.version`. Two checkouts are used so the version helper does not
 depend on Git being installed in the supported Python container.
 
-On every push to `master`, `.github/workflows/release.yml` repeats the version comparison, then
-requires the reusable CI and Home Assistant/HACS validation workflows. Only after they succeed
-does its final job receive `contents: write` and call full-SHA-pinned `actions/github-script`.
+On every push to `master`, `.github/workflows/release.yml` first reads `.version` from the exact
+pushed SHA and looks up its GitHub Release using full-SHA-pinned `actions/github-script` with
+read-only contents permission. If that version already has a correctly named published stable
+release and its exact lightweight tag still points to the release's recorded target commit, all
+remaining release-workflow jobs are skipped successfully. Missing, moved, annotated, or conflicting
+tags fail the release-state job. If no release exists, the workflow repeats the version comparison
+and requires the reusable CI and Home Assistant/HACS validation workflows. Only after they succeed
+does its final job receive `contents: write`.
 The action creates both:
 
 - a lightweight tag named exactly like `.version`, in `X.Y.Z` form;
 - a published GitHub Release with the same title and tag.
 
 The release body contains only the matching version section from `CHANGELOG.md`, followed by a
-tag-stable link to the complete changelog. A rerun accepts an existing release only when its tag,
-target commit, title, notes, and published state already match exactly; conflicts fail without
-moving the tag or rewriting the release.
+tag-stable link to the complete changelog. The publication action refuses an existing conflicting
+tag, target commit, title, notes, or published state without moving the tag or rewriting the
+release. Later maintenance pushes use the earlier read-only release-state check and do not rewrite
+an already published release or its notes.
 
 HACS uses the tag name of the latest published GitHub Release as the remote version and offers
 recent releases to users. A tag without a published Release is not sufficient for this behavior.
-An unchanged-version maintenance push fails both the standalone version workflow and the release
-workflow's version job, so it never reaches publication; its `Unreleased` notes remain for the next
-release-bearing change.
+An unchanged-version maintenance push still fails the standalone version workflow, which the owner
+explicitly bypasses under the narrow maintenance policy. Its release workflow succeeds after the
+existing-release check and does not run version, CI, validation, or publication; its `Unreleased`
+notes remain for the next release-bearing change.
 
 ## Remote Repository Settings
 

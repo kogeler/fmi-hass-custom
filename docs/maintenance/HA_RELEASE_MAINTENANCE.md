@@ -72,10 +72,10 @@ For a maintenance-only refresh:
 
 The current **Version increment** workflow deliberately rejects an unchanged `.version`. For this
 owner-approved maintenance-only path, the owner manually bypasses only that required check when
-merging. Afterward, the standalone **Version increment** workflow and the version job inside the
-**Release** workflow fail on the resulting `master` push; the release publish job is skipped. These
-expected failures are not permission to bypass any other gate and must never be used when the
-release conditions below apply.
+merging. Afterward, the standalone **Version increment** workflow still fails on the resulting
+`master` push. The **Release** workflow independently finds the already published version and exits
+successfully after its read-only release-state job; its version, CI, validation, and publish jobs
+are skipped. The manual bypass must never be used when the release conditions below apply.
 
 A new FMI integration release is required when any of these changes:
 

@@ -14,6 +14,7 @@ All notable changes to this project are documented in this file.
 - Documented a repeatable Home Assistant stable-release maintenance flow that keeps reference-only updates unreleased until the distributed integration contract changes.
 - Clarified how to switch HACS from another FMI repository to this fork without deleting the existing Home Assistant integration entry or registry state.
 - Made the informational prerelease compatibility job skip successfully when no newer installable Home Assistant prerelease exists, while retaining failures for actual prerelease regressions.
+- Made the `master` release workflow finish successfully without repeating release gates when `.version` already has a published stable GitHub Release with its exact lightweight tag still attached to the recorded release commit.
 
 ### Security
 

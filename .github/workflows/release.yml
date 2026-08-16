@@ -15,8 +15,91 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release-state:
+    name: Release state
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      release_required: ${{ steps.check.outputs.release_required }}
+    steps:
+      - name: Check whether the current version is already published
+        id: check
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          EXPECTED_REPOSITORY: kogeler/fmi-hass-custom
+        with:
+          script: |
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            if (repository !== process.env.EXPECTED_REPOSITORY) {
+              throw new Error(`Refusing to inspect unexpected repository ${repository}`);
+            }
+
+            const versionFile = await github.rest.repos.getContent({
+              ...context.repo,
+              path: ".version",
+              ref: context.sha,
+            });
+            if (
+              Array.isArray(versionFile.data) ||
+              versionFile.data.type !== "file" ||
+              versionFile.data.encoding !== "base64"
+            ) {
+              throw new Error(".version is not a base64-encoded repository file");
+            }
+            const version = Buffer.from(
+              versionFile.data.content.replace(/\n/g, ""),
+              "base64",
+            ).toString("utf8").trim();
+            if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(version)) {
+              throw new Error(".version is not a stable semantic version");
+            }
+
+            let existing;
+            try {
+              existing = await github.rest.repos.getReleaseByTag({
+                ...context.repo,
+                tag: version,
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              core.notice(`No published release exists for ${version}; running release gates`);
+              core.setOutput("release_required", "true");
+              return;
+            }
+            if (
+              existing.data.tag_name !== version ||
+              existing.data.name !== version ||
+              existing.data.draft ||
+              existing.data.prerelease
+            ) {
+              throw new Error(`Existing release ${version} is not a published stable release`);
+            }
+
+            let tag;
+            try {
+              tag = await github.rest.git.getRef({
+                ...context.repo,
+                ref: `tags/${version}`,
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              throw new Error(`Published release ${version} has no matching Git tag`);
+            }
+            if (
+              tag.data.ref !== `refs/tags/${version}` ||
+              tag.data.object.type !== "commit" ||
+              tag.data.object.sha !== existing.data.target_commitish
+            ) {
+              throw new Error(`Published release ${version} has a conflicting Git tag or target`);
+            }
+
+            core.notice(`Release ${existing.data.html_url} already exists; skipping release gates`);
+            core.setOutput("release_required", "false");
+
   version:
     name: Version increment
+    needs: release-state
+    if: needs.release-state.outputs.release_required == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     container:
@@ -40,12 +123,16 @@ jobs:
 
   ci:
     name: CI gate
+    needs: release-state
+    if: needs.release-state.outputs.release_required == 'true'
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
 
   validate:
     name: Validation gate
+    needs: release-state
+    if: needs.release-state.outputs.release_required == 'true'
     uses: ./.github/workflows/validate.yml
     permissions:
       contents: read
@@ -53,9 +140,11 @@ jobs:
   publish:
     name: Publish release
     needs:
+      - release-state
       - ci
       - validate
       - version
+    if: needs.release-state.outputs.release_required == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
