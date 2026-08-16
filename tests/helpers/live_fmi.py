@@ -6,9 +6,12 @@
 from __future__ import annotations
 
 import math
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
+
+from homeassistant.util import dt as dt_util
 
 
 class LiveContractError(AssertionError):
@@ -41,6 +44,8 @@ HA_FORECAST_RANGES = {
     "precipitation": (0.0, 500.0),
     "cloud_coverage": (0.0, 100.0),
 }
+
+HA_FORECAST_PRECIPITATION_HALF_STEP = 0.005
 
 
 def aware_timestamp(value: object, label: str) -> datetime:
@@ -173,3 +178,43 @@ def validate_ha_forecast(
             raise LiveContractError(f"{label} item {index} has no usable numeric values")
         validated.append((timestamp, item))
     return validated
+
+
+def validate_daily_precipitation(
+    hourly: Sequence[tuple[datetime, Mapping[str, Any]]],
+    daily: Sequence[tuple[datetime, Mapping[str, Any]]],
+) -> None:
+    """Validate daily sums after Home Assistant independently rounds service values."""
+    hourly_by_day: defaultdict[date, list[float]] = defaultdict(list)
+    for timestamp, item in hourly:
+        precipitation = item.get("precipitation")
+        if precipitation is not None:
+            hourly_by_day[dt_util.as_local(timestamp).date()].append(float(precipitation))
+
+    compared_days = 0
+    for timestamp, item in daily:
+        values = hourly_by_day[dt_util.as_local(timestamp).date()]
+        if not values:
+            continue
+        compared_days += 1
+        raw_daily = item.get("precipitation")
+        if not isinstance(raw_daily, int | float | str):
+            raise LiveContractError(f"daily precipitation is not numeric: {raw_daily!r}")
+        try:
+            daily_value = float(raw_daily)
+        except (TypeError, ValueError) as error:
+            raise LiveContractError(f"daily precipitation is not numeric: {raw_daily!r}") from error
+        expected = math.fsum(values)
+        rounding_tolerance = HA_FORECAST_PRECIPITATION_HALF_STEP * (len(values) + 1)
+        if not math.isfinite(daily_value) or not math.isclose(
+            daily_value,
+            expected,
+            rel_tol=0.0,
+            abs_tol=rounding_tolerance,
+        ):
+            raise LiveContractError(
+                f"daily precipitation {daily_value} differs from displayed hourly sum "
+                f"{expected} beyond the {rounding_tolerance} rounding bound"
+            )
+    if not compared_days:
+        raise LiveContractError("no matching hourly/daily precipitation day was exposed")

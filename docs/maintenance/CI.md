@@ -2,7 +2,7 @@
 
 # Continuous Integration And Release Gates
 
-Last verified: 2026-08-01.
+Last verified: 2026-08-08.
 
 ## Workflow Topology
 
@@ -14,7 +14,7 @@ Last verified: 2026-08-01.
 | `validate.yml` | Pull requests; `master` pushes; manual; reusable from release | Version/layout smoke, actionlint, digest-pinned hassfest, and digest-pinned HACS validation | None |
 | `dependency-review.yml` | Pull requests | Use native dependency diff for independent repositories or exact-exception frozen audit for forks | None |
 | `codeql.yml` | Pull requests; `master` pushes; manual | Security-extended CodeQL for Python and GitHub Actions workflow languages | `security-events: write` only for results |
-| `release.yml` | Push to `master` | Re-run version, CI, and validation gates; publish exact-version tag/release | `contents: write` only in final publish job |
+| `release.yml` | Push to `master` | Skip an already published version; otherwise re-run version, CI, and validation gates and publish the exact-version tag/release | `contents: write` only in final publish job |
 | `compatibility.yml` | Pull requests; `master` pushes; manual | Independently resolve, freeze, recreate, and test the latest stable and latest available prerelease HA graphs | None |
 
 Quality, version, validation, dependency-review, and CodeQL workflows use `pull_request`; they
@@ -35,11 +35,13 @@ failure stays visible under the job-level non-blocking policy.
 The CI job keeps the ordinary coverage suite deterministic and socket-blocked, then runs the four
 bounded `live` probes as a separate final step with no secrets. CI, validation, CodeQL,
 compatibility, and version workflows all run directly for pull requests and `master` pushes and
-can be dispatched manually from a selected branch. On every `master` push, `release.yml` also
-invokes the same reusable CI and validation definitions and independently repeats the version
-check, so publication waits for gates tied to that exact Release run. This deliberate repetition is
-required because GitHub Actions cannot express `needs` across independent workflow runs. An FMI
-service/network outage now blocks merge and release by owner decision. No file under
+can be dispatched manually from a selected branch. On every `master` push, `release.yml` first
+checks whether the exact `.version` already has a published stable release. If so, its remaining
+jobs are skipped successfully. For a new version it invokes the same reusable CI and validation
+definitions and independently repeats the version check, so publication waits for gates tied to
+that exact Release run. This deliberate repetition is required because GitHub Actions cannot
+express `needs` across independent workflow runs. An FMI service/network outage now blocks merge
+and release by owner decision. No file under
 `.github/workflows/` may declare a `schedule` trigger.
 
 The manual version check compares the selected branch with `master` by default and permits an
@@ -134,9 +136,17 @@ GitHub. Required PR checks and branch protection are therefore the preventive co
 
 `HA_RELEASE_MAINTENANCE.md` defines the sole unchanged-version exception: an owner-approved Home
 Assistant reference-only refresh with no distributed integration, HACS-floor, or manifest runtime
-requirement change. The owner manually bypasses only **Version increment** after every other gate
-passes. Its expected post-push version failure blocks publication; do not suppress or generalize
-that failure because the same enforcement protects normal release-bearing changes.
+requirement change. The owner manually bypasses only standalone **Version increment** after every
+other branch gate passes. On `master`, the release workflow sees the existing published version and
+skips all remaining work successfully. Do not generalize this bypass because the same standalone
+enforcement protects normal release-bearing changes.
+
+The release-state job receives only `contents: read`, reads `.version` from the exact pushed SHA,
+and accepts an existing release only when its tag and name match that stable version, it is neither
+draft nor prerelease, and its exact lightweight Git tag still points to the release's recorded
+target commit. Missing, moved, annotated, or conflicting tags and invalid release metadata fail
+rather than suppressing release validation. A new version has no existing release and therefore
+follows the complete gated publication path.
 
 ## Maintainer Release Verification
 

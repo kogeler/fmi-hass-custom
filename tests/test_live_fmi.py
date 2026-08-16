@@ -8,9 +8,9 @@ from __future__ import annotations
 import asyncio
 import math
 import socket
-from collections import Counter, defaultdict
+from collections import Counter
 from collections.abc import Awaitable, Callable, Generator
-from datetime import date, datetime, timedelta
+from datetime import timedelta
 from typing import Any, cast
 from xml.etree.ElementTree import ParseError
 
@@ -32,7 +32,6 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
-from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from requests.exceptions import RequestException
 
@@ -46,6 +45,7 @@ from custom_components.fmi.const import (
 )
 from tests.helpers.live_fmi import (
     LiveContractError,
+    validate_daily_precipitation,
     validate_ha_forecast,
     validate_model_forecast,
     validate_model_weather,
@@ -188,27 +188,6 @@ def _finite_attribute(
     if not math.isfinite(value) or not minimum <= value <= maximum:
         raise LiveContractError(f"Home Assistant attribute {name}={raw!r} is implausible")
     return value
-
-
-def _assert_daily_precipitation(
-    hourly: list[tuple[datetime, Any]],
-    daily: list[tuple[datetime, Any]],
-) -> None:
-    hourly_by_day: defaultdict[date, list[float]] = defaultdict(list)
-    for timestamp, item in hourly:
-        precipitation = item.get("precipitation")
-        if precipitation is not None:
-            hourly_by_day[dt_util.as_local(timestamp).date()].append(float(precipitation))
-
-    compared_days = 0
-    for timestamp, item in daily:
-        values = hourly_by_day[dt_util.as_local(timestamp).date()]
-        if not values:
-            continue
-        compared_days += 1
-        assert item.get("precipitation") == pytest.approx(math.fsum(values))
-    if not compared_days:
-        raise LiveContractError("no matching hourly/daily precipitation day was exposed")
 
 
 async def test_home_assistant_live_entity_and_forecast_contract(
@@ -367,7 +346,7 @@ async def test_home_assistant_live_entity_and_forecast_contract(
     daily_items = await _forecast_service(hass, main.entity_id, "daily")
     hourly = validate_ha_forecast(hourly_items, "hourly")
     daily = validate_ha_forecast(daily_items, "daily")
-    _assert_daily_precipitation(hourly, daily)
+    validate_daily_precipitation(hourly, daily)
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
