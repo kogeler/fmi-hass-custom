@@ -302,17 +302,32 @@ jobs:
               }
             }
 
+            // TEMPORARY: execute the PR implementation while associating the
+            // smoke-test snapshot with the real default-branch commit. The
+            // Dependency Submission API only updates repository results for a
+            // coherent default-branch ref/SHA pair. Restore context.sha and
+            // context.ref after the API returns SUCCESS.
+            const defaultRef = await github.request(
+              "GET /repos/{owner}/{repo}/git/ref/{ref}",
+              {
+                ...context.repo,
+                ref: "heads/master",
+                headers: {
+                  accept: "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2026-03-10",
+                },
+              },
+            );
+
             const response = await github.request(
               "POST /repos/{owner}/{repo}/dependency-graph/snapshots",
               {
                 ...context.repo,
                 version: 0,
-                sha: context.sha,
-                // TEMPORARY: the job-level condition admits only master and
-                // the reviewed smoke-test branch. Restore context.ref after SUCCESS.
+                sha: defaultRef.data.object.sha,
                 ref: "refs/heads/master",
                 job: {
-                  correlator: `${context.workflow} ${process.env.GITHUB_JOB}`,
+                  correlator: "fmi-hass-custom-pip-locks",
                   id: String(context.runId),
                   html_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
                 },
