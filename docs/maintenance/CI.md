@@ -34,7 +34,10 @@ credentials are never persisted.
   Fork pull requests use the exact reviewed `make audit` fallback in the toolbox because GitHub's
   dependency-review API does not expose their dependency diff to this workflow.
 - **CodeQL** runs `security-extended` for both Python and GitHub Actions. Only its matrix job can
-  upload security events.
+  upload security events. Its explicit SARIF categories retain the historical
+  `.github/workflows/codeql.yml:analyze/language:*` identities after workflow consolidation, so
+  pull requests remain comparable with the `master` alert baseline; the category is an opaque
+  analysis identity and does not require the former workflow file to exist.
 - **Latest Home Assistant stable** resolves, freezes, recreates, checks, and tests a moving stable
   graph in the resolver container. It is blocking.
 - **Latest Home Assistant prerelease** performs the same work for a newer prerelease and is

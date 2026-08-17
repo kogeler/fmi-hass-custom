@@ -90,6 +90,7 @@ def test_ci_preserves_hacs_security_and_compatibility_gates() -> None:
     assert "queries: security-extended" in ci
     assert "- actions" in ci
     assert "- python" in ci
+    assert "category: .github/workflows/codeql.yml:analyze/language:${{ matrix.language }}" in ci
     assert "security-events: write" in ci
     assert "actions/dependency-review-action@" in ci
     assert "if: github.event.pull_request.head.repo.full_name == github.repository" in ci

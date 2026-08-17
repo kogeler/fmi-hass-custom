@@ -246,7 +246,9 @@ jobs:
       - name: Analyze
         uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
-          category: /language:${{ matrix.language }}
+          # Preserve the SARIF identities established by the former dedicated
+          # workflow so pull requests retain their master alert baseline.
+          category: .github/workflows/codeql.yml:analyze/language:${{ matrix.language }}
 
   compatibility-stable:
     name: Latest Home Assistant stable
