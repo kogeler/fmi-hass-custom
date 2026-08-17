@@ -2,7 +2,7 @@
 
 # HACS Repository And Releases
 
-Last verified: 2026-08-16.
+Last verified: 2026-08-17.
 
 ## What HACS Installs
 
@@ -74,11 +74,25 @@ records that explicitly exercise a version contract.
 
 ## Change And Release Contract
 
+Every dated release section that contains a new user-facing capability must begin with a
+`### User-facing features` subsection. This first block is reserved for behavior that a user can
+directly discover, enable, configure, or use, and it describes the benefit before implementation
+details. Examples include a new setup path, a new option or entity, or a new way to interact with
+an existing entry. CI changes, dependency updates, refactors, test infrastructure, and maintainer
+documentation do not belong in this block.
+
+The remaining entries follow under the conventional `Added`, `Changed`, `Fixed`, and `Security`
+subsections as applicable. Fixes that restore an existing contract remain under `Fixed` unless they
+also deliver a distinct new capability. Do not add an empty user-facing subsection or manufacture a
+feature for a maintenance-only release. This ordering matters because the matching changelog section
+is reused verbatim for the pull-request managed block and the published GitHub Release notes.
+
 A release-bearing pull request to `master` must:
 
 1. Increase `.version` above the exact target commit's version.
 2. Run `make version-sync` so the committed manifest mirror matches.
-3. Add a non-empty `## X.Y.Z - YYYY-MM-DD` section to `CHANGELOG.md`.
+3. Add a non-empty `## X.Y.Z - YYYY-MM-DD` section to `CHANGELOG.md`, with any user-facing
+   capabilities in the first `### User-facing features` subsection.
 4. Pass the **Version increment** job and every other required job in reusable CI.
 
 A Home Assistant reference-only refresh is the narrow exception. When integration code and other

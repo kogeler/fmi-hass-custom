@@ -6,6 +6,10 @@ All notable changes to this project are documented in this file.
 
 ## 1.1.0 - 2026-08-17
 
+### User-facing features
+
+- Added map-based setup and reconfiguration together with FMI place-name search and explicit map confirmation, so a location can be selected or moved without entering raw coordinates and without replacing the existing integration entry or its entity identities.
+
 ### Added
 
 - Added a content-addressed rootless Podman toolbox with tar-streamed source, read-only filesystems, private namespaces, dropped capabilities, no-new-privileges, bounded resources, and offline networking by default.
@@ -14,7 +18,6 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
-- Replaced raw latitude/longitude setup and reconfiguration fields with a choice between Home Assistant's standard location map and FMI place-name search followed by explicit map confirmation, while preserving the existing stored coordinates and stable identity model.
 - Moved all direct Python dependencies to PEP 621 metadata and replaced the legacy requirement inputs with three generated SHA-256 hash locks for runtime review, the container toolbox, and host-only Ruff.
 - Made every offline, network-block, live FMI, and moving-compatibility pytest run use automatic xdist workers while preserving one shared twelve-request live budget.
 - Serialized Make orchestration around shared locks, images, and reports; made failed exports return an atomic empty archive; and prevented partial coverage output from being published as a completed report.
