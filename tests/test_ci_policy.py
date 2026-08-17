@@ -126,8 +126,13 @@ def test_ci_write_permissions_are_confined_to_trusted_result_jobs() -> None:
         "POST /repos/{owner}/{repo}/dependency-graph/snapshots",
         '"X-GitHub-Api-Version": "2026-03-10"',
         "github-token: ${{ github.token }}",
+        "response.status !== 201",
+        'context.ref === "refs/heads/feat/map-location"',
+        'new Set(["SUCCESS", "ACCEPTED"])',
+        "!acceptedResults.has(response.data.result)",
     ):
         assert proof in submission
+    assert 'new Set(["SUCCESS"])' in submission
     assert "pull_request" not in submission
     assert "BOX_" not in submission
 
@@ -136,7 +141,10 @@ def test_version_job_compares_exact_base_and_head_through_make() -> None:
     """Consolidation retains PR, push, reusable, and manual version semantics."""
     ci = _workflow("ci.yml")
     version = ci.split("\n  version:\n", maxsplit=1)[1]
-    assert "github.event.pull_request.base.sha || github.event.before || inputs.base_ref" in version
+    assert "github.event.pull_request.base.sha ||" in version
+    assert "(github.ref == 'refs/heads/feat/map-location' && 'master') ||" in version
+    assert "github.event.before ||" in version
+    assert "inputs.base_ref" in version
     assert "github.event.pull_request.head.repo.full_name || github.repository" in version
     assert "github.event.pull_request.head.sha || github.sha" in version
     assert "base_version=" in version

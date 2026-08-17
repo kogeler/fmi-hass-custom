@@ -327,10 +327,23 @@ jobs:
                 },
               },
             );
-            if (response.status !== 201 || response.data.result !== "SUCCESS") {
-              throw new Error(`Dependency submission failed: HTTP ${response.status}`);
+            // A non-default branch is recorded but may not update the active
+            // repository graph. INVALID remains a hard failure everywhere.
+            const acceptedResults = context.ref === "refs/heads/feat/map-location"
+              ? new Set(["SUCCESS", "ACCEPTED"])
+              : new Set(["SUCCESS"]);
+            if (
+              response.status !== 201 ||
+              !acceptedResults.has(response.data.result)
+            ) {
+              throw new Error(
+                `Dependency submission failed: HTTP ${response.status}, ` +
+                `result ${response.data.result}: ${response.data.message}`,
+              );
             }
-            core.notice(response.data.message);
+            core.notice(
+              `${response.data.message} (result: ${response.data.result})`,
+            );
 
   codeql:
     name: CodeQL (${{ matrix.language }})
@@ -438,7 +451,13 @@ jobs:
       - name: Check out base version
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha || github.event.before || inputs.base_ref }}
+          ref: >-
+            ${{
+              github.event.pull_request.base.sha ||
+              (github.ref == 'refs/heads/feat/map-location' && 'master') ||
+              github.event.before ||
+              inputs.base_ref
+            }}
           path: base
           persist-credentials: false
 
