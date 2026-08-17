@@ -6,14 +6,14 @@ from datetime import timedelta
 LOGGER = logging.getLogger(__package__)
 
 DOMAIN = "fmi"
-NAME = "FMI"
 MANUFACTURER = "Finnish Meteorological Institute"
 CONFIG_ENTRY_VERSION = 2
 TIMEOUT_FMI_INTEG_IN_SEC = 40
 AUX_HTTP_TOTAL_TIMEOUT_SECONDS = 5
 AUX_HTTP_CONNECT_TIMEOUT_SECONDS = 2
 AUX_HTTP_READ_TIMEOUT_SECONDS = 3
-AUX_HTTP_MAX_PAYLOAD_BYTES = 2 * 1024 * 1024
+XML_MAX_PAYLOAD_BYTES = 2 * 1024 * 1024
+AUX_HTTP_MAX_PAYLOAD_BYTES = XML_MAX_PAYLOAD_BYTES
 
 FORECAST_UPDATE_INTERVAL = timedelta(minutes=30)
 OBSERVATION_UPDATE_INTERVAL = timedelta(minutes=10)
@@ -61,7 +61,6 @@ ATTR_STRIKES = "strikes"
 ATTR_PEAK_CURRENT = "peak_current"
 ATTR_CLOUD_COVER = "cloud_cover"
 ATTR_ELLIPSE_MAJOR = "ellipse_major"
-ATTR_FORECAST = CONF_FORECAST = "forecast"
 ATTR_HUMIDITY = "relative_humidity"
 ATTR_WIND_SPEED = "wind_speed"
 ATTR_PRECIPITATION = "precipitation"

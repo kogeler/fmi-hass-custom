@@ -171,6 +171,17 @@ async def test_diagnostics_redact_location_and_stable_identity(
     assert "24.654321" not in serialized
 
 
+def test_source_availability_snapshot_cannot_mutate_coordinator_state() -> None:
+    """Keep sanitized diagnostics consumers from changing source health."""
+    coordinator = cast(Any, object.__new__(FMIDataUpdateCoordinator))
+    coordinator._source_available = {"forecast": True}
+
+    snapshot = coordinator.source_availability
+    snapshot["forecast"] = False
+
+    assert coordinator.source_availability == {"forecast": True}
+
+
 @pytest.mark.parametrize("latitude", [-90.0, 90.0])
 def test_lightning_bounding_box_is_valid_at_geographic_poles(latitude: float) -> None:
     """Keep optional FMI bbox coordinates finite and inside WGS84 limits."""
@@ -178,3 +189,24 @@ def test_lightning_bounding_box_is_valid_at_geographic_poles(latitude: float) ->
 
     assert -90 <= bbox.lat_min <= bbox.lat_max <= 90
     assert -180 <= bbox.lon_min <= bbox.lon_max <= 180
+
+
+def test_lightning_bounding_box_spans_globe_when_crossing_antimeridian() -> None:
+    """Avoid an inverted FMI query box when a radius crosses the date line."""
+    bbox = utils.get_bounding_box(0.0, 179.0, half_side_in_km=200)
+
+    assert (bbox.lon_min, bbox.lon_max) == (-180.0, 180.0)
+
+
+@pytest.mark.parametrize(
+    ("latitude", "longitude", "half_side"),
+    [(91.0, 24.94, 200), (60.17, 181.0, 200), (60.17, 24.94, 0)],
+)
+def test_lightning_bounding_box_rejects_invalid_inputs(
+    latitude: float,
+    longitude: float,
+    half_side: int,
+) -> None:
+    """Input validation remains active under optimized Python execution."""
+    with pytest.raises(ValueError):
+        utils.get_bounding_box(latitude, longitude, half_side)

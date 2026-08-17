@@ -8,16 +8,20 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from typing import Any
 
 import fmi_weather_client as upstream
 from fmi_weather_client import models
 
-GML_NAMESPACE = "http://www.opengis.net/gml/3.2"
-GMLCOV_NAMESPACE = "http://www.opengis.net/gmlcov/1.0"
-SWE_NAMESPACE = "http://www.opengis.net/swe/2.0"
+from .xml_parser import (
+    ensure_safe_expat,
+    iter_xml_elements,
+    parse_xml_document,
+    xml_attribute,
+    xml_text,
+)
+
 FORECAST_GUST_PARAMETER = "HourlyMaximumGust"
 
 
@@ -55,8 +59,17 @@ def _install_upstream_privacy_filters() -> None:
 
 _install_upstream_privacy_filters()
 
-async_observation_by_place = upstream.async_observation_by_place
-async_observation_by_station_id = upstream.async_observation_by_station_id
+
+async def async_observation_by_place(place: str) -> models.Weather | None:
+    """Call the upstream place observation only on a safe XML runtime."""
+    ensure_safe_expat()
+    return await upstream.async_observation_by_place(place)
+
+
+async def async_observation_by_station_id(station_id: int) -> models.Weather | None:
+    """Call the upstream station observation only on a safe XML runtime."""
+    ensure_safe_expat()
+    return await upstream.async_observation_by_station_id(station_id)
 
 
 def _finite_number(value: Any) -> float | None:
@@ -70,16 +83,29 @@ def _finite_number(value: Any) -> float | None:
 
 def _hourly_gusts_by_time(body: str) -> dict[datetime, float | None]:
     """Extract the forecast producer's hourly gust field from a WFS response."""
-    root = ET.fromstring(body)
-    field_names = [field.get("name", "") for field in root.findall(f".//{{{SWE_NAMESPACE}}}field")]
+    document = parse_xml_document(body)
+    field_names = [
+        xml_attribute(field, "name") or "" for field in iter_xml_elements(document, "field")
+    ]
     if FORECAST_GUST_PARAMETER not in field_names:
         return {}
     gust_index = field_names.index(FORECAST_GUST_PARAMETER)
 
-    positions = root.findtext(f".//{{{GMLCOV_NAMESPACE}}}positions", default="")
-    value_sets = root.findtext(
-        f".//{{{GML_NAMESPACE}}}doubleOrNilReasonTupleList",
-        default="",
+    positions = next(
+        (
+            text
+            for node in iter_xml_elements(document, "positions")
+            if (text := xml_text(node)) is not None
+        ),
+        "",
+    )
+    value_sets = next(
+        (
+            text
+            for node in iter_xml_elements(document, "doubleOrNilReasonTupleList")
+            if (text := xml_text(node)) is not None
+        ),
+        "",
     )
     gusts: dict[datetime, float | None] = {}
     for position_line, value_line in zip(

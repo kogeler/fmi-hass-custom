@@ -1,0 +1,7 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
+# actionlint's embedded label list lags the official ubuntu-26.04 runner.
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04

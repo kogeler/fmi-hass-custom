@@ -4,13 +4,22 @@
 
 All notable changes to this project are documented in this file.
 
-## Unreleased
+## 1.0.2 - 2026-08-16
+
+### Added
+
+- Added a content-addressed rootless Podman toolbox with tar-streamed source, read-only filesystems, private namespaces, dropped capabilities, no-new-privileges, bounded resources, and offline networking by default.
+- Added containerized Bandit and ShellCheck gates while retaining Pylint, mypy, pip-audit, actionlint, hassfest, HACS, Dependency Review, and CodeQL checks.
 
 ### Changed
 
-- Updated the reproducible development and test reference to Home Assistant 2026.8.1 with its matching test helper and regenerated complete dependency freeze, while retaining the existing HACS minimum because no functional incompatibility was found.
+- Moved all direct Python dependencies to PEP 621 metadata and replaced the legacy requirement inputs with three generated SHA-256 hash locks for runtime review, the container toolbox, and host-only Ruff.
+- Made every offline, network-block, live FMI, and moving-compatibility pytest run use automatic xdist workers while preserving one shared ten-request live budget.
+- Serialized Make orchestration around shared locks, images, and reports; made failed exports return an atomic empty archive; and prevented partial coverage output from being published as a completed report.
+- Consolidated read-only GitHub checks into one reusable CI workflow, retained isolated PR metadata and release write boundaries, and aligned Dependabot with the pip and GitHub Actions manifests.
+- Updated the reproducible development and test reference to Home Assistant 2026.8.1 with its matching test helper and regenerated development hash lock, while retaining the existing HACS minimum because no functional incompatibility was found.
 - Retained version-free latest-stable and prerelease CI compatibility resolution because it already selects and tests the current Home Assistant channels independently of the reference lock.
-- Removed concrete Home Assistant and test-helper version assertions from repository tests; compatibility is established by behavior, while exact selections remain in the reviewed dependency inputs and generated freeze.
+- Removed concrete Home Assistant and test-helper version assertions from repository tests; compatibility is established by behavior, while exact selections remain in PEP 621 and the generated development lock.
 - Documented a repeatable Home Assistant stable-release maintenance flow that keeps reference-only updates unreleased until the distributed integration contract changes.
 - Clarified how to switch HACS from another FMI repository to this fork without deleting the existing Home Assistant integration entry or registry state.
 - Made the informational prerelease compatibility job skip successfully when no newer installable Home Assistant prerelease exists, while retaining failures for actual prerelease regressions.
@@ -22,6 +31,7 @@ All notable changes to this project are documented in this file.
 
 ### Security
 
+- Replaced integration-owned standard-library XML parsing with maintained `xmltodict==1.0.4`, explicit entity disabling, a 2 MiB parser ceiling, and an Expat 2.7.2 minimum; also made bounding-box input validation effective even when Python assertions are optimized away.
 - Removed the Pillow and PyJWT vulnerability exceptions after Home Assistant selected their fixed releases, and documented an exact temporary exception for the vulnerable cryptography release still pinned by Home Assistant.
 
 ## 1.0.1 - 2026-08-01

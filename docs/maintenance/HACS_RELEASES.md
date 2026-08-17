@@ -2,7 +2,7 @@
 
 # HACS Repository And Releases
 
-Last verified: 2026-08-08.
+Last verified: 2026-08-16.
 
 ## What HACS Installs
 
@@ -39,14 +39,14 @@ environment; it does not prove that the previous minimum stopped working.
 Raise the floor only after reproducing a real incompatibility at the existing minimum, such as an
 integration API or Python runtime contract that the integration must use and the older release does
 not provide. Document the broken behavior, regression coverage, user impact, and release change.
-Do not raise it merely to mirror the newest stable release or the versions selected in
-`requirements-direct.txt`.
+Do not raise it merely to mirror the newest stable release or the versions selected in root
+`pyproject.toml`.
 
 Tests and runtime code must not assert concrete Home Assistant, test-helper, or HACS-minimum version
 numbers. Offline and Home Assistant tests establish functional compatibility; the HACS validator
-checks the metadata contract. Exact development/test selections belong in
-`requirements-direct.txt` and the generated `requirements.txt` graph, while `hacs.json` remains the
-single declaration of the installation floor.
+checks the metadata contract. Exact development/test selections belong in root PEP 621 and the
+generated `requirements-dev.txt` graph, while `hacs.json` remains the single declaration of the
+installation floor.
 
 ## Version Source
 
@@ -79,7 +79,7 @@ A release-bearing pull request to `master` must:
 1. Increase `.version` above the exact target commit's version.
 2. Run `make version-sync` so the committed manifest mirror matches.
 3. Add a non-empty `## X.Y.Z - YYYY-MM-DD` section to `CHANGELOG.md`.
-4. Pass the dedicated **Version increment** workflow as well as normal CI/validation.
+4. Pass the **Version increment** job and every other required job in reusable CI.
 
 A Home Assistant reference-only refresh is the narrow exception. When integration code and other
 HACS-installed user-facing files, the `hacs.json` installation floor, and manifest runtime
@@ -97,9 +97,9 @@ pushed SHA and looks up its GitHub Release using full-SHA-pinned `actions/github
 read-only contents permission. If that version already has a correctly named published stable
 release and its exact lightweight tag still points to the release's recorded target commit, all
 remaining release-workflow jobs are skipped successfully. Missing, moved, annotated, or conflicting
-tags fail the release-state job. If no release exists, the workflow repeats the version comparison
-and requires the reusable CI and Home Assistant/HACS validation workflows. Only after they succeed
-does its final job receive `contents: write`.
+tags fail the release-state job. If no release exists, the workflow requires reusable CI, which
+contains version, Home Assistant/HACS validation, live, security, and compatibility jobs. Only
+after they succeed does its final job receive `contents: write`.
 The action creates both:
 
 - a lightweight tag named exactly like `.version`, in `X.Y.Z` form;
@@ -113,8 +113,8 @@ an already published release or its notes.
 
 HACS uses the tag name of the latest published GitHub Release as the remote version and offers
 recent releases to users. A tag without a published Release is not sufficient for this behavior.
-An unchanged-version maintenance push still fails the standalone version workflow, which the owner
-explicitly bypasses under the narrow maintenance policy. Its release workflow succeeds after the
+An unchanged-version maintenance PR still fails the CI version job, which the owner explicitly
+bypasses under the narrow maintenance policy. Its release workflow succeeds after the
 existing-release check and does not run version, CI, validation, or publication; its `Unreleased`
 notes remain for the next release-bearing change.
 

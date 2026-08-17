@@ -17,7 +17,7 @@ concurrency:
 jobs:
   release-state:
     name: Release state
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     outputs:
       release_required: ${{ steps.check.outputs.release_required }}
@@ -96,74 +96,53 @@ jobs:
             core.notice(`Release ${existing.data.html_url} already exists; skipping release gates`);
             core.setOutput("release_required", "false");
 
-  version:
-    name: Version increment
-    needs: release-state
-    if: needs.release-state.outputs.release_required == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    container:
-      image: docker.io/library/python@sha256:1a3c6dbfd2173971abba880c3cc2ec4643690901f6ad6742d0827bae6cefc925
-    steps:
-      - name: Check out previous version
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.before }}
-          path: base
-          persist-credentials: false
-      - name: Check out pushed version
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          path: source
-          persist-credentials: false
-      - name: Require synchronized version increase
-        working-directory: source
-        run: python .github/scripts/version.py check --base-root ../base
-
   ci:
     name: CI gate
     needs: release-state
     if: needs.release-state.outputs.release_required == 'true'
     uses: ./.github/workflows/ci.yml
     permissions:
+      actions: read
       contents: read
-
-  validate:
-    name: Validation gate
-    needs: release-state
-    if: needs.release-state.outputs.release_required == 'true'
-    uses: ./.github/workflows/validate.yml
-    permissions:
-      contents: read
+      security-events: write
 
   publish:
     name: Publish release
     needs:
       - release-state
       - ci
-      - validate
-      - version
     if: needs.release-state.outputs.release_required == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
     permissions:
       contents: write
-    container:
-      image: docker.io/library/python@sha256:1a3c6dbfd2173971abba880c3cc2ec4643690901f6ad6742d0827bae6cefc925
     steps:
       - name: Check out release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Generate release notes
-        run: python .github/scripts/version.py notes --output release-notes.md
+      - name: Verify rootless Podman
+        run: make doctor
+      - name: Resolve image cache keys
+        id: images
+        run: make image-key >> "$GITHUB_OUTPUT"
+      - name: Restore toolbox image
+        id: toolbox-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .artifacts/images/toolbox.tar
+          key: podman-${{ runner.os }}-${{ runner.arch }}-toolbox-${{ steps.images.outputs.toolbox }}
+      - name: Load cached toolbox image
+        if: steps.toolbox-cache.outputs.cache-hit == 'true'
+        run: make image-load-toolbox
+      - name: Generate release notes in the toolbox
+        run: make release-notes
       - name: Create exact-version tag and release
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           EXPECTED_REPOSITORY: kogeler/fmi-hass-custom
-          RELEASE_NOTES_PATH: release-notes.md
+          RELEASE_NOTES_PATH: .artifacts/release-notes.md
           TARGET_SHA: ${{ github.sha }}
           VERSION_PATH: .version
         with:

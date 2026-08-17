@@ -56,8 +56,8 @@ during the switch, complete the fork download before restarting Home Assistant.
 5. Add the integration from **Settings > Devices & services** as described above.
 
 Do not copy the whole repository into `custom_components/fmi/`, and do not install packages from
-the root development `requirements.txt` into Home Assistant. Home Assistant installs the two
-runtime requirements declared by the integration manifest.
+any root `requirements*.txt` file into Home Assistant. Those files are generated maintainer locks;
+Home Assistant installs the exact runtime requirements declared by the integration manifest.
 
 ## Upgrade
 
@@ -217,7 +217,7 @@ public strike coordinate for best-effort address enrichment; it does not receive
 home coordinate directly. See the [security and privacy contract](maintenance/COMPATIBILITY_SECURITY.md)
 and [known limitations](../TODO.md) before using lightning beyond a small private deployment.
 
-Documentation references verified 2026-08-01:
+Documentation references verified 2026-08-16:
 
 - [HACS custom repositories](https://www.hacs.xyz/docs/faq/custom_repositories/)
 - [HACS repository download and update behavior](https://www.hacs.xyz/docs/use/repositories/dashboard/)

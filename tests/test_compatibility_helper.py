@@ -37,12 +37,8 @@ def test_missing_prerelease_is_an_informational_skip(
         [
             str(SCRIPT),
             "prerelease",
-            "--bootstrap",
-            str(tmp_path / "bootstrap.txt"),
-            "--homeassistant",
-            str(tmp_path / "homeassistant.txt"),
-            "--direct",
-            str(tmp_path / "direct.txt"),
+            "--project",
+            str(tmp_path / "pyproject.toml"),
             "--output",
             str(tmp_path / "resolved.txt"),
         ],
@@ -63,3 +59,26 @@ def test_recreated_prerelease_must_still_match_the_channel(
 
     with pytest.raises(COMPATIBILITY.CompatibilityError):
         COMPATIBILITY._assert_channel("python", "prerelease")
+
+
+def test_moving_inputs_are_derived_from_project_metadata(tmp_path: Path) -> None:
+    """Use only direct project names and deliberately discard reference pins."""
+    project = tmp_path / "pyproject.toml"
+    project.write_text(
+        """
+[project]
+dependencies = ["fmi-weather-client==1.0.0", "geopy==2.5.0"]
+[project.optional-dependencies]
+dev = ["homeassistant==2026.8.1", "pytest-homeassistant-custom-component==0.13.355"]
+""".strip(),
+        encoding="utf-8",
+    )
+
+    homeassistant, direct = COMPATIBILITY._moving_inputs(project, tmp_path / "inputs")
+
+    assert homeassistant.read_text(encoding="utf-8") == "homeassistant\n"
+    assert direct.read_text(encoding="utf-8").splitlines() == [
+        "fmi-weather-client",
+        "geopy",
+        "pytest-homeassistant-custom-component",
+    ]

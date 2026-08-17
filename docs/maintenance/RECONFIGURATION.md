@@ -2,7 +2,7 @@
 
 # Location Reconfiguration and Identity
 
-Last verified: 2026-07-31
+Last verified against current code: 2026-08-16.
 
 ## User behavior
 

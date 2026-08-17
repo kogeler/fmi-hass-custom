@@ -1,0 +1,10 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
+[project]
+name = "fmi-hass-custom-lint-environment"
+version = "0"
+requires-python = ">=3.14"
+dependencies = [
+  "ruff==0.16.1",
+]

@@ -4,7 +4,8 @@
 
 ## Resolve vulnerable Home Assistant-pinned cryptography
 
-- Status: `BLOCKED_UPSTREAM`; temporary risk accepted by the repository owner on 2026-08-08.
+- Status: `BLOCKED_UPSTREAM`; temporary risk accepted by the repository owner on 2026-08-08 and
+  rechecked on 2026-08-16.
 - Home Assistant 2026.8.1 requires `cryptography==48.0.1` exactly. The raw audit reports
   `PYSEC-2026-3552`, `PYSEC-2026-3553`, and `PYSEC-2026-3554`; fixing the complete set requires
   cryptography 50.0.0.
@@ -19,12 +20,12 @@
 - The earlier Pillow/PyJWT exceptions are removed because Home Assistant now selects Pillow 12.3.0
   and PyJWT 2.13.0, which pass the current raw audit.
 
-After an upstream fix, update the Home Assistant/helper pair, regenerate the complete freeze, and
+After an upstream fix, update the Home Assistant/helper pair, regenerate the three hash locks, and
 require `make audit-raw`, `make audit`, the full offline suite, and `make validate` to pass before
 removing this item. The raw audit intentionally remains nonzero while the upstream pin is
 vulnerable; the policy audit passes only for the exact accepted finding set.
 
-Evidence rechecked 2026-08-08: [PKCS#7 advisory](https://osv.dev/vulnerability/PYSEC-2026-3552),
+Evidence rechecked 2026-08-16: [PKCS#7 advisory](https://osv.dev/vulnerability/PYSEC-2026-3552),
 [certificate path-building advisory](https://osv.dev/vulnerability/PYSEC-2026-3553),
 [name-constraints advisory](https://osv.dev/vulnerability/PYSEC-2026-3554), Home Assistant 2026.8.1
 package metadata, and the open [Home Assistant cryptography 50.0.0 update](https://github.com/home-assistant/core/pull/178496).

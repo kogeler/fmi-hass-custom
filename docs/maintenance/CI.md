@@ -2,191 +2,109 @@
 
 # Continuous Integration And Release Gates
 
-Last verified: 2026-08-08.
+Last verified locally: 2026-08-17.
 
 ## Workflow Topology
 
-| Workflow | Trigger | Purpose | Effective write permission |
+The repository maintains exactly three workflows:
+
+| Workflow | Trigger | Purpose | Write permission |
 |---|---|---|---|
-| `pr-body.yml` | PR open/reopen/source update | Synchronize a managed PR-body block from the source branch's latest changelog section | `pull-requests: write` only |
-| `version.yml` | Pull requests; `master` pushes; manual | Require `.version` to increase relative to the exact base tree and validate manifest/changelog synchronization | None |
-| `ci.yml` | Pull requests; `master` pushes; manual; reusable from release | Formatting, Ruff/Pylint, mypy, frozen dependency check, offline HA suite, distribution smoke, 95% coverage, then bounded live FMI probes | None |
-| `validate.yml` | Pull requests; `master` pushes; manual; reusable from release | Version/layout smoke, actionlint, digest-pinned hassfest, and digest-pinned HACS validation | None |
-| `dependency-review.yml` | Pull requests | Use native dependency diff for independent repositories or exact-exception frozen audit for forks | None |
-| `codeql.yml` | Pull requests; `master` pushes; manual | Security-extended CodeQL for Python and GitHub Actions workflow languages | `security-events: write` only for results |
-| `release.yml` | Push to `master` | Skip an already published version; otherwise re-run version, CI, and validation gates and publish the exact-version tag/release | `contents: write` only in final publish job |
-| `compatibility.yml` | Pull requests; `master` pushes; manual | Independently resolve, freeze, recreate, and test the latest stable and latest available prerelease HA graphs | None |
+| `ci.yml` | PR, `master` push, manual, reusable | All read-only/status quality, security, live, validation, compatibility, and version gates | CodeQL alone gets `security-events: write` |
+| `pr-body.yml` | PR open/reopen/source update | Synchronize the managed PR body block from bounded source-changelog data | `pull-requests: write` only |
+| `release.yml` | `master` push | Skip an existing exact release or reuse CI and publish a new exact-version release | `contents: write` only in `publish` |
 
-Quality, version, validation, dependency-review, and CodeQL workflows use `pull_request`; they
-receive neither repository secrets nor a write token. Checkout credentials are not persisted.
-Required jobs install the complete committed reference graph with `--no-deps` and run `pip check`.
-The event-driven and manually triggered compatibility jobs instead detect resolver drift: neither
-workflow job contains an HA, test-helper, FMI-client, geopy, or pip version. Stable compatibility
-fails its workflow and is a recommended required PR check. Prerelease compatibility uses job-level
-`continue-on-error` so an upstream beta can report a visible failure without blocking the
-reference stable release contract.
+No workflow is scheduled. Every external action uses a full commit SHA with a reviewed version
+comment. Executable images use immutable digests. Jobs use `ubuntu-26.04`; `.github/actionlint.yaml`
+teaches actionlint 1.7.12 that official label until its embedded list catches up. Checkout
+credentials are never persisted.
 
-When no newer installable Home Assistant prerelease exists, the prerelease resolver reports an
-explicit informational skip and exits successfully without writing a resolved freeze. This is not a
-compatibility failure. Once a prerelease is available, dependency resolution, environment
-recreation, `pip check`, channel verification, and the full offline suite remain mandatory; a real
-failure stays visible under the job-level non-blocking policy.
+## Reusable CI Jobs
 
-The CI job keeps the ordinary coverage suite deterministic and socket-blocked, then runs the four
-bounded `live` probes as a separate final step with no secrets. CI, validation, CodeQL,
-compatibility, and version workflows all run directly for pull requests and `master` pushes and
-can be dispatched manually from a selected branch. On every `master` push, `release.yml` first
-checks whether the exact `.version` already has a published stable release. If so, its remaining
-jobs are skipped successfully. For a new version it invokes the same reusable CI and validation
-definitions and independently repeats the version check, so publication waits for gates tied to
-that exact Release run. This deliberate repetition is required because GitHub Actions cannot
-express `needs` across independent workflow runs. An FMI service/network outage now blocks merge
-and release by owner decision. No file under
-`.github/workflows/` may declare a `schedule` trigger.
+`ci.yml` contains these separately visible boundaries:
 
-The manual version check compares the selected branch with `master` by default and permits an
-explicit base branch or commit. On a `master` push it compares the pushed commit with
-`github.event.before`, matching the release gate. Dependency review stays PR-only. GitHub's
-dependency-diff API returns `403` for fork repositories, so `dependency-review.yml` calls the
-native action only when `github.event.repository.fork` is false. On this fork it installs the
-committed full freeze and runs `.github/scripts/dependency_audit.py`; the helper permits only the
-exact package/version/advisory tuples in `.github/dependency-audit-exceptions.json`, fails on a new
-finding, and also fails when an exception becomes stale. PR-body synchronization remains tied to
-trusted PR metadata events, and release publication remains tied exclusively to a
-version-incrementing `master` push.
+- **Confined quality and offline tests** sets up host Python only for hash-locked Ruff, verifies
+  rootless Podman, restores content-addressed toolbox/resolver OCI archives, and runs `make ci`.
+  Coverage is written only to `$GITHUB_STEP_SUMMARY`; the job has no PR write token.
+- **Bounded live FMI** depends on quality and runs `make live` online without repository secrets.
+- **Home Assistant and HACS validation** depends on quality, supplies the read-only GitHub token and
+  exact head repository/SHA to HACS, and runs the Make validator contract. Actionlint/hassfest use a
+  tar snapshot, not a checkout bind mount; HACS fetches the exact remote revision itself.
+- **Dependency review** uses the native dependency-diff action for same-repository pull requests.
+  Fork pull requests use the exact reviewed `make audit` fallback in the toolbox because GitHub's
+  dependency-review API does not expose their dependency diff to this workflow.
+- **CodeQL** runs `security-extended` for both Python and GitHub Actions. Only its matrix job can
+  upload security events.
+- **Latest Home Assistant stable** resolves, freezes, recreates, checks, and tests a moving stable
+  graph in the resolver container. It is blocking.
+- **Latest Home Assistant prerelease** performs the same work for a newer prerelease and is
+  informational. No available newer prerelease is an explicit successful skip; a real failure is
+  visible through job-level `continue-on-error`.
+- **Version increment** checks out the exact base and head, reads the base version as data, and
+  executes the repository version helper inside the toolbox.
 
-`pr-body.yml` is the single isolated `pull_request_target` exception because fork PR tokens on the
-ordinary event cannot update their PR body. It receives no secrets and only `contents: read` plus
-`pull-requests: write`. It checks out the trusted default branch without a head ref, reads only the
-exact head SHA's `CHANGELOG.md` through SHA-pinned `actions/github-script`, and treats that file as
-bounded inert UTF-8 data. Only the trusted default-branch `.github/scripts/pr_body.py` executes;
-the workflow never checks out head code, installs head dependencies, interpolates head content
-into a shell command, or writes repository contents/cache.
+All project pytest paths reached by these jobs use `-n auto --dist=worksteal`, with xdist deriving
+the automatic worker count from the CPUs visible to its container. The quality job's Make contract
+includes lock reproduction, format/lint/type/Bandit/ShellCheck, offline coverage, network and
+confinement proofs, version synchronization, actionlint/hassfest, reviewed audit, and dependency
+policy tests. License inventory remains an explicit maintainer dependency-review command rather
+than a CI job. HACS, live FMI, and moving compatibility remain separate because they have distinct
+network/failure boundaries.
 
-The helper copies the source changelog's first `##` section, so normal development PRs use
-`Unreleased` while release branches use their dated version section. Hidden markers delimit the
-generated block. Manual text outside the block is retained, and the block refreshes on PR open,
-reopen, and source updates. Invalid/empty sections, ambiguous markers, and bodies above the GitHub
-limit fail visibly instead of erasing the existing body. The workflow also re-reads the current PR
-before writing and refuses to overwrite a manual edit made while synchronization was running.
+Toolbox and resolver OCI archives are cached independently by OS, architecture, and exact context
+hash. Restore verifies the expected tag. Save uses a temporary archive and rename. External
+validator images are pulled only by immutable digest and are not placed in a shared writable
+dependency cache.
 
-No dependency cache is written. The pinned container layers and small frozen install already keep
-the jobs bounded, while avoiding a writable cache shared between untrusted pull requests and
-trusted release jobs.
+## Trust Boundaries
 
-## Dynamic Compatibility Resolution
+Ordinary PR jobs use `pull_request`, read-only contents, no repository secrets, and no write token.
+Their source is untrusted but runs only through the confined/read-only paths above.
 
-`compatibility.yml` has two independent jobs. `Latest Home Assistant stable` resolves the newest
-non-prerelease HA first, temporarily constrains that exact resolver result, and selects the newest
-test helper and integration dependencies compatible with it. `Latest Home Assistant prerelease`
-attempts to select the newest installable HA prerelease independently of the helper's possibly
-lagging exact HA metadata. If none is newer than stable, it stops with the successful informational
-skip described above. When it selects a prerelease, it permits only that single helper-to-HA
-metadata mismatch; every other `pip check` failure remains fatal, and the test suite must pass.
+`pr-body.yml` is the sole `pull_request_target` exception. It checks out the trusted default
+branch, reads only the exact head SHA's `CHANGELOG.md` through the GitHub contents API, bounds that
+file to 1 MB, and treats it as inert UTF-8 data. Only trusted `.github/scripts/pr_body.py` executes
+in a digest-pinned minimal Python job container. The workflow re-reads the current PR body before
+updating and refuses a race. It never checks out head code, installs head dependencies, interpolates
+head data into shell, or receives repository-content write permission.
 
-Both jobs use `.github/scripts/compatibility.py`. The helper installs only from requirement or
-constraint files. For each available target, it resolves in a temporary venv, writes the complete
-transitive result using `pip freeze` to `requirements-compatibility-*-resolved.txt`, creates a
-second empty venv, installs the generated freeze with `--no-deps`, verifies the requested release
-channel and dependency metadata, and runs pytest only in that recreated environment. It removes a
-previous output before resolution so a skipped prerelease cannot leave stale evidence. Generated
-drift freezes are ignored locally because their purpose is to describe that single run, not to
-replace the committed reference lock.
-
-## Immutable Dependencies
-
-All external JavaScript actions use full commit SHAs. All executable containers use registry
-digests. Hassfest and HACS are invoked directly from reviewed image digests so their mutable nested
-image tags cannot bypass repository review. Actionlint uses its multi-architecture release digest.
-Dependabot tracks both Python inputs and GitHub Actions references; grouped PRs are limited to
-non-major updates.
-
-Every repository-authored CI helper is Python under `.github/scripts/`. GitHub API orchestration is
-the single exception to Python-only helper logic: inline bodies of the native, SHA-pinned
-`actions/github-script` use its pre-authenticated Octokit client for release publication and PR
-metadata. Workflows contain no `curl`, `gh api`, or repository-authored GitHub HTTP client.
+`release.yml` first reads `.version` from the exact pushed SHA and validates any existing Release
+and lightweight tag using read-only API access. A matching published version is a successful no-op.
+For a new version, the workflow calls the same `ci.yml` from that pushed commit. Only after every
+reusable job succeeds does `publish` receive `contents: write`, generate release notes via the
+toolbox, and create the exact-version tag and Release. It refuses conflicting tags, targets, names,
+notes, draft state, or prerelease state and never rewrites an existing conflict.
 
 ## Recommended `master` Protection
 
-Configure a branch ruleset for `master` with pull requests required, force pushes/deletions
-blocked, conversations resolved, and these checks required:
+After the new workflow has run once, select the actual GitHub-rendered names corresponding to:
 
-- `Version increment / Version increment`
-- `CI / Quality, offline, and live tests`
-- `Home Assistant and HACS validation / Layout and metadata`
-- `Home Assistant and HACS validation / Workflow syntax`
-- `Home Assistant and HACS validation / Hassfest`
-- `Home Assistant and HACS validation / HACS`
-- `Dependency review / Dependency review`
-- `CodeQL / Analyze (actions)`
-- `CodeQL / Analyze (python)`
-- `Compatibility / Latest Home Assistant stable`
+- `CI / Confined quality and offline tests`
+- `CI / Bounded live FMI`
+- `CI / Home Assistant and HACS validation`
+- `CI / Dependency review`
+- `CI / CodeQL (actions)`
+- `CI / CodeQL (python)`
+- `CI / Latest Home Assistant stable`
+- `CI / Version increment`
 
-GitHub exposes exact check labels only after each new workflow has run once. If the UI renders a
-slightly different qualified label, select the run whose workflow/job names match the list above.
-Do not require `Compatibility / Latest Home Assistant prerelease`: it is an early-warning signal
-for an unsupported moving target. Live FMI is part of the required CI job and must not be split
-into an optional workflow.
-Do not make PR-body synchronization a required merge check; its write permission and metadata-only
-purpose are deliberately separate from code quality gates.
+Do not require `CI / Latest Home Assistant prerelease` or the PR-body metadata job. Keep pull
+requests, resolved conversations, blocked force pushes/deletions, and read-only default Actions
+token enabled. Dependency graph, Dependabot alerts, and security updates remain owner-controlled
+repository settings.
 
-The post-push release version check deliberately fails direct or multi-commit pushes that do not
-increase `.version`, but a failed post-push workflow cannot remove a commit already accepted by
-GitHub. Required PR checks and branch protection are therefore the preventive control.
+Exact check labels exist only after a real GitHub run. Local actionlint, policy tests, and Make
+verification cannot claim that remote branch rules or HACS API access have been applied.
 
-`HA_RELEASE_MAINTENANCE.md` defines the sole unchanged-version exception: an owner-approved Home
-Assistant reference-only refresh with no distributed integration, HACS-floor, or manifest runtime
-requirement change. The owner manually bypasses only standalone **Version increment** after every
-other branch gate passes. On `master`, the release workflow sees the existing published version and
-skips all remaining work successfully. Do not generalize this bypass because the same standalone
-enforcement protects normal release-bearing changes.
+## Maintainer Verification
 
-The release-state job receives only `contents: read`, reads `.version` from the exact pushed SHA,
-and accepts an existing release only when its tag and name match that stable version, it is neither
-draft nor prerelease, and its exact lightweight Git tag still points to the release's recorded
-target commit. Missing, moved, annotated, or conflicting tags and invalid release metadata fail
-rather than suppressing release validation. A new version has no existing release and therefore
-follows the complete gated publication path.
+For a release PR and its `master` push:
 
-## Maintainer Release Verification
-
-For every release merged or pushed to `master`:
-
-1. Confirm every standalone branch check appears for both the release PR and `master` push, and
-   record the exact required-check labels.
-2. Confirm the `master` Release run passes its parallel version, CI/live, and validation gates
-   before the publish job starts.
-3. Confirm the tag and published Release named by `.version` point to the finished release commit
-   and release notes match the corresponding `CHANGELOG.md` section plus full-changelog link.
-4. Add this repository to HACS as a custom Integration and verify the published version installs to
-   `<config>/custom_components/fmi/`.
-5. Confirm `Compatibility` ran on the release PR and `master` push, then run it manually from a
-   custom branch once. Verify stable creates and reinstalls its full freeze. Verify prerelease does
-   the same when a newer installable candidate exists, or reports a successful explicit skip when
-   none exists. Both jobs must use no secrets.
-6. Confirm the bounded live step ran after offline coverage on both the release PR and `master` run.
-7. Enable the recommended branch ruleset and keep the repository Actions default token read-only.
-8. Open or update a later test PR and confirm its managed body block matches the first changelog
-   section from that PR's exact source SHA while any manual text remains unchanged.
-
-Branch protection, Actions token defaults, and the published Release remain owner-controlled
-settings. A pull request that introduces `pr-body.yml` cannot use that workflow for its own body:
-GitHub loads `pull_request_target` workflows only from the default branch. Synchronization begins
-with later pull requests after the trusted workflow reaches `master`.
-
-## Authoritative References
-
-- Reusable workflows: <https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows>
-- Workflow token and fork behavior: <https://docs.github.com/en/actions/concepts/security/github_token>
-- Secure pull-request triggers:
-  <https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target>
-- Repository contents API used to read the exact head changelog:
-  <https://docs.github.com/en/rest/repos/contents>
-- Pull request API used to update only the PR body:
-  <https://docs.github.com/en/rest/pulls/pulls#update-a-pull-request>
-- CodeQL GitHub Actions queries:
-  <https://docs.github.com/en/code-security/reference/code-scanning/codeql/codeql-queries/actions-built-in-queries>
-- GitHub dependency review API and its fork limitation:
-  <https://docs.github.com/en/rest/dependency-graph/dependency-review>
-- Dependabot configuration:
-  <https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file>
+1. Confirm every expected CI job ran on the exact head SHA and stable compatibility was blocking.
+2. Confirm live FMI followed quality and used no secrets.
+3. Confirm HACS reported the exact source repository/ref and no validator received a checkout bind.
+4. Confirm CodeQL produced both language results and no other CI job gained write permission.
+5. Confirm the Release run reused CI before its publish job.
+6. Confirm the tag, Release name/target, notes, `.version`, manifest mirror, and dated changelog
+   section agree.
+7. Confirm the pip and GitHub-Actions Dependabot entries recognize their new manifests/locks.

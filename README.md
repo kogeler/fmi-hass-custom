@@ -40,14 +40,21 @@ integration, not as an official Home Assistant Core integration.
 
 ### Maintainers
 
-- [Home Assistant release maintenance](docs/maintenance/HA_RELEASE_MAINTENANCE.md)
 - [Development environment and commands](docs/maintenance/DEVELOPMENT.md)
+- [Dependency ownership and review](docs/maintenance/DEPENDENCIES.md)
 - [CI and release gates](docs/maintenance/CI.md)
+- [Home Assistant release maintenance](docs/maintenance/HA_RELEASE_MAINTENANCE.md)
 - [HACS repository and release model](docs/maintenance/HACS_RELEASES.md)
-- [Forecast semantics](docs/maintenance/FORECAST_SEMANTICS.md)
-- [Migration guarantees](docs/maintenance/MIGRATIONS.md)
-- [Compatibility, security, and privacy contract](docs/maintenance/COMPATIBILITY_SECURITY.md)
 - [Runtime architecture and invariants](docs/maintenance/RUNTIME.md)
+- [Source availability](docs/maintenance/AVAILABILITY.md)
+- [Optional lightning and sea-level sources](docs/maintenance/OPTIONAL_SOURCES.md)
+- [Live FMI tests](docs/maintenance/LIVE_TESTS.md)
+- [Forecast semantics](docs/maintenance/FORECAST_SEMANTICS.md)
+- [Time and missing-data policy](docs/maintenance/TIME_AND_MISSING_DATA.md)
+- [Sensor and gust contract](docs/maintenance/SENSORS.md)
+- [Migration guarantees](docs/maintenance/MIGRATIONS.md)
+- [Location reconfiguration and identity](docs/maintenance/RECONFIGURATION.md)
+- [Compatibility, security, and privacy contract](docs/maintenance/COMPATIBILITY_SECURITY.md)
 - [License](LICENSE)
 
 ## Maintainer

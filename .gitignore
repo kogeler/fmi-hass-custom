@@ -6,6 +6,8 @@
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
-requirements-compatibility-*-resolved.txt
 __pycache__/
 *.pyc
+/tmp
+.artifacts/
+venv-lint/

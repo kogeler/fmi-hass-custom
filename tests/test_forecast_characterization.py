@@ -89,7 +89,7 @@ def test_hourly_forecast_spans_three_local_dates(monkeypatch) -> None:
     _set_helsinki_timezone(monkeypatch)
     forecast = forecast_from_fixture("forecast_normal.json")
 
-    hourly = _entity(forecast)._forecast(daily_mode=False)
+    hourly = _entity(forecast)._hourly_forecast()
 
     assert hourly is not None
     assert len(hourly) == 49
@@ -119,7 +119,7 @@ def test_daily_grouping_crosses_calendar_boundaries(
     _set_helsinki_timezone(monkeypatch)
     forecast = forecast_from_fixture("forecast_boundaries.json", series)
 
-    daily = _entity(forecast)._forecast(daily_mode=True)
+    daily = _entity(forecast)._daily_forecast()
 
     assert daily is not None
     assert _local_dates(daily) == expected_dates
@@ -129,7 +129,7 @@ def test_hourly_forecast_uses_helsinki_dst_transition(monkeypatch) -> None:
     _set_helsinki_timezone(monkeypatch)
     forecast = forecast_from_fixture("forecast_boundaries.json", "dst_transition")
 
-    hourly = _entity(forecast)._forecast(daily_mode=False)
+    hourly = _entity(forecast)._hourly_forecast()
     assert hourly is not None
     timestamps = [datetime.fromisoformat(item[ATTR_FORECAST_TIME]) for item in hourly]
     local_hours = [timestamp.astimezone(HELSINKI).hour for timestamp in timestamps]
@@ -184,7 +184,7 @@ def test_daily_forecast_sums_hourly_precipitation(monkeypatch) -> None:
     _set_helsinki_timezone(monkeypatch)
     forecast = forecast_from_fixture("forecast_normal.json")
 
-    daily = _entity(forecast)._forecast(daily_mode=True)
+    daily = _entity(forecast)._daily_forecast()
 
     assert daily is not None
     assert daily[0][ATTR_FORECAST_NATIVE_PRECIPITATION] == pytest.approx(1.1)
@@ -195,7 +195,7 @@ def test_daily_forecast_aggregates_mixed_conditions_wind_and_means(monkeypatch) 
     _set_helsinki_timezone(monkeypatch)
     forecast = forecast_from_fixture("forecast_daily_cases.json", "mixed_conditions")
 
-    daily = _entity(forecast)._forecast(daily_mode=True)
+    daily = _entity(forecast)._daily_forecast()
 
     assert daily is not None
     assert len(daily) == 1
@@ -228,7 +228,7 @@ def test_daily_forecast_distinguishes_missing_precipitation_from_zero(
     _set_helsinki_timezone(monkeypatch)
     forecast = forecast_from_fixture("forecast_daily_cases.json", series)
 
-    daily = _entity(forecast)._forecast(daily_mode=True)
+    daily = _entity(forecast)._daily_forecast()
 
     assert daily is not None
     assert daily[0][ATTR_FORECAST_NATIVE_PRECIPITATION] == expected
@@ -250,7 +250,7 @@ def test_daily_forecast_handles_negative_and_missing_temperatures(
     _set_helsinki_timezone(monkeypatch)
     forecast = forecast_from_fixture("forecast_daily_cases.json", series)
 
-    daily = _entity(forecast)._forecast(daily_mode=True)
+    daily = _entity(forecast)._daily_forecast()
 
     assert daily is not None
     assert daily[0][ATTR_FORECAST_NATIVE_TEMP] == expected_high
@@ -262,8 +262,8 @@ def test_forecast_sorts_and_deduplicates_timestamps(monkeypatch) -> None:
     forecast = forecast_from_fixture("forecast_daily_cases.json", "unordered_duplicates")
     entity = _entity(forecast)
 
-    hourly = entity._forecast(daily_mode=False)
-    daily = entity._forecast(daily_mode=True)
+    hourly = entity._hourly_forecast()
+    daily = entity._daily_forecast()
 
     assert hourly is not None
     assert [item[ATTR_FORECAST_NATIVE_TEMP] for item in hourly] == [1.0, 2.5, 3.0]
@@ -278,7 +278,7 @@ def test_daily_forecast_uses_partial_local_day_without_extrapolation(monkeypatch
     _set_helsinki_timezone(monkeypatch)
     forecast = forecast_from_fixture("forecast_daily_cases.json", "mixed_conditions")
 
-    daily = _entity(forecast)._forecast(daily_mode=True)
+    daily = _entity(forecast)._daily_forecast()
 
     assert daily is not None
     assert len(daily) == 1
@@ -291,7 +291,7 @@ def test_hourly_forecast_preserves_both_dst_end_hours(monkeypatch) -> None:
     _set_helsinki_timezone(monkeypatch)
     forecast = forecast_from_fixture("forecast_daily_cases.json", "dst_end")
 
-    hourly = _entity(forecast)._forecast(daily_mode=False)
+    hourly = _entity(forecast)._hourly_forecast()
 
     assert hourly is not None
     local_times = [
@@ -310,9 +310,11 @@ async def test_forecast_methods_return_literal_granularity(monkeypatch) -> None:
 
     hourly = await legacy_daily.async_forecast_hourly()
     daily = await legacy_daily.async_forecast_daily()
+    twice_daily = await legacy_daily.async_forecast_twice_daily()
 
     assert hourly is not None and len(hourly) == 49
     assert daily is not None and len(daily) == 3
+    assert twice_daily is None
     primary = FMIWeatherEntity("FMI", cast(Any, coordinator))
     observation = FMIWeatherEntity("FMI", cast(Any, coordinator), station_id=True)
     assert primary.supported_features == (
@@ -332,7 +334,7 @@ def test_hourly_forecast_uses_current_home_assistant_keys_and_units(monkeypatch)
     entity.logger = logging.getLogger(__name__)
 
     entity.update_callback()
-    hourly = entity._forecast(daily_mode=False)
+    hourly = entity._hourly_forecast()
 
     assert entity._attr_native_precipitation_unit == "mm"
     assert hourly is not None

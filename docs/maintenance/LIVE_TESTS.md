@@ -7,7 +7,7 @@ Live suite last verified: 2026-08-16 against Home Assistant 2026.8.1 and
 
 ## Purpose And Selection
 
-The live suite is a marker-isolated compatibility probe, not part of the ordinary offline pytest selection. It checks the installed dependency against FMI WFS and then loads the integration through current Home Assistant config-entry, entity-state, entity-registry, and weather forecast-service APIs. The Home Assistant test helper installs a per-test DNS/socket guard independently of pytest's command-line socket option, so the live module narrowly restores real DNS/sockets in an autouse fixture and reinstates the guard during teardown. Required `ci.yml` runs the four live tests as a distinct step immediately after the offline coverage gate for every pull request and every `master` release run.
+The live suite is a marker-isolated compatibility probe, not part of the ordinary offline pytest selection. It checks the installed dependency against FMI WFS and then loads the integration through current Home Assistant config-entry, entity-state, entity-registry, and weather forecast-service APIs. The Home Assistant test helper installs a per-test DNS/socket guard independently of pytest's command-line socket option, so the live module narrowly restores real DNS/sockets in an autouse fixture and reinstates the guard during teardown. Required `ci.yml` runs the four live tests in a separate online rootless-Podman job after the offline quality gate for every pull request and every `master` push.
 
 The public locations are deliberately unrelated to the repository owner's Home Assistant configuration:
 
@@ -19,30 +19,31 @@ The public locations are deliberately unrelated to the repository owner's Home A
 
 ## Commands
 
-Run the complete live suite, with networking enabled and no xdist workers:
+Run the complete live suite with automatic xdist workers and the shared global request budget.
+Xdist derives the worker count from CPUs visible inside the container, and the Make target prints
+the actual number of FMI request attempts on completion:
 
 ```bash
 make live
 ```
 
-Equivalent explicit command in the supported Podman environment:
+Use a fixed worker count only for diagnosis:
 
 ```bash
-podman run --rm --userns=keep-id -v "$PWD:/workspace:Z" -w /workspace \
-  localhost/fmi-hass-custom-dev:local \
-  python -m pytest -o addopts= --strict-config --strict-markers -n 0 -m live
+make live PYTEST_WORKERS=2
 ```
 
 Prove default/offline marker separation:
 
 ```bash
 make test-fast
-podman run --rm --userns=keep-id -v "$PWD:/workspace:Z" -w /workspace \
-  --network=none localhost/fmi-hass-custom-dev:local \
-  python -m pytest -q tests/test_live_fmi.py
+make test-network-block
 ```
 
-The second command must collect and deselect the live tests without attempting a socket. Do not run selected live tests with `--network=none` and interpret the resulting transport failure as an FMI outage.
+The offline suite must collect and deselect live tests without attempting a socket. Do not run
+selected live tests with `--network=none` and interpret the resulting transport failure as an FMI
+outage. Project source is tar-streamed into private tmpfs; a bind-mounted checkout is not a
+supported command.
 
 ## WFS Surface And Request Budget
 
@@ -55,9 +56,9 @@ All calls use `https://opendata.fmi.fi/wfs`, WFS 2.0 `GetFeature`, and the insta
 | Home Assistant current, hourly forecast, and station observation | Both queries above | 3 | 4 |
 | Total | - | 6 | 10 |
 
-Each dependency call retries once, after one second, only for timeout, transport, or FMI server errors. Client/request and parsing/shape errors are not retried. The Home Assistant probe uses the integration's 40-second coordinator bound and performs no test-level retry. It suppresses the unrelated optional sea-level request and permits at most one place-observation fallback, while retaining real forecast/current/station calls and their normal parsers.
+Each dependency call retries once, after one second, only for timeout, transport, or FMI server errors. Client/request and parsing/shape errors are not retried. The Home Assistant probe uses the integration's 40-second coordinator bound and performs no test-level retry. It suppresses the unrelated optional sea-level request and permits at most one place-observation fallback, while retaining real forecast/current/station calls and their normal parsers. All xdist workers share a file-locked counter and two-slot semaphore in the container's `/tmp`; every real attempt reserves before I/O, and attempt eleven fails locally without contacting FMI.
 
-FMI currently publishes limits of 20,000 Download Service requests per day and 600 combined Download/View requests per five minutes. The ten-request worst case is 0.05% of the daily Download limit and about 1.67% of the short-window combined limit. Never add xdist, unbounded parameterization, response polling, or automatic retry plugins to this workflow.
+FMI currently publishes limits of 20,000 Download Service requests per day and 600 combined Download/View requests per five minutes. The ten-request worst case is 0.05% of the daily Download limit and about 1.67% of the short-window combined limit. Automatic xdist is required, but its worker count never changes the shared ten-attempt/two-concurrent-request bounds. Never add unbounded parameterization, response polling, or automatic retry plugins.
 
 ## Assertions
 
@@ -84,9 +85,9 @@ No test asserts an exact temperature, condition, precipitation, station reading,
 - `FMI parsing/contract failure` or `LiveContractError`: response/model/service shape, timestamps, values, or ordering drifted. Preserve the failing public metadata and add an offline fixture before adapting code.
 - `Home Assistant setup/exposure failure`: client data did not complete config-entry setup or reach entity/service APIs. Reproduce offline at the coordinator/entity boundary before changing lifecycle behavior.
 
-The exact four bounded tests and request budget are the final test step in required `ci.yml`. The
-job uses no secret and runs for pull requests and, through the reusable release gate, every
-`master` push even when version or validation fails. There is no standalone or scheduled live
+The exact four bounded tests and request budget are a required `ci.yml` job after quality. The job
+uses no secret and runs for pull requests and every `master` push; a new-version release invokes
+the reusable CI a second time before publication. There is no standalone or scheduled live
 workflow. An FMI transport/service outage is intentionally merge- and release-blocking; use the
 failure classification above and re-run once before diagnosing an integration regression.
 

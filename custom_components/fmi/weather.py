@@ -89,7 +89,6 @@ class FMIWeatherEntity(CoordinatorEntity[FMIDataUpdateCoordinator], WeatherEntit
         """Initialize FMI weather object."""
         self.logger = const.LOGGER.getChild("weather")
         super().__init__(coordinator)
-        self._observation_mode = station_id
         self._attr_supported_features = (
             WeatherEntityFeature(0)
             if station_id
@@ -299,17 +298,13 @@ class FMIWeatherEntity(CoordinatorEntity[FMIDataUpdateCoordinator], WeatherEntit
             )
         return result
 
-    def _forecast(self, daily_mode: bool) -> list[Forecast]:
-        """Return the requested forecast granularity from cached FMI data."""
-        return self._daily_forecast() if daily_mode else self._hourly_forecast()
-
     async def async_forecast_hourly(self) -> list[Forecast] | None:
         """Return the hourly forecast in native units."""
         return self._hourly_forecast()
 
     async def async_forecast_twice_daily(self) -> list[Forecast] | None:
-        """Return the daily forecast in native units."""
-        raise NotImplementedError
+        """Report the unsupported twice-daily granularity without exposing stale data."""
+        return None
 
     async def async_forecast_daily(self) -> list[Forecast] | None:
         """Return the daily forecast in native units."""

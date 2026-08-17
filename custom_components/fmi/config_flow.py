@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from typing import Any
 from uuid import uuid4
-from xml.etree.ElementTree import ParseError
 
 import voluptuous as vol
 from fmi_weather_client.errors import ClientError, ServerError
@@ -38,7 +37,14 @@ async def validate_user_config(data: dict[str, Any]) -> str:
         )
     except (ClientError, RequestException, ServerError) as error:
         raise CannotConnectError from error
-    except (AttributeError, KeyError, OverflowError, ParseError, TypeError, ValueError) as error:
+    except (
+        AttributeError,
+        KeyError,
+        OverflowError,
+        SyntaxError,
+        TypeError,
+        ValueError,
+    ) as error:
         raise InvalidFMIResponseError from error
     if weather is None:
         raise CannotConnectError

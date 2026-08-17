@@ -18,6 +18,7 @@ from fmi_weather_client.errors import ClientError, ServerError
 from homeassistant.util.loop import protect_loop
 
 from custom_components.fmi import fmi_client as integration_fmi_client
+from custom_components.fmi.xml_parser import XMLPayloadError
 from tests.helpers.fmi import (
     CONSUMED_WEATHER_DATA_FIELDS,
     FIXTURE_DIR,
@@ -251,15 +252,15 @@ def test_client_adapter_rejects_non_string_parameter_contract(monkeypatch) -> No
 
 def test_hourly_gust_parser_ignores_absent_and_misaligned_fields() -> None:
     """Return no gusts when the optional field or its aligned value is unavailable."""
-    no_hourly_field = f"""
-        <root xmlns:swe="{integration_fmi_client.SWE_NAMESPACE}">
+    no_hourly_field = """
+        <root xmlns:swe="http://www.opengis.net/swe/2.0">
           <swe:field name="WindGust" />
         </root>
     """
-    missing_aligned_value = f"""
-        <root xmlns:gml="{integration_fmi_client.GML_NAMESPACE}"
-              xmlns:gmlcov="{integration_fmi_client.GMLCOV_NAMESPACE}"
-              xmlns:swe="{integration_fmi_client.SWE_NAMESPACE}">
+    missing_aligned_value = """
+        <root xmlns:gml="http://www.opengis.net/gml/3.2"
+              xmlns:gmlcov="http://www.opengis.net/gmlcov/1.0"
+              xmlns:swe="http://www.opengis.net/swe/2.0">
           <swe:field name="WindGust" />
           <swe:field name="HourlyMaximumGust" />
           <gmlcov:positions>60.17 24.94</gmlcov:positions>
@@ -269,6 +270,28 @@ def test_hourly_gust_parser_ignores_absent_and_misaligned_fields() -> None:
 
     assert integration_fmi_client._hourly_gusts_by_time(no_hourly_field) == {}  # noqa: SLF001
     assert integration_fmi_client._hourly_gusts_by_time(missing_aligned_value) == {}  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '<!DOCTYPE root [<!ENTITY value "unsafe">]><root>&value;</root>',
+        ('<!DOCTYPE root [<!ENTITY value SYSTEM "file:///etc/passwd">]><root>&value;</root>'),
+    ],
+)
+def test_hourly_gust_parser_rejects_entities(payload: str) -> None:
+    """The forecast adapter must reject internal and external entity declarations."""
+
+    with pytest.raises(XMLPayloadError, match="invalid or unsafe XML"):
+        integration_fmi_client._hourly_gusts_by_time(payload)  # noqa: SLF001
+
+
+def test_hourly_gust_parser_bounds_forecast_xml() -> None:
+    """Bound parser memory independently of the synchronous upstream transport."""
+    payload = "<root>" + "x" * (2 * 1024 * 1024) + "</root>"
+
+    with pytest.raises(XMLPayloadError, match="exceeds size limit"):
+        integration_fmi_client._hourly_gusts_by_time(payload)  # noqa: SLF001
 
 
 async def test_client_adapter_preserves_weather_and_forecast_timesteps(monkeypatch) -> None:
@@ -307,6 +330,37 @@ async def test_client_adapter_returns_none_for_empty_current_forecast(monkeypatc
     monkeypatch.setattr(integration_fmi_client, "_request_by_coordinates", lambda *args: empty)
 
     assert await integration_fmi_client.async_weather_by_coordinates(60.17, 24.94) is None
+
+
+async def test_observation_adapters_enforce_safe_expat(monkeypatch) -> None:
+    """Gate upstream observation parsing before it reaches xmltodict."""
+    expected = weather_from_fixture("observation.json", "observation")
+    assert expected is not None
+    gate = Mock()
+
+    async def observation_by_place(place: str):
+        assert place == "Helsinki"
+        return expected
+
+    async def observation_by_station_id(station_id: int):
+        assert station_id == 101004
+        return expected
+
+    monkeypatch.setattr(integration_fmi_client, "ensure_safe_expat", gate)
+    monkeypatch.setattr(
+        integration_fmi_client.upstream,
+        "async_observation_by_place",
+        observation_by_place,
+    )
+    monkeypatch.setattr(
+        integration_fmi_client.upstream,
+        "async_observation_by_station_id",
+        observation_by_station_id,
+    )
+
+    assert await integration_fmi_client.async_observation_by_place("Helsinki") is expected
+    assert await integration_fmi_client.async_observation_by_station_id(101004) is expected
+    assert gate.call_count == 2
 
 
 def test_observation_and_empty_results_use_real_models() -> None:

@@ -1,6 +1,35 @@
 # Copyright (c) 2026 kogeler
 # SPDX-License-Identifier: MIT
 
+[project]
+name = "fmi-hass-custom-environment"
+version = "0"
+requires-python = ">=3.14"
+dependencies = [
+  "fmi-weather-client==1.0.0",
+  "geopy==2.5.0",
+  "xmltodict==1.0.4",
+]
+
+[project.optional-dependencies]
+# Complete reference environment used only inside the toolbox container. The
+# Home Assistant selection is not the minimum release declared by HACS.
+dev = [
+  "bandit[toml]==1.9.4",
+  "homeassistant==2026.8.1",
+  "mypy==2.3.0",
+  "packaging==26.3",
+  "pip-audit==2.10.1",
+  "pip-licenses==5.5.5",
+  "pylint==4.0.6",
+  "pytest==9.0.3",
+  "pytest-asyncio==1.4.0",
+  "pytest-cov==7.1.0",
+  "pytest-homeassistant-custom-component==0.13.355",
+  "pytest-socket==0.8.0",
+  "pytest-xdist==3.8.0",
+]
+
 [tool.pytest.ini_options]
 addopts = [
   "--strict-config",
@@ -22,6 +51,7 @@ branch = true
 source = ["custom_components/fmi"]
 
 [tool.coverage.report]
+fail_under = 95
 show_missing = true
 skip_covered = true
 
@@ -40,3 +70,6 @@ check_untyped_defs = true
 ignore_missing_imports = true
 show_error_codes = true
 warn_unused_configs = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv-lint"]

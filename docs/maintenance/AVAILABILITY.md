@@ -5,6 +5,8 @@
 This policy defines how the integration behaves when one FMI data source is unavailable. It is
 the current source-isolation contract for the supported Home Assistant environment.
 
+Last verified against current code: 2026-08-16.
+
 ## Current conditions and setup
 
 The primary coordinator requests forecast-backed current weather by coordinates. If that request fails or returns no data, it requests an observation by the config entry's place title. Failure includes FMI client/server errors, request-library transport errors, invalid XML/parser output, and malformed external model shapes. The fallback observation becomes the current weather for the primary weather entity and its current-condition sensors; it does not fabricate forecast data.
@@ -31,7 +33,11 @@ A timeout in the primary current/forecast path follows the same stale-data polic
 
 Coordinator entities register only the listener managed by Home Assistant's `CoordinatorEntity` lifecycle. The first entity listener starts periodic refreshes, so an unavailable source can recover without a reload. A later successful refresh restores availability and current/forecast data as applicable. Unload removes entity listeners and the config-entry update listener; reload follows the same independent setup policy.
 
-Source logs are transition-based: one warning when a source becomes unavailable and one informational message when it recovers. Repeated failures in the same outage do not emit the same source warning on every refresh. Cancellation and unrelated exception classes are not caught as source availability events.
+Source logs are transition-based: one warning when a source becomes unavailable and one
+informational message when it recovers. Repeated failures in the same outage do not emit the same
+source warning on every refresh. Primary FMI boundaries classify only their documented exception
+set. Optional boundaries classify any ordinary exception locally so optional failures remain
+isolated; cancellation still propagates.
 
 ## Optional sources
 

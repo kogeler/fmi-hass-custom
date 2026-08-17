@@ -4,9 +4,11 @@
 """Availability and recovery tests for independent FMI data sources."""
 
 import logging
-import xml.etree.ElementTree as ET
+from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import AsyncMock
 
+import pytest
 from fmi_weather_client.errors import ClientError
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import (
@@ -20,7 +22,8 @@ from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from requests.exceptions import RequestException
 
-from custom_components.fmi import FMIDataUpdateCoordinator
+from custom_components import fmi as integration
+from custom_components.fmi import FMIDataUpdateCoordinator, FMIObservationUpdateCoordinator
 from custom_components.fmi import fmi as fmi_client
 from custom_components.fmi.const import (
     CONF_LIGHTNING,
@@ -73,6 +76,24 @@ def _patch_sea_level(monkeypatch, update=None) -> None:
         "_FMIDataUpdateCoordinator__async_update_mareo_data",
         async_update,
     )
+
+
+class _ImmediateDeadline:
+    """Raise the coordinator-wide deadline before any source call starts."""
+
+    async def __aenter__(self):
+        raise TimeoutError("Synthetic coordinator deadline")
+
+    async def __aexit__(self, *_args) -> None:
+        return None
+
+
+def test_observation_coordinator_rejects_missing_station_configuration() -> None:
+    """Fail before creating a coordinator that could never fetch observations."""
+    config_entry = cast(Any, SimpleNamespace(options={}))
+
+    with pytest.raises(AttributeError, match="observation not configured"):
+        FMIObservationUpdateCoordinator(cast(Any, None), cast(Any, None), config_entry)
 
 
 def _entry(
@@ -379,7 +400,7 @@ async def test_malformed_forecast_keeps_current_weather_available(
     _patch_fmi_sources(
         monkeypatch,
         weather=weather,
-        forecast=ET.ParseError("Synthetic malformed forecast XML"),
+        forecast=SyntaxError("Synthetic malformed forecast XML"),
     )
     _patch_sea_level(monkeypatch)
     entry = _entry(hass)
@@ -394,11 +415,11 @@ async def test_malformed_forecast_keeps_current_weather_available(
     assert all(state.state != STATE_UNAVAILABLE for state in hass.states.async_all("weather"))
 
 
-async def test_primary_timeout_clears_stale_data_and_recovers(
+async def test_primary_source_timeout_clears_stale_data_and_recovers(
     hass: HomeAssistant,
     monkeypatch,
 ) -> None:
-    """Clear current data on a core timeout and recover on the next refresh."""
+    """Clear current data on a source timeout and recover on the next refresh."""
     weather = weather_from_fixture("forecast_normal.json")
     forecast = forecast_from_fixture("forecast_normal.json")
     weather_mock = AsyncMock(side_effect=[weather, TimeoutError, weather])
@@ -425,6 +446,82 @@ async def test_primary_timeout_clears_stale_data_and_recovers(
     assert all(state.state != STATE_UNAVAILABLE for state in hass.states.async_all("weather"))
 
 
+async def test_primary_deadline_timeout_clears_stale_data_and_recovers(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Enforce the coordinator-wide deadline and clear stale current data."""
+    weather = weather_from_fixture("forecast_normal.json")
+    forecast = forecast_from_fixture("forecast_normal.json")
+    _patch_fmi_sources(monkeypatch, weather=weather, forecast=forecast)
+    _patch_sea_level(monkeypatch)
+    entry = _entry(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data.coordinator
+    original_timeout = integration.timeout
+    monkeypatch.setattr(integration, "timeout", lambda _seconds: _ImmediateDeadline())
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert not coordinator.last_update_success
+    assert coordinator.get_weather() is None
+    assert coordinator.get_forecasts() == []
+    assert coordinator.source_availability["primary update"] is False
+    assert all(state.state == STATE_UNAVAILABLE for state in hass.states.async_all("weather"))
+
+    monkeypatch.setattr(integration, "timeout", original_timeout)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert coordinator.last_update_success
+    assert coordinator.get_weather() is weather
+    assert coordinator.get_forecasts()
+    assert coordinator.source_availability["primary update"] is True
+
+
+async def test_observation_deadline_timeout_clears_stale_data_and_recovers(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Apply the same hard deadline and recovery contract to station observations."""
+    weather = weather_from_fixture("forecast_normal.json")
+    forecast = forecast_from_fixture("forecast_normal.json")
+    observation = weather_from_fixture("observation.json", "observation")
+    _patch_fmi_sources(
+        monkeypatch,
+        weather=weather,
+        forecast=forecast,
+        station_observation=observation,
+    )
+    _patch_sea_level(monkeypatch)
+    entry = _entry(hass, station_id=101004)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data.observation_coordinator
+    assert coordinator is not None
+    original_timeout = integration.timeout
+    monkeypatch.setattr(integration, "timeout", lambda _seconds: _ImmediateDeadline())
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert not coordinator.last_update_success
+    assert coordinator.get_observation() is None
+    assert coordinator.source_availability["station observation"] is False
+
+    monkeypatch.setattr(integration, "timeout", original_timeout)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert coordinator.last_update_success
+    assert coordinator.get_observation() is observation
+    assert coordinator.source_availability["station observation"] is True
+
+
 async def test_optional_source_failure_does_not_disable_current_weather(
     hass: HomeAssistant,
     monkeypatch,
@@ -435,7 +532,7 @@ async def test_optional_source_failure_does_not_disable_current_weather(
     _patch_fmi_sources(monkeypatch, weather=weather, forecast=forecast)
 
     def fail_sea_level(self) -> None:
-        raise ET.ParseError("Synthetic malformed sea-level payload")
+        raise SyntaxError("Synthetic malformed sea-level payload")
 
     _patch_sea_level(monkeypatch, fail_sea_level)
     entry = _entry(hass)
