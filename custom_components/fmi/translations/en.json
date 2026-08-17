@@ -6,25 +6,57 @@
         },
         "error": {
             "cannot_connect": "Failed to connect",
+            "place_not_found": "FMI could not find forecast data for that place. Try a more specific city or place name.",
+            "place_required": "Enter a city or place name.",
             "unknown": "Unexpected error"
         },
         "step": {
       "user": {
-                "data": {
-                    "latitude": "Latitude",
-                    "longitude": "Longitude",
-                    "name": "Name"
-                },
-        "description": "FMI Configuration Parameters",
-        "title": "Finnish Meteorological Institute"
+        "description": "Choose how to select the forecast location.",
+        "title": "Finnish Meteorological Institute",
+        "menu_options": {
+          "map": "Choose on map",
+          "place": "Search by place name"
+        },
+        "menu_option_descriptions": {
+          "map": "Use the Home location or select another point on the map.",
+          "place": "Ask FMI to resolve a city or place, then confirm it on the map."
+        }
       },
       "reconfigure": {
-        "data": {
-          "latitude": "Latitude",
-          "longitude": "Longitude"
+        "description": "Choose how to move this FMI entry. Existing entities and customized entity IDs are preserved.",
+        "title": "Move FMI location",
+        "menu_options": {
+          "map": "Choose on map",
+          "place": "Search by place name"
         },
-        "description": "Update the coordinates used by this FMI entry. Existing entities and customized entity IDs are preserved.",
-        "title": "Move FMI location"
+        "menu_option_descriptions": {
+          "map": "Select a new point on the map.",
+          "place": "Ask FMI to resolve a city or place, then confirm it on the map."
+        }
+      },
+      "map": {
+        "data": {
+          "location": "Forecast location",
+          "name": "Name"
+        },
+        "description": "Accept the marker to use this point, or move it to another forecast location. FMI validates the selected point before it is saved.",
+        "title": "Choose forecast location on map"
+      },
+      "place": {
+        "data": {
+          "name": "Name",
+          "place": "City or place"
+        },
+        "description": "FMI receives this search text and returns its matching forecast point. You will confirm the result before it is saved.",
+        "title": "Search FMI by place name"
+      },
+      "place_confirm": {
+        "data": {
+          "location": "Forecast location"
+        },
+        "description": "FMI resolved **{place}**. Confirm this point or adjust the marker; the final point is validated again before saving.",
+        "title": "Confirm forecast location"
       }
         }
     },

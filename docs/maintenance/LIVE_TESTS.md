@@ -2,8 +2,8 @@
 
 # Live FMI Tests
 
-Live suite last verified: 2026-08-16 against Home Assistant 2026.8.1 and
-`fmi-weather-client` 1.0.0. FMI WFS documentation/metadata last reviewed: 2026-08-08.
+Live suite last verified: 2026-08-17 against Home Assistant 2026.8.1 and
+`fmi-weather-client` 1.0.0. FMI WFS documentation/metadata last reviewed: 2026-08-17.
 
 ## Purpose And Selection
 
@@ -13,7 +13,7 @@ The public locations are deliberately unrelated to the repository owner's Home A
 
 | Probe | Public identifier | Reason |
 |---|---|---|
-| Southern forecast | Helsinki, `60.17,24.94` | Rounded city-centre coordinates provide a stable southern Finland point inside the edited Scandinavia forecast domain. |
+| Place resolution and final coordinate validation | Helsinki | A public city name exercises FMI's place-name boundary; the resolved point is checked only against a broad northern-European bound before normal coordinate validation. |
 | Northern forecast | Kilpisjarvi, `69.05,20.79` | Rounded public station-area coordinates exercise high-latitude output near Finland's north-western boundary. FMI's current station table lists Enontekio Kilpisjarvi as an operative weather station at approximately `69.0,20.8`. |
 | Observation | Helsinki Kumpula, `FMISID 101004` | FMI publishes the station identifier and meteorological role; the selected client returns current observations for this public station. |
 
@@ -51,18 +51,19 @@ All calls use `https://opendata.fmi.fi/wfs`, WFS 2.0 `GetFeature`, and the insta
 
 | Level | Stored query | Nominal requests | Maximum |
 |---|---|---:|---:|
-| Dependency forecasts, south and north | `fmi::forecast::edited::weather::scandinavia::point::multipointcoverage` | 2 | 4 |
+| Dependency place resolution and resolved-coordinate validation | `fmi::forecast::edited::weather::scandinavia::point::multipointcoverage` | 2 | 4 |
+| Dependency northern forecast | `fmi::forecast::edited::weather::scandinavia::point::multipointcoverage` | 1 | 2 |
 | Dependency station observation | `fmi::observations::weather::multipointcoverage` | 1 | 2 |
 | Home Assistant current, hourly forecast, and station observation | Both queries above | 3 | 4 |
-| Total | - | 6 | 10 |
+| Total | - | 7 | 12 |
 
-Each dependency call retries once, after one second, only for timeout, transport, or FMI server errors. Client/request and parsing/shape errors are not retried. The Home Assistant probe uses the integration's 40-second coordinator bound and performs no test-level retry. It suppresses the unrelated optional sea-level request and permits at most one place-observation fallback, while retaining real forecast/current/station calls and their normal parsers. All xdist workers share a file-locked counter and two-slot semaphore in the container's `/tmp`; every real attempt reserves before I/O, and attempt eleven fails locally without contacting FMI.
+Each dependency call retries once, after one second, only for timeout, transport, or FMI server errors. Client/request and parsing/shape errors are not retried. The Home Assistant probe uses the integration's 40-second coordinator bound and performs no test-level retry. It suppresses the unrelated optional sea-level request and permits at most one place-observation fallback, while retaining real forecast/current/station calls and their normal parsers. All xdist workers share a file-locked counter and two-slot semaphore in the container's `/tmp`; every real attempt reserves before I/O, and attempt thirteen fails locally without contacting FMI.
 
-FMI currently publishes limits of 20,000 Download Service requests per day and 600 combined Download/View requests per five minutes. The ten-request worst case is 0.05% of the daily Download limit and about 1.67% of the short-window combined limit. Automatic xdist is required, but its worker count never changes the shared ten-attempt/two-concurrent-request bounds. Never add unbounded parameterization, response polling, or automatic retry plugins.
+FMI currently publishes limits of 20,000 Download Service requests per day and 600 combined Download/View requests per five minutes. The twelve-request worst case is 0.06% of the daily Download limit and 2% of the short-window combined limit. Automatic xdist is required, but its worker count never changes the shared twelve-attempt/two-concurrent-request bounds. Never add unbounded parameterization, response polling, or automatic retry plugins.
 
 ## Assertions
 
-The dependency probe requires a non-empty place and series, aware strictly ordered timestamps, at least one usable core meteorological value, broad physical plausibility for finite values, and an observation no more than 45 minutes old. The selected client requests a 20-minute observation window at a 10-minute timestep, and the integration refreshes station data every 10 minutes; the 45-minute bound adds service/clock margin without accepting materially stale dashboard data. FMI/client `NaN` missing sentinels are treated as absent; infinity, non-numeric present values, and out-of-range finite values are contract failures.
+The dependency probes require a non-empty canonical place, a resolved point inside a broad northern-European bound, non-empty forecast series, aware strictly ordered timestamps, at least one usable core meteorological value, broad physical plausibility for finite values, and an observation no more than 45 minutes old. The resolved point is validated through the same coordinate-weather boundary used by the config flow; no exact external label or coordinates are asserted. The selected client requests a 20-minute observation window at a 10-minute timestep, and the integration refreshes station data every 10 minutes; the 45-minute bound adds service/clock margin without accepting materially stale dashboard data. FMI/client `NaN` missing sentinels are treated as absent; infinity, non-numeric present values, and out-of-range finite values are contract failures.
 
 The Home Assistant probe additionally requires:
 
@@ -93,11 +94,11 @@ failure classification above and re-run once before diagnosing an integration re
 
 ## Licence, Attribution, And Privacy
 
-FMI open data is licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). Runtime entities retain the attribution `Weather Data provided by FMI`. Tests store no response payload or weather values as artifacts; logs may contain only the three public identifiers above, query parameters, classifications, and normal pytest diagnostics. Never substitute owner coordinates, secrets, private station choices, Home Assistant storage, or captured owner data.
+FMI open data is licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). Runtime entities retain the attribution `Weather Data provided by FMI`. Tests store no response payload or weather values as artifacts; logs may contain only the public identifiers above, failure classifications, and normal pytest diagnostics, never query parameters or response bodies. Never substitute owner coordinates, secrets, private station choices, Home Assistant storage, or captured owner data.
 
 ## Authoritative Sources
 
-Accessed 2026-07-31:
+Accessed 2026-08-17:
 
 - FMI WFS service, stored-query discovery, terms, and limits: <https://en.ilmatieteenlaitos.fi/open-data-manual-fmi-wfs-services>
 - FMI stored-query examples and parameter guidance: <https://en.ilmatieteenlaitos.fi/open-data-manual-wfs-examples-and-guidelines>

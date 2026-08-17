@@ -23,7 +23,8 @@ integration, not as an official Home Assistant Core integration.
   installation floor remains the value in `hacs.json` until a real integration incompatibility
   requires raising it.
 - Changing Home Assistant's Home zone does not move an entry automatically. Use the integration's
-  **Reconfigure** action to change coordinates.
+  **Reconfigure** action to choose a new map point or search FMI by place name and confirm the
+  result on the map.
 - Lightning is opt-in and its address enrichment uses the public Nominatim service. This is
   accepted only for small private deployments until the tracked provider limitation is resolved.
 - Station observations require a valid FMI station ID. Sea-level and lightning sensors can be

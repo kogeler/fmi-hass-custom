@@ -33,6 +33,7 @@ CONF_LIGHTNING_DISTANCE = "lightning_radius"
 CONF_LIGHTNING_MAX_AGE = "lightning_max_age_minutes"
 CONF_OBSERVATION_STATION = "observation_station_id"
 CONF_ENTITY_IDENTITY = "entity_identity"
+CONF_PLACE_QUERY = "place"
 
 HUMIDITY_RANGE = list(range(1, 101))
 HUMIDITY_MIN_DEFAULT = 30

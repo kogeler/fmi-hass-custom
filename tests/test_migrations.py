@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, STATE_UNAVAILABLE
+from homeassistant.const import CONF_LATITUDE, CONF_LOCATION, CONF_LONGITUDE, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr
@@ -20,7 +20,12 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.fmi import FMIDataUpdateCoordinator, async_migrate_entry
 from custom_components.fmi import fmi as fmi_client
-from custom_components.fmi.const import CONF_DAILY_MODE, CONF_ENTITY_IDENTITY, DOMAIN
+from custom_components.fmi.const import (
+    CONF_DAILY_MODE,
+    CONF_ENTITY_IDENTITY,
+    CONF_PLACE_QUERY,
+    DOMAIN,
+)
 from tests.helpers.fmi import forecast_from_fixture, load_json_fixture, weather_from_fixture
 
 
@@ -392,7 +397,20 @@ async def test_duplicate_coordinate_policy_is_stable_across_migration(
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
             context={"source": config_entries.SOURCE_USER},
-            data={"name": "FMI", "latitude": 60.17, "longitude": 24.94},
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {"next_step_id": "map"},
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                "name": "FMI",
+                CONF_LOCATION: {
+                    CONF_LATITUDE: 60.17,
+                    CONF_LONGITUDE: 24.94,
+                },
+            },
         )
         assert result["type"] is FlowResultType.ABORT
         assert result["reason"] == "already_configured"
@@ -407,9 +425,15 @@ async def test_reconfigure_after_migration_preserves_all_registry_identity(
     """Move a migrated entry without recreating legacy, custom, weather, or daily records."""
     snapshot = _create_v062_snapshot(hass)
     _patch_sources(monkeypatch, include_oulu=True)
+    monkeypatch.setattr(
+        fmi_client,
+        "async_resolve_place",
+        AsyncMock(return_value=fmi_client.PlaceResolution("Oulu", 65.01, 25.47)),
+    )
     await _setup_snapshot(hass, snapshot)
     entry = snapshot.entries["helsinki"]
     original_identity = entry.data[CONF_ENTITY_IDENTITY]
+    original_options = dict(entry.options)
     original_records = _registry_records(hass, snapshot)
     original_device_id = snapshot.devices["helsinki"].id
 
@@ -422,7 +446,16 @@ async def test_reconfigure_after_migration_preserves_all_registry_identity(
     )
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
-        {CONF_LATITUDE: 65.01, CONF_LONGITUDE: 25.47},
+        {"next_step_id": "place"},
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_PLACE_QUERY: "Oulu"},
+    )
+    assert result["step_id"] == "place_confirm"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_LOCATION: {CONF_LATITUDE: 65.01, CONF_LONGITUDE: 25.47}},
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
@@ -432,6 +465,7 @@ async def test_reconfigure_after_migration_preserves_all_registry_identity(
     assert entry.data[CONF_LATITUDE] == 65.01
     assert entry.data[CONF_LONGITUDE] == 25.47
     assert entry.title == "Oulu"
+    assert dict(entry.options) == original_options
     assert _registry_records(hass, snapshot) == original_records
     device = dr.async_get(hass).async_get(original_device_id)
     assert device is not None and device.name == "Oulu"

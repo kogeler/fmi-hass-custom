@@ -43,9 +43,10 @@ defined in `RUNTIME.md`.
 
 ## Data And Privacy Boundaries
 
-- FMI necessarily receives configured coordinates for setup validation, current/forecast,
-  lightning-area, and sea-level requests. Responses are processed in memory and are not copied to
-  diagnostics.
+- FMI necessarily receives either place-search text during the optional setup/reconfigure search
+  path or configured coordinates for final setup validation, current/forecast, lightning-area,
+  and sea-level requests. Search text is transient and is not stored in the config entry, logs, or
+  diagnostics. Responses are processed in memory and are not copied to diagnostics.
 - When lightning is enabled, Nominatim receives only a selected public FMI strike coordinate on a
   cache miss, never the configured home coordinate. The returned address may be shown as the
   lightning sensor value; raw strike coordinates are its documented fallback.
@@ -56,7 +57,8 @@ defined in `RUNTIME.md`.
   place/weather values, external payloads, entry IDs, unique IDs, and legacy coordinate identity.
 - Entity states intentionally expose configured place and weather data to the Home Assistant user;
   that user-facing behavior is distinct from logs and downloadable diagnostics.
-- Integration-owned external FMI XML is parsed with `xmltodict==1.0.4` on Expat 2.7.2 or newer,
+- Integration-owned external FMI XML, including place-resolution responses, is parsed with
+  `xmltodict==1.0.4` on Expat 2.7.2 or newer,
   with entity declarations explicitly disabled and a 2 MiB parser-input ceiling. Expat has no
   external-resource handler in this path, so an external DTD declaration is inert rather than
   loaded. Optional-source HTTP payloads retain the same 2 MiB streaming limit and parsing remains

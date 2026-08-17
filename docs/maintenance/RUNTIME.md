@@ -8,7 +8,7 @@ and runtime side effects. Read it before changing `custom_components/fmi/__init_
 PEP 621 metadata and `requirements-dev.txt`; `hacs.json` independently declares the installation
 floor. Keep historical investigation outside this current contract.
 
-Last verified against current code: 2026-08-16.
+Last verified against current code: 2026-08-17.
 
 ## Entry Ownership And Lifecycle
 
@@ -29,6 +29,9 @@ Last verified against current code: 2026-08-16.
 - Coordinate current/forecast work in the synchronous FMI client runs outside the event loop
   through `asyncio.to_thread`, including forecast XML parsing. Observation helpers use the
   client's executor-backed async API.
+- Setup/reconfigure place resolution uses the selected client's ten-second request and parser
+  semantics inside `asyncio.to_thread`, after the response passes the same entity-disabled 2 MiB
+  XML boundary as coordinate forecasts.
 - Integration-owned lightning and sea-level HTTP uses Home Assistant's shared aiohttp session.
   Their XML parsing and Nominatim reverse geocoding run through `async_add_executor_job`.
 - Cancellation must propagate. Primary FMI/dependency parsing boundaries catch the documented
@@ -58,9 +61,10 @@ Transition logging should report an outage and recovery once, not on every poll.
 - Empty results and `None` are no-data failures. Numeric boundaries accept finite values and reject
   booleans, malformed strings, NaN, and infinities without fabricating zeroes.
 - FMI dependency requests use the client's ten-second HTTP timeout inside the 40-second primary
-  coordinator bound. Integration-owned optional FMI HTTP uses 2-second connect, 3-second read, and
-  5-second total timeouts plus a 2 MiB response limit. Nominatim reverse geocoding has its own
-  three-second timeout.
+  coordinator bound; transient setup place lookup uses the same ten-second request timeout.
+  Integration-owned optional FMI HTTP uses 2-second connect, 3-second read, and 5-second total
+  timeouts plus a 2 MiB response limit. Nominatim reverse geocoding has its own three-second
+  timeout.
 - Runtime refreshes add no retry loop. A normal primary refresh makes one current request, one
   hourly forecast request, and one sea-level request. Place observation is requested only after a
   current failure. A station adds one request on its independent cadence. Enabled lightning adds
@@ -73,8 +77,8 @@ Transition logging should report an outage and recovery once, not on every poll.
 The integration must not configure the process-wide root logger. Logs may contain source names,
 availability transitions, HTTP status classes, and exception class names, but not configured
 coordinates, coordinate-derived identity, raw FMI/XML responses, or arbitrary external exception
-text. The FMI dependency logger filter must continue to remove coordinate-bearing request records
-and raw parser payloads.
+text. Place-search text has the same protection. The FMI dependency logger filter must continue to
+remove query/coordinate-bearing request records and raw parser payloads.
 
 Diagnostics expose only sanitized configuration/options, config version, poll cadence, coordinator
 success, and source availability flags. They must not expose coordinates, place/weather values,
@@ -91,7 +95,7 @@ privacy boundary.
   optional HTTP bounds, and polar bounding boxes.
 - `tests/test_auxiliary_payloads.py`: bounded entity-disabled optional-source XML parsing,
   timestamps, freshness, and failures.
-- `tests/test_fmi_contract.py`: bounded entity-disabled forecast-gust XML parsing and adapter
+- `tests/test_fmi_contract.py`: bounded entity-disabled forecast/place XML parsing and adapter
   request semantics.
 - `tests/test_xml_parser.py`: Expat version floor, entity rejection, inert external DTD behavior,
   byte limits, namespaces, and parser result-shape validation.

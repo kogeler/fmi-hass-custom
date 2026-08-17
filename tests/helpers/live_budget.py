@@ -13,7 +13,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-MAX_LIVE_REQUESTS = 10
+MAX_LIVE_REQUESTS = 12
 MAX_CONCURRENT_REQUESTS = 2
 
 

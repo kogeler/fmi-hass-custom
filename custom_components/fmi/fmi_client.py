@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -23,6 +24,15 @@ from .xml_parser import (
 )
 
 FORECAST_GUST_PARAMETER = "HourlyMaximumGust"
+
+
+@dataclass(frozen=True, slots=True)
+class PlaceResolution:
+    """Validated location fields needed by the config flow."""
+
+    place: str
+    latitude: float
+    longitude: float
 
 
 class _UpstreamPrivacyFilter(logging.Filter):
@@ -70,6 +80,38 @@ async def async_observation_by_station_id(station_id: int) -> models.Weather | N
     """Call the upstream station observation only on a safe XML runtime."""
     ensure_safe_expat()
     return await upstream.async_observation_by_station_id(station_id)
+
+
+def _place_coordinate(value: Any, *, minimum: float, maximum: float) -> float:
+    """Validate one coordinate returned by the selected FMI client."""
+    if isinstance(value, bool):
+        raise TypeError("FMI place coordinate must be numeric")
+    number = float(value)
+    if not math.isfinite(number) or not minimum <= number <= maximum:
+        raise ValueError("FMI place coordinate is outside WGS84")
+    return number
+
+
+def _resolve_place(place: str) -> PlaceResolution | None:
+    """Resolve one name after bounding XML before the selected parser runs."""
+    body = upstream.http.request_weather_by_place(place)
+    parse_xml_document(body)
+    forecast = upstream.forecast_parser.parse_fmi_response(body, models.RequestType.WEATHER)
+    if not forecast.forecasts:
+        return None
+    canonical_place = forecast.place
+    if not isinstance(canonical_place, str) or not (canonical_place := canonical_place.strip()):
+        raise ValueError("FMI place result has no canonical name")
+    return PlaceResolution(
+        place=canonical_place,
+        latitude=_place_coordinate(forecast.lat, minimum=-90, maximum=90),
+        longitude=_place_coordinate(forecast.lon, minimum=-180, maximum=180),
+    )
+
+
+async def async_resolve_place(place: str) -> PlaceResolution | None:
+    """Resolve a place with bounded parsing outside the event loop."""
+    return await asyncio.to_thread(_resolve_place, place)
 
 
 def _finite_number(value: Any) -> float | None:

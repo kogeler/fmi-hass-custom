@@ -90,7 +90,7 @@ Every pytest path uses pytest-xdist with `PYTEST_WORKERS=auto` by default and
 `--dist=worksteal`, including offline, network-block, live, and moving compatibility runs. Xdist
 derives the automatic count from the CPU resources visible inside the container. An explicit
 `PYTEST_WORKERS=<N>` is diagnostic only; do not introduce a serial default or a special serial
-suite. Live workers share one cross-process ten-attempt budget and two-request semaphore. Make
+suite. Live workers share one cross-process twelve-attempt budget and two-request semaphore. Make
 serializes its target graph even if invoked with `-j`; test parallelism belongs inside xdist, not
 across competing toolbox containers and shared artifacts.
 

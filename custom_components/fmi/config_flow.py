@@ -5,15 +5,19 @@
 
 from __future__ import annotations
 
+import math
+from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
+from xml.parsers.expat import ExpatError
 
 import voluptuous as vol
 from fmi_weather_client.errors import ClientError, ServerError
 from homeassistant import config_entries
-from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME, CONF_OFFSET
+from homeassistant.const import CONF_LATITUDE, CONF_LOCATION, CONF_LONGITUDE, CONF_NAME, CONF_OFFSET
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.selector import LocationSelector, TextSelector
 from requests.exceptions import RequestException
 
 from . import const
@@ -28,6 +32,24 @@ class InvalidFMIResponseError(Exception):
     """Report an unexpected but recognized FMI response failure."""
 
 
+class _ValidatedLocationSelector(LocationSelector):
+    """Retain the standard map UI while enforcing a finite WGS84 point."""
+
+    def __call__(self, data: Any) -> dict[str, float]:
+        if isinstance(data, Mapping) and any(
+            isinstance(data.get(key), bool) for key in (CONF_LATITUDE, CONF_LONGITUDE)
+        ):
+            raise vol.Invalid("location coordinates must be numbers")
+        location = super().__call__(data)
+        latitude = location[CONF_LATITUDE]
+        longitude = location[CONF_LONGITUDE]
+        if not math.isfinite(latitude) or not -90 <= latitude <= 90:
+            raise vol.Invalid("latitude must be finite and between -90 and 90")
+        if not math.isfinite(longitude) or not -180 <= longitude <= 180:
+            raise vol.Invalid("longitude must be finite and between -180 and 180")
+        return location
+
+
 async def validate_user_config(data: dict[str, Any]) -> str:
     """Validate coordinates with the same asynchronous FMI boundary as runtime."""
     try:
@@ -39,6 +61,8 @@ async def validate_user_config(data: dict[str, Any]) -> str:
         raise CannotConnectError from error
     except (
         AttributeError,
+        ExpatError,
+        IndexError,
         KeyError,
         OverflowError,
         SyntaxError,
@@ -48,7 +72,10 @@ async def validate_user_config(data: dict[str, Any]) -> str:
         raise InvalidFMIResponseError from error
     if weather is None:
         raise CannotConnectError
-    return weather.place
+    place = weather.place
+    if not isinstance(place, str) or not (place := place.strip()):
+        raise InvalidFMIResponseError
+    return place
 
 
 def _same_location(entry: config_entries.ConfigEntry, data: dict[str, Any]) -> bool:
@@ -77,12 +104,42 @@ def _location_schema(
     *,
     include_name: bool,
 ) -> vol.Schema:
-    """Build the setup or reconfigure coordinate form."""
+    """Build the setup or reconfigure standard-map form."""
     fields: dict[vol.Marker, Any] = {}
     if include_name:
         fields[vol.Required(CONF_NAME, default=const.DEFAULT_NAME)] = str
-    fields[vol.Required(CONF_LATITUDE, default=latitude)] = cv.latitude
-    fields[vol.Required(CONF_LONGITUDE, default=longitude)] = cv.longitude
+    fields[
+        vol.Required(
+            CONF_LOCATION,
+            default={CONF_LATITUDE: latitude, CONF_LONGITUDE: longitude},
+        )
+    ] = _ValidatedLocationSelector()
+    return vol.Schema(fields)
+
+
+def _coordinate_data(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Flatten transient selector data into the existing stored-data shape."""
+    location = user_input[CONF_LOCATION]
+    data = {
+        CONF_LATITUDE: location[CONF_LATITUDE],
+        CONF_LONGITUDE: location[CONF_LONGITUDE],
+    }
+    if CONF_NAME in user_input:
+        data[CONF_NAME] = user_input[CONF_NAME]
+    return data
+
+
+def _place_schema(
+    *,
+    include_name: bool,
+    name: str = const.DEFAULT_NAME,
+    place: str = "",
+) -> vol.Schema:
+    """Build a transient FMI place-name form."""
+    fields: dict[vol.Marker, Any] = {}
+    if include_name:
+        fields[vol.Required(CONF_NAME, default=name)] = str
+    fields[vol.Required(const.CONF_PLACE_QUERY, default=place)] = TextSelector()
     return vol.Schema(fields)
 
 
@@ -91,38 +148,44 @@ class FMIConfigFlowHandler(config_entries.ConfigFlow, domain=const.DOMAIN):
 
     VERSION = const.CONFIG_ENTRY_VERSION
     CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
+    _pending_name: str | None = None
+    _place_resolution: fmi.PlaceResolution
 
     async def async_step_user(
         self,
         user_input: dict[str, Any] | None = None,
     ) -> config_entries.ConfigFlowResult:
-        """Create an FMI entry for a validated unique location."""
+        """Offer the two complete location-selection paths."""
+        _ = user_input
+        return self.async_show_menu(
+            step_id="user",
+            menu_options=["map", "place"],
+        )
+
+    async def async_step_map(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> config_entries.ConfigFlowResult:
+        """Create or move an FMI entry from the standard location selector."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            if _location_is_configured(self.hass, user_input):
-                return self.async_abort(reason="already_configured")
-            try:
-                place = await validate_user_config(user_input)
-            except CannotConnectError:
-                errors["base"] = "cannot_connect"
-            except InvalidFMIResponseError:
-                const.LOGGER.error("Unexpected response validating an FMI location")
-                errors["base"] = "unknown"
-            else:
-                if _location_is_configured(self.hass, user_input):
-                    return self.async_abort(reason="already_configured")
-                identity = f"fmi:{uuid4().hex}"
-                await self.async_set_unique_id(identity)
-                entry_data = dict(user_input)
-                entry_data[const.CONF_ENTITY_IDENTITY] = identity
-                return self.async_create_entry(title=place, data=entry_data)
+            result, errors = await self._async_finish_location(user_input)
+            if result is not None:
+                return result
 
+        if self.source == config_entries.SOURCE_RECONFIGURE:
+            entry = self._get_reconfigure_entry()
+            latitude = entry.data[CONF_LATITUDE]
+            longitude = entry.data[CONF_LONGITUDE]
+        else:
+            latitude = self.hass.config.latitude
+            longitude = self.hass.config.longitude
         return self.async_show_form(
-            step_id="user",
+            step_id="map",
             data_schema=_location_schema(
-                self.hass.config.latitude,
-                self.hass.config.longitude,
-                include_name=True,
+                latitude,
+                longitude,
+                include_name=self.source != config_entries.SOURCE_RECONFIGURE,
             ),
             errors=errors,
         )
@@ -131,42 +194,139 @@ class FMIConfigFlowHandler(config_entries.ConfigFlow, domain=const.DOMAIN):
         self,
         user_input: dict[str, Any] | None = None,
     ) -> config_entries.ConfigFlowResult:
-        """Move an existing entry while retaining its immutable identity."""
-        entry = self._get_reconfigure_entry()
+        """Offer both paths while retaining the selected entry's identity."""
+        _ = user_input
+        return self.async_show_menu(
+            step_id="reconfigure",
+            menu_options=["map", "place"],
+        )
+
+    async def async_step_place(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> config_entries.ConfigFlowResult:
+        """Resolve a free-text place through FMI before map confirmation."""
         errors: dict[str, str] = {}
+        name = const.DEFAULT_NAME
+        place_query = ""
         if user_input is not None:
-            if _location_is_configured(
-                self.hass,
-                user_input,
-                exclude_entry_id=entry.entry_id,
-            ):
-                return self.async_abort(reason="already_configured")
-            try:
-                place = await validate_user_config(user_input)
-            except CannotConnectError:
-                errors["base"] = "cannot_connect"
-            except InvalidFMIResponseError:
-                const.LOGGER.error("Unexpected response validating an FMI location")
-                errors["base"] = "unknown"
+            if CONF_NAME in user_input:
+                name = user_input[CONF_NAME]
+            place_query = user_input[const.CONF_PLACE_QUERY].strip()
+            if not place_query:
+                errors[const.CONF_PLACE_QUERY] = "place_required"
             else:
-                return self.async_update_and_abort(
-                    entry,
-                    title=place,
-                    data_updates={
-                        CONF_LATITUDE: user_input[CONF_LATITUDE],
-                        CONF_LONGITUDE: user_input[CONF_LONGITUDE],
-                    },
-                )
+                try:
+                    resolution = await fmi.async_resolve_place(place_query)
+                except ClientError:
+                    errors["base"] = "place_not_found"
+                except RequestException, ServerError:
+                    errors["base"] = "cannot_connect"
+                except (
+                    AttributeError,
+                    ExpatError,
+                    IndexError,
+                    KeyError,
+                    OverflowError,
+                    SyntaxError,
+                    TypeError,
+                    ValueError,
+                ):
+                    const.LOGGER.error("Unexpected response resolving an FMI place")
+                    errors["base"] = "unknown"
+                else:
+                    if resolution is None:
+                        errors["base"] = "place_not_found"
+                    else:
+                        self._pending_name = name
+                        self._place_resolution = resolution
+                        return await self.async_step_place_confirm()
 
         return self.async_show_form(
-            step_id="reconfigure",
-            data_schema=_location_schema(
-                entry.data[CONF_LATITUDE],
-                entry.data[CONF_LONGITUDE],
-                include_name=False,
+            step_id="place",
+            data_schema=_place_schema(
+                include_name=self.source != config_entries.SOURCE_RECONFIGURE,
+                name=name,
+                place=place_query,
             ),
             errors=errors,
         )
+
+    async def async_step_place_confirm(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> config_entries.ConfigFlowResult:
+        """Confirm or adjust an FMI-resolved point before the common write boundary."""
+        resolution = self._place_resolution
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            final_input = dict(user_input)
+            if self.source != config_entries.SOURCE_RECONFIGURE:
+                final_input[CONF_NAME] = self._pending_name or const.DEFAULT_NAME
+            result, errors = await self._async_finish_location(final_input)
+            if result is not None:
+                return result
+
+        return self.async_show_form(
+            step_id="place_confirm",
+            data_schema=_location_schema(
+                resolution.latitude,
+                resolution.longitude,
+                include_name=False,
+            ),
+            errors=errors,
+            description_placeholders={"place": resolution.place},
+        )
+
+    async def _async_finish_location(
+        self,
+        user_input: dict[str, Any],
+    ) -> tuple[config_entries.ConfigFlowResult | None, dict[str, str]]:
+        """Validate and persist one normalized final point for either path."""
+        data = _coordinate_data(user_input)
+        entry = (
+            self._get_reconfigure_entry()
+            if self.source == config_entries.SOURCE_RECONFIGURE
+            else None
+        )
+        exclude_entry_id = entry.entry_id if entry is not None else None
+        if _location_is_configured(
+            self.hass,
+            data,
+            exclude_entry_id=exclude_entry_id,
+        ):
+            return self.async_abort(reason="already_configured"), {}
+        try:
+            place = await validate_user_config(data)
+        except CannotConnectError:
+            return None, {"base": "cannot_connect"}
+        except InvalidFMIResponseError:
+            const.LOGGER.error("Unexpected response validating an FMI location")
+            return None, {"base": "unknown"}
+        if _location_is_configured(
+            self.hass,
+            data,
+            exclude_entry_id=exclude_entry_id,
+        ):
+            return self.async_abort(reason="already_configured"), {}
+        if entry is not None:
+            return (
+                self.async_update_and_abort(
+                    entry,
+                    title=place,
+                    data_updates={
+                        CONF_LATITUDE: data[CONF_LATITUDE],
+                        CONF_LONGITUDE: data[CONF_LONGITUDE],
+                    },
+                ),
+                {},
+            )
+
+        identity = f"fmi:{uuid4().hex}"
+        await self.async_set_unique_id(identity)
+        entry_data = dict(data)
+        entry_data[const.CONF_ENTITY_IDENTITY] = identity
+        return self.async_create_entry(title=place, data=entry_data), {}
 
     @staticmethod
     @callback

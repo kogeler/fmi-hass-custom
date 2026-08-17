@@ -271,10 +271,10 @@ live: toolbox-image
 			[[ "$$count" =~ ^[0-9]+$$ ]] || { \
 				printf "invalid live FMI request counter: %s\\n" "$$count" >&2; exit 1; \
 			}; \
-			(( count <= 10 )) || { \
-				printf "live FMI request budget exceeded: %s > 10\\n" "$$count" >&2; exit 1; \
+			(( count <= 12 )) || { \
+				printf "live FMI request budget exceeded: %s > 12\\n" "$$count" >&2; exit 1; \
 			}; \
-			printf "live FMI request attempts: %s/10\\n" "$$count"; \
+			printf "live FMI request attempts: %s/12\\n" "$$count"; \
 			exit $$status'
 
 compatibility-stable: lock-image

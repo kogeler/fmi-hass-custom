@@ -129,17 +129,33 @@ async def _live_call[T](label: str, operation: Callable[[], Awaitable[T]]) -> T:
     raise AssertionError("unreachable live retry state")
 
 
-@pytest.mark.parametrize(
-    ("label", "latitude", "longitude"),
-    [SOUTHERN_LOCATION, NORTHERN_LOCATION],
-    ids=["southern-helsinki", "northern-kilpisjarvi"],
-)
-async def test_dependency_forecast_contract(
-    label: str,
-    latitude: float,
-    longitude: float,
-) -> None:
-    """Detect installed-client or WFS drift at southern and northern points."""
+async def test_dependency_place_resolution_contract() -> None:
+    """Resolve a public name and validate its point through the production boundary."""
+    resolution = await _live_call(
+        "Helsinki place resolution",
+        lambda: fmi_client.async_resolve_place(SOUTHERN_LOCATION[0]),
+    )
+    if resolution is None:
+        raise LiveContractError("Helsinki place resolution returned no forecast point")
+    if not 55 <= resolution.latitude <= 75 or not 5 <= resolution.longitude <= 35:
+        raise LiveContractError("Helsinki place resolution returned a point outside the region")
+    current = await _live_call(
+        "resolved Helsinki coordinate validation",
+        lambda: fmi_client.async_weather_by_coordinates(
+            resolution.latitude,
+            resolution.longitude,
+        ),
+    )
+    validate_model_weather(
+        current,
+        "resolved Helsinki coordinate validation",
+        max_age=timedelta(hours=2),
+    )
+
+
+async def test_dependency_northern_forecast_contract() -> None:
+    """Detect installed-client or WFS drift at a northern public point."""
+    label, latitude, longitude = NORTHERN_LOCATION
     forecast = await _live_call(
         f"{label} forecast",
         lambda: fmi_client.async_forecast_by_coordinates(latitude, longitude, 1, 48),

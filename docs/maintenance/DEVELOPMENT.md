@@ -119,7 +119,7 @@ returns XML, Markdown, and total reports through the entrypoint's explicit expor
 ignored `.artifacts/`.
 
 Live tests also use automatic workers. A file-locked counter and two-slot semaphore under the
-container's shared `/tmp` preserve the global ten-attempt budget. Compatibility creates disposable
+container's shared `/tmp` preserve the global twelve-attempt budget. Compatibility creates disposable
 resolver/runner virtual environments only inside the resolver container and derives its unpinned
 package names from root PEP 621 metadata.
 

@@ -2,15 +2,21 @@
 
 # Location Reconfiguration and Identity
 
-Last verified against current code: 2026-08-16.
+Last verified against current code: 2026-08-17.
 
 ## User behavior
 
-An existing FMI entry can be moved from its Home Assistant integration menu by choosing **Reconfigure** and entering a new latitude and longitude.
+An existing FMI entry can be moved from its Home Assistant integration menu by choosing
+**Reconfigure**, then either:
+
+- select a point with Home Assistant's standard location map, whose marker starts at the entry's
+  stored point rather than the current Home zone; or
+- send a city or place name to FMI, review FMI's resolved point on the same map, and confirm or
+  adjust the marker.
 
 The flow:
 
-1. applies Home Assistant's latitude and longitude validation;
+1. validates the selector mapping as finite WGS84 latitude and longitude;
 2. rejects coordinates already used by another FMI entry;
 3. asks FMI for current weather at the proposed location;
 4. changes nothing when FMI validation fails;
@@ -19,7 +25,9 @@ The flow:
 
 Entity IDs and unique IDs are retained, including customized entity IDs used by automations and dashboards. Device and entity display context updates to the newly resolved FMI place after reload.
 
-Dynamic tracking of Home zone coordinates is intentionally not implemented. It would add a separate subscription and migration lifecycle without being necessary for safe location reconfiguration. Users can run Reconfigure when their location changes.
+Dynamic tracking of Home zone coordinates is intentionally not implemented. It would add a
+separate subscription and migration lifecycle without being necessary for safe location
+reconfiguration. Users can run Reconfigure and select the new point when their location changes.
 
 ## Identity model
 
@@ -41,11 +49,14 @@ rules are in `MIGRATIONS.md`.
 ## Failure and privacy rules
 
 - FMI client/server errors produce a translated connection error and leave the entry unchanged.
+- A place lookup with no matching forecast data stays on the translated search form. The search
+  result never changes the entry until its map point passes final coordinate validation.
 - Unexpected validation failures produce a translated generic error and are logged without coordinates.
 - The flow uses the same asynchronous, contract-tested FMI adapter as runtime setup.
-- Exact coordinates are not placed in validation log messages.
+- Place search text and exact coordinates are not placed in validation log messages or persisted
+  as flow-mode metadata.
 
 ## Authoritative references
 
-- Home Assistant, "Integrations should have a reconfigure flow": <https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/reconfiguration-flow/> (accessed 2026-07-31)
-- Home Assistant, "Config flow": <https://developers.home-assistant.io/docs/core/integration/config_flow/> (accessed 2026-07-31)
+- Home Assistant, "Integrations should have a reconfigure flow": <https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/reconfiguration-flow/> (accessed 2026-08-17)
+- Home Assistant, "Config flow": <https://developers.home-assistant.io/docs/core/integration/config_flow/> (accessed 2026-08-17)

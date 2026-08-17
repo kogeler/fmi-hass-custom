@@ -14,8 +14,9 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Replaced raw latitude/longitude setup and reconfiguration fields with a choice between Home Assistant's standard location map and FMI place-name search followed by explicit map confirmation, while preserving the existing stored coordinates and stable identity model.
 - Moved all direct Python dependencies to PEP 621 metadata and replaced the legacy requirement inputs with three generated SHA-256 hash locks for runtime review, the container toolbox, and host-only Ruff.
-- Made every offline, network-block, live FMI, and moving-compatibility pytest run use automatic xdist workers while preserving one shared ten-request live budget.
+- Made every offline, network-block, live FMI, and moving-compatibility pytest run use automatic xdist workers while preserving one shared twelve-request live budget.
 - Serialized Make orchestration around shared locks, images, and reports; made failed exports return an atomic empty archive; and prevented partial coverage output from being published as a completed report.
 - Consolidated read-only GitHub checks into one reusable CI workflow, retained isolated PR metadata and release write boundaries, and aligned Dependabot with the pip and GitHub Actions manifests.
 - Updated the reproducible development and test reference to Home Assistant 2026.8.1 with its matching test helper and regenerated development hash lock, while retaining the existing HACS minimum because no functional incompatibility was found.
