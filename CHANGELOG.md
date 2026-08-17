@@ -10,6 +10,7 @@ All notable changes to this project are documented in this file.
 
 - Added a content-addressed rootless Podman toolbox with tar-streamed source, read-only filesystems, private namespaces, dropped capabilities, no-new-privileges, bounded resources, and offline networking by default.
 - Added containerized Bandit and ShellCheck gates while retaining Pylint, mypy, pip-audit, actionlint, hassfest, HACS, Dependency Review, and CodeQL checks.
+- Added trusted `master`-only Dependency Submission for the complete runtime, development, and Ruff hash locks using the job-scoped standard GitHub token.
 
 ### Changed
 

@@ -28,6 +28,7 @@ PYTHON_SOURCES := custom_components/fmi tests .github/scripts
 SHELL_FILES := containers/toolbox/entrypoint.sh
 COVERAGE_REPORT := coverage-report.md
 COVERAGE_TOTAL := coverage-total.txt
+DEPENDENCY_SNAPSHOT := dependency-snapshot.json
 RUFF_OUTPUT_FORMAT ?=
 RUFF_OUTPUT := $(if $(RUFF_OUTPUT_FORMAT),--output-format=$(RUFF_OUTPUT_FORMAT))
 
@@ -42,7 +43,7 @@ include make/container.mk
 	test-network-block coverage-report confinement-test version-check version-sync \
 	validate validate-local validate-actions validate-hassfest validate-hacs live \
 	compatibility-stable compatibility-prerelease audit audit-raw licenses outdated \
-	validator-images release-notes check ci clean
+	validator-images dependency-snapshot release-notes check ci clean
 
 help:
 	@printf '%s\n' \
@@ -63,6 +64,8 @@ help:
 		'                   Pull immutable external validator images' \
 		'make audit         Enforce reviewed dependency vulnerability exceptions' \
 		'make licenses      Print the installed dependency license inventory' \
+		'make dependency-snapshot' \
+		'                   Build all three GitHub dependency manifests offline' \
 		'make check         Run the complete local gate set' \
 		'make ci            Run local gates plus the online reviewed audit' \
 		'make clean         Remove generated caches and reports, never tmp/'
@@ -304,6 +307,15 @@ licenses: toolbox-image
 outdated: toolbox-image
 	$(BOX_RUN_ONLINE) python -m pip list --outdated
 
+dependency-snapshot: toolbox-image
+	@mkdir -p $(ARTIFACTS)
+	@$(BOX_ARCHIVE) | $(PODMAN) run $(BOX_CONFINE) \
+		--env BOX_EXPORT=$(DEPENDENCY_SNAPSHOT) \
+		--env BOX_EXPORT_ON_SUCCESS=1 $(TOOLBOX_TAG) \
+		python .github/scripts/dependency_snapshot.py \
+			--output $(DEPENDENCY_SNAPSHOT) \
+		| tar --extract --file=- --directory=$(ARTIFACTS) --no-same-owner
+
 release-notes: toolbox-image
 	@mkdir -p $(ARTIFACTS)
 	@$(BOX_ARCHIVE) | $(PODMAN) run $(BOX_CONFINE) \
@@ -315,7 +327,8 @@ release-notes: toolbox-image
 		| tar --extract --file=- --no-same-owner
 
 check: lint type-check bandit syntax shellcheck test-full \
-	test-network-block version-check confinement-test freeze-check validate
+	test-network-block version-check confinement-test freeze-check validate \
+	dependency-snapshot
 
 ci: validator-images check audit
 
@@ -327,6 +340,7 @@ clean:
 	 done
 	@for path in .coverage coverage.xml $(COVERAGE_REPORT) $(COVERAGE_TOTAL) \
 		$(ARTIFACTS)/coverage.xml $(ARTIFACTS)/$(COVERAGE_REPORT) \
-		$(ARTIFACTS)/$(COVERAGE_TOTAL) $(ARTIFACTS)/release-notes.md; do \
+		$(ARTIFACTS)/$(COVERAGE_TOTAL) $(ARTIFACTS)/$(DEPENDENCY_SNAPSHOT) \
+		$(ARTIFACTS)/release-notes.md; do \
 		if [[ -f "$$path" ]]; then unlink "$$path"; fi; \
 	done

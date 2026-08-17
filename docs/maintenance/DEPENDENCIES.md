@@ -11,9 +11,9 @@ Last verified: 2026-08-17.
 | Root `pyproject.toml` dependencies | Exact integration runtime dependencies; identical to manifest requirements |
 | Root `pyproject.toml` `dev` extra | Exact direct Home Assistant reference, test, audit, and analysis tools |
 | `tools/lint/pyproject.toml` | Exact Ruff-only host environment |
-| `requirements.txt` | Generated hashed runtime closure for review, audit, and dependency graph |
-| `requirements-dev.txt` | Generated hashed toolbox closure |
-| `requirements-lint.txt` | Generated hashed Ruff-only closure |
+| `requirements.txt` | Generated hashed runtime closure; submitted to Dependency graph as runtime |
+| `requirements-dev.txt` | Generated hashed toolbox closure; submitted as development |
+| `requirements-lint.txt` | Generated hashed Ruff-only closure; submitted as development |
 | Toolbox `lock` stage | Exact self-hosting pip-tools bootstrap; the only inline install exception |
 
 There are no maintained `.in` files, `requirements/` directory, compatibility inputs, bootstrap
@@ -82,6 +82,24 @@ does not create another committed environment: it derives unpinned runtime/HA/he
 root PEP 621, freezes and recreates a temporary graph inside the resolver container, and exports
 ignored per-run evidence under `.artifacts/compatibility/`.
 
+## GitHub Dependency Graph
+
+GitHub's static pip parser reliably recognizes the conventional `requirements.txt`, but the two
+audience-specific lock names are not the complete graph contract. `make dependency-snapshot` parses
+all three generated files offline, cross-checks their exact direct packages and versions against
+the two PEP 621 owners, requires at least one SHA-256 hash for every resolved pin, and fails on any
+unknown lock syntax. It exports ignored `.artifacts/dependency-snapshot.json`; this is derived
+evidence and must not be committed.
+
+On a direct `master` push, the trusted **Submit dependency graph** CI job uploads exactly three
+manifests through GitHub's Dependency Submission API. Runtime entries have `runtime` scope; the
+toolbox and Ruff graphs have `development` scope. Direct/indirect relationships come from PEP 621
+ownership and the complete locks. The job uses only its standard repository `GITHUB_TOKEN` with
+job-level `contents: write`; no PAT is required, checkout credentials are not persisted, and the
+token is never passed into the offline generator container. PR and reusable Release invocations
+cannot enter this write boundary. A new or renamed lock becomes visible remotely only after the
+corresponding commit reaches `master` and that job succeeds.
+
 ## Vulnerabilities, Licenses, And External References
 
 `make audit` audits the installed dev graph and accepts only the exact package/version/advisory
@@ -101,10 +119,11 @@ GitHub-Actions entry; it does not track a Docker ecosystem.
 1. Change only the direct PEP 621 owner and synchronize manifest requirements when runtime changes.
 2. Run `make refresh-dependencies` or `make lock`; review every changed pin and hash audience.
 3. Run `make freeze-check`, build the dev image, and confirm `pip check`.
-4. Run format/lint/type/Bandit, full offline coverage, validators, reviewed audit, and licenses.
-5. Run stable and prerelease compatibility for HA/runtime dependency changes.
-6. Keep the HACS minimum unchanged unless the old floor has a reproduced integration failure.
-7. A manifest runtime requirement change is release-bearing: update `.version`, synchronize the
+4. Run `make dependency-snapshot` and inspect that all three manifest counts remain plausible.
+5. Run format/lint/type/Bandit, full offline coverage, validators, reviewed audit, and licenses.
+6. Run stable and prerelease compatibility for HA/runtime dependency changes.
+7. Keep the HACS minimum unchanged unless the old floor has a reproduced integration failure.
+8. A manifest runtime requirement change is release-bearing: update `.version`, synchronize the
    manifest mirror, and add the matching dated changelog section.
 
 ## XML Parser References

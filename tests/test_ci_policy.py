@@ -41,6 +41,7 @@ def test_ci_uses_make_rootless_podman_and_independent_image_caches() -> None:
     ci = _workflow("ci.yml")
     for event in ("pull_request:", "push:", "workflow_call:", "workflow_dispatch:"):
         assert event in ci
+    assert "name: CI" in ci
     assert "- master" in ci
     assert "Set up Python for Ruff" in ci
     assert "cache-dependency-path: requirements-lint.txt" in ci
@@ -48,6 +49,7 @@ def test_ci_uses_make_rootless_podman_and_independent_image_caches() -> None:
     assert "run: make ci" in ci
     assert "run: make live" in ci
     assert "run: make validate" in ci
+    assert "run: make dependency-snapshot" in ci
     assert "run: make compatibility-stable" in ci
     assert "run: make compatibility-prerelease" in ci
     assert "PYTEST_WORKERS" not in ci
@@ -100,14 +102,34 @@ def test_ci_preserves_hacs_security_and_compatibility_gates() -> None:
     assert "run: make audit" in ci
 
 
-def test_read_only_ci_has_only_the_codeql_result_permission() -> None:
-    """Quality, validation, live, compatibility, and version jobs cannot write."""
+def test_ci_write_permissions_are_confined_to_trusted_result_jobs() -> None:
+    """Only CodeQL and direct-master dependency submission can write results."""
     ci = _workflow("ci.yml")
     assert "permissions:\n  contents: read" in ci
-    assert "contents: write" not in ci
     assert "pull-requests: write" not in ci
     assert ci.count("security-events: write") == 1
+    assert ci.count("contents: write") == 1
     assert "$GITHUB_STEP_SUMMARY" in ci
+
+    submission = ci.split("\n  dependency-submission:\n", maxsplit=1)[1].split(
+        "\n  codeql:\n", maxsplit=1
+    )[0]
+    for proof in (
+        "name: Submit dependency graph",
+        "github.event_name == 'push'",
+        "github.ref == 'refs/heads/master'",
+        "github.workflow == 'CI'",
+        "needs: quality",
+        "contents: write",
+        "persist-credentials: false",
+        "run: make dependency-snapshot",
+        "POST /repos/{owner}/{repo}/dependency-graph/snapshots",
+        '"X-GitHub-Api-Version": "2026-03-10"',
+        "github-token: ${{ github.token }}",
+    ):
+        assert proof in submission
+    assert "pull_request" not in submission
+    assert "BOX_" not in submission
 
 
 def test_version_job_compares_exact_base_and_head_through_make() -> None:

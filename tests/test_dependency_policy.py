@@ -198,6 +198,7 @@ def test_make_target_surface_has_no_legacy_or_duplicate_execution_path() -> None
         "compatibility-stable",
         "confinement-test",
         "coverage-report",
+        "dependency-snapshot",
         "dev-build",
         "doctor",
         "format",
@@ -238,6 +239,7 @@ def test_make_target_surface_has_no_legacy_or_duplicate_execution_path() -> None
         "version-sync",
     }
     assert ".NOTPARALLEL:" in makefile
+    assert "freeze-check validate \\\n\tdependency-snapshot" in makefile
     assert "check: lint type-check bandit syntax shellcheck test-full" in makefile
     assert "check: format-check" not in makefile
     assert "development-seed" not in makefile

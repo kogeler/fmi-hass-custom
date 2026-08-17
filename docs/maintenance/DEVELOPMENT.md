@@ -56,6 +56,7 @@ multiplying those worker pools and prevents races on locks, OCI archives, and ex
 | HACS validation with explicit remote inputs | `make validate-hacs` |
 | Reviewed/raw vulnerability checks | `make audit` / `make audit-raw` |
 | License / update inventory | `make licenses` / `make outdated` |
+| Build all three Dependency Submission manifests | `make dependency-snapshot` |
 | Latest stable/prerelease HA | `make compatibility-stable` / `make compatibility-prerelease` |
 | Public live FMI probes | `make live` |
 | Complete local gate / CI quality contract | `make check` / `make ci` |
@@ -66,11 +67,12 @@ then runs actionlint and hassfest offline. HACS necessarily remains online and r
 without receiving the checkout.
 
 `make check` is the complete local gate excluding live FMI, moving compatibility, audit, and
-license inventory. Its lock-reproduction step uses the resolver's online contour; ordinary
-analysis, tests, and validators remain offline. HACS runs only when its three explicit remote
-inputs are present and otherwise reports a skip. `make ci` adds the reviewed dependency audit and
-is the quality job contract; CI keeps live FMI, HACS, dependency review, CodeQL, and moving
-compatibility as separately visible jobs with their own permissions and failure boundaries.
+license inventory. It includes the offline dependency snapshot. Its lock-reproduction step uses
+the resolver's online contour; ordinary analysis, tests, and validators remain offline. HACS runs
+only when its three explicit remote inputs are present and otherwise reports a skip. `make ci` adds
+the reviewed dependency audit and is the quality job contract; CI keeps live FMI, HACS, dependency
+review, CodeQL, and moving compatibility as separately visible jobs with their own permissions and
+failure boundaries.
 
 ## Dependency Environments
 
@@ -90,6 +92,9 @@ Every lock has the standard pip-compile header, exact pins, and SHA-256 hashes. 
 image deliberately permits hash-verified source distributions because Home Assistant's graph
 contains `mock-open` and `PyRIC` without wheels; they build only during the rootless image build.
 The host Ruff install is wheel-only. Ruff and pip-tools must never enter the development lock.
+`make dependency-snapshot` checks these three locks against their PEP 621 owners inside the offline
+toolbox and exports the ignored GitHub API manifest fragment to
+`.artifacts/dependency-snapshot.json`.
 
 To change a dependency:
 
@@ -97,8 +102,8 @@ To change a dependency:
    identical to `custom_components/fmi/manifest.json`.
 2. Run `make refresh-dependencies` for an upgrade, or `make lock` after a direct pin change.
 3. Review all three lock diffs and confirm only the intended audiences changed.
-4. Run `make freeze-check`, `make test-full`, `make lint`, `make type-check`, `make validate`,
-   `make audit`, and `make licenses`.
+4. Run `make freeze-check`, `make dependency-snapshot`, `make test-full`, `make lint`,
+   `make type-check`, `make validate`, `make audit`, and `make licenses`.
 5. Run both compatibility targets for Home Assistant/runtime dependency changes.
 
 Never edit a generated lock by hand, add a `requirements/` directory or `.in` file, create another

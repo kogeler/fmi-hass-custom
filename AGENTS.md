@@ -83,6 +83,7 @@ fallback.
 | Stable / prerelease drift | `make compatibility-stable` / `make compatibility-prerelease` |
 | Reviewed vulnerability policy / raw inventory | `make audit` / `make audit-raw` |
 | License inventory | `make licenses` |
+| Build all three Dependency Submission manifests | `make dependency-snapshot` |
 | Prove container confinement | `make confinement-test` |
 
 Every pytest path uses pytest-xdist with `PYTEST_WORKERS=auto` by default and
@@ -143,9 +144,12 @@ set. `tools/lint/pyproject.toml` owns only Ruff. Root `requirements.txt`,
 `requirements-dev.txt`, and `requirements-lint.txt` are generated `pip-compile` outputs with
 SHA-256 hashes and must not be hand-edited; no other requirements manifests or `.in` files are
 maintained. The resolver's exact wheel-only bootstrap is the sole inline self-hosting exception in
-the toolbox Containerfile. Moving compatibility inputs are derived unpinned from PEP 621 inside
-the resolver container and publish only ignored run evidence. Follow
-`docs/maintenance/DEVELOPMENT.md` for updates and review both vulnerability and license results.
+the toolbox Containerfile. `make dependency-snapshot` derives the three GitHub Dependency
+Submission manifests from those locks inside the offline toolbox; only the direct trusted
+`master`-push job uploads them with job-scoped `contents: write`. Moving compatibility inputs are
+derived unpinned from PEP 621 inside the resolver container and publish only ignored run evidence.
+Follow `docs/maintenance/DEVELOPMENT.md` for updates and review both vulnerability and license
+results.
 Support, privacy, and accepted-risk boundaries are in `docs/maintenance/COMPATIBILITY_SECURITY.md`.
 
 Release-bearing PRs to `master` must increment `.version`, synchronize the manifest, and add the
