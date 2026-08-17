@@ -127,12 +127,11 @@ def test_ci_write_permissions_are_confined_to_trusted_result_jobs() -> None:
         '"X-GitHub-Api-Version": "2026-03-10"',
         "github-token: ${{ github.token }}",
         "response.status !== 201",
-        'context.ref === "refs/heads/feat/map-location"',
-        'new Set(["SUCCESS", "ACCEPTED"])',
-        "!acceptedResults.has(response.data.result)",
+        'ref: "refs/heads/master",',
+        'response.data.result !== "SUCCESS"',
     ):
         assert proof in submission
-    assert 'new Set(["SUCCESS"])' in submission
+    assert 'new Set(["SUCCESS", "ACCEPTED"])' not in submission
     assert "pull_request" not in submission
     assert "BOX_" not in submission
 
