@@ -9,8 +9,6 @@ on:
   push:
     branches:
       - master
-      # TEMPORARY: remove after the Dependency Submission smoke test.
-      - feat/map-location
   workflow_call:
   workflow_dispatch:
     inputs:
@@ -226,8 +224,7 @@ jobs:
     # also caps its reusable-workflow token at read-only permissions.
     if: >-
       github.event_name == 'push' &&
-      (github.ref == 'refs/heads/master' ||
-      github.ref == 'refs/heads/feat/map-location') &&
+      github.ref == 'refs/heads/master' &&
       github.workflow == 'CI'
     needs: quality
     runs-on: ubuntu-26.04
@@ -302,30 +299,13 @@ jobs:
               }
             }
 
-            // TEMPORARY: execute the PR implementation while associating the
-            // smoke-test snapshot with the real default-branch commit. The
-            // Dependency Submission API only updates repository results for a
-            // coherent default-branch ref/SHA pair. Restore context.sha and
-            // context.ref after the API returns SUCCESS.
-            const defaultRef = await github.request(
-              "GET /repos/{owner}/{repo}/git/ref/{ref}",
-              {
-                ...context.repo,
-                ref: "heads/master",
-                headers: {
-                  accept: "application/vnd.github+json",
-                  "X-GitHub-Api-Version": "2026-03-10",
-                },
-              },
-            );
-
             const response = await github.request(
               "POST /repos/{owner}/{repo}/dependency-graph/snapshots",
               {
                 ...context.repo,
                 version: 0,
-                sha: defaultRef.data.object.sha,
-                ref: "refs/heads/master",
+                sha: context.sha,
+                ref: context.ref,
                 job: {
                   correlator: "fmi-hass-custom-pip-locks",
                   id: String(context.runId),
@@ -466,7 +446,6 @@ jobs:
           ref: >-
             ${{
               github.event.pull_request.base.sha ||
-              (github.ref == 'refs/heads/feat/map-location' && 'master') ||
               github.event.before ||
               inputs.base_ref
             }}

@@ -110,6 +110,8 @@ def test_ci_write_permissions_are_confined_to_trusted_result_jobs() -> None:
     assert ci.count("security-events: write") == 1
     assert ci.count("contents: write") == 1
     assert "$GITHUB_STEP_SUMMARY" in ci
+    assert "feat/map-location" not in ci
+    assert "TEMPORARY" not in ci
 
     submission = ci.split("\n  dependency-submission:\n", maxsplit=1)[1].split(
         "\n  codeql:\n", maxsplit=1
@@ -123,14 +125,13 @@ def test_ci_write_permissions_are_confined_to_trusted_result_jobs() -> None:
         "contents: write",
         "persist-credentials: false",
         "run: make dependency-snapshot",
-        "GET /repos/{owner}/{repo}/git/ref/{ref}",
-        "sha: defaultRef.data.object.sha",
+        "sha: context.sha",
         "POST /repos/{owner}/{repo}/dependency-graph/snapshots",
         'correlator: "fmi-hass-custom-pip-locks"',
         '"X-GitHub-Api-Version": "2026-03-10"',
         "github-token: ${{ github.token }}",
         "response.status !== 201",
-        'ref: "refs/heads/master",',
+        "ref: context.ref",
         'response.data.result !== "SUCCESS"',
     ):
         assert proof in submission
@@ -144,7 +145,6 @@ def test_version_job_compares_exact_base_and_head_through_make() -> None:
     ci = _workflow("ci.yml")
     version = ci.split("\n  version:\n", maxsplit=1)[1]
     assert "github.event.pull_request.base.sha ||" in version
-    assert "(github.ref == 'refs/heads/feat/map-location' && 'master') ||" in version
     assert "github.event.before ||" in version
     assert "inputs.base_ref" in version
     assert "github.event.pull_request.head.repo.full_name || github.repository" in version
