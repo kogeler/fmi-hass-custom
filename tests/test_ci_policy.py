@@ -23,7 +23,12 @@ def _workflow(name: str) -> str:
 def test_workflow_set_is_minimal_event_driven_and_fully_pinned() -> None:
     """Superseded workflow files cannot survive as a second execution path."""
     workflows = sorted(WORKFLOWS.glob("*.yml"))
-    assert [path.name for path in workflows] == ["ci.yml", "pr-body.yml", "release.yml"]
+    assert [path.name for path in workflows] == [
+        "ci.yml",
+        "dependency-submission.yml",
+        "pr-body.yml",
+        "release.yml",
+    ]
     for path in workflows:
         content = path.read_text(encoding="utf-8")
         external_uses = [
@@ -49,7 +54,7 @@ def test_ci_uses_make_rootless_podman_and_independent_image_caches() -> None:
     assert "run: make ci" in ci
     assert "run: make live" in ci
     assert "run: make validate" in ci
-    assert "run: make dependency-snapshot" in ci
+    assert "run: make dependency-snapshot" not in ci
     assert "run: make compatibility-stable" in ci
     assert "run: make compatibility-prerelease" in ci
     assert "PYTEST_WORKERS" not in ci
@@ -102,26 +107,26 @@ def test_ci_preserves_hacs_security_and_compatibility_gates() -> None:
     assert "run: make audit" in ci
 
 
-def test_ci_write_permissions_are_confined_to_trusted_result_jobs() -> None:
-    """Only CodeQL and direct-master dependency submission can write results."""
+def test_ci_write_permissions_are_confined_to_codeql() -> None:
+    """Reusable CI cannot request the contents-write permission denied by Release."""
     ci = _workflow("ci.yml")
     assert "permissions:\n  contents: read" in ci
     assert "pull-requests: write" not in ci
     assert ci.count("security-events: write") == 1
-    assert ci.count("contents: write") == 1
+    assert "contents: write" not in ci
     assert "$GITHUB_STEP_SUMMARY" in ci
     assert "feat/map-location" not in ci
     assert "TEMPORARY" not in ci
 
-    submission = ci.split("\n  dependency-submission:\n", maxsplit=1)[1].split(
-        "\n  codeql:\n", maxsplit=1
-    )[0]
+
+def test_dependency_submission_has_a_separate_trusted_write_boundary() -> None:
+    """Only a direct master push can upload the three validated lock manifests."""
+    submission = _workflow("dependency-submission.yml")
     for proof in (
+        "name: Dependency submission",
+        "push:",
+        "- master",
         "name: Submit dependency graph",
-        "github.event_name == 'push'",
-        "github.ref == 'refs/heads/master'",
-        "github.workflow == 'CI'",
-        "needs: quality",
         "contents: write",
         "persist-credentials: false",
         "run: make dependency-snapshot",
@@ -135,13 +140,16 @@ def test_ci_write_permissions_are_confined_to_trusted_result_jobs() -> None:
         'response.data.result !== "SUCCESS"',
     ):
         assert proof in submission
+    assert submission.count("contents: write") == 1
+    assert "pull_request:" not in submission
+    assert "workflow_call:" not in submission
+    assert "workflow_dispatch:" not in submission
     assert 'new Set(["SUCCESS", "ACCEPTED"])' not in submission
-    assert "pull_request" not in submission
     assert "BOX_" not in submission
 
 
 def test_version_job_compares_exact_base_and_head_through_make() -> None:
-    """Consolidation retains PR, push, reusable, and manual version semantics."""
+    """Version checks permit only recovery of a still-unpublished release train."""
     ci = _workflow("ci.yml")
     version = ci.split("\n  version:\n", maxsplit=1)[1]
     assert "github.event.pull_request.base.sha ||" in version
@@ -149,6 +157,13 @@ def test_version_job_compares_exact_base_and_head_through_make() -> None:
     assert "inputs.base_ref" in version
     assert "github.event.pull_request.head.repo.full_name || github.repository" in version
     assert "github.event.pull_request.head.sha || github.sha" in version
+    assert "github.rest.repos.getReleaseByTag" in version
+    assert "github.rest.repos.getLatestRelease" in version
+    assert 'latestVersion = "0.6.2"' in version
+    assert 'core.setOutput("unpublished_base_version", latestVersion)' in version
+    assert "current_version=\"$(tr -d '\\r\\n' < .version)\"" in version
+    assert '"$current_version" == "$base_version"' in version
+    assert '-n "$UNPUBLISHED_BASE_VERSION"' in version
     assert "base_version=" in version
     assert 'make version-check VERSION_ARGS="--base-version $base_version"' in version
 
@@ -174,6 +189,7 @@ def test_release_reuses_ci_and_writes_only_in_publish_job() -> None:
     assert "uses: ./.github/workflows/ci.yml" in ci_gate
     assert "needs: release-state" in ci_gate
     assert "security-events: write" in ci_gate
+    assert "contents: read" in ci_gate
 
     publish = release.split("\n  publish:\n", maxsplit=1)[1]
     assert "- release-state" in publish
@@ -186,7 +202,10 @@ def test_release_reuses_ci_and_writes_only_in_publish_job() -> None:
 
 def test_pr_body_is_the_only_pull_request_target_write_boundary() -> None:
     """Untrusted head code cannot execute with the metadata write token."""
-    combined = "\n".join(_workflow(name) for name in ("ci.yml", "pr-body.yml", "release.yml"))
+    combined = "\n".join(
+        _workflow(name)
+        for name in ("ci.yml", "dependency-submission.yml", "pr-body.yml", "release.yml")
+    )
     pr_body = _workflow("pr-body.yml")
     assert combined.count("pull_request_target:") == 1
     assert "pull-requests: write" in pr_body

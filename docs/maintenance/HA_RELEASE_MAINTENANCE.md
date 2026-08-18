@@ -78,6 +78,11 @@ merging. The **Release** workflow independently finds the already published vers
 successfully after its read-only release-state job; reusable CI and publication are skipped. The
 manual bypass must never be used when the release conditions below apply.
 
+This published-version rule is distinct from release recovery: while an incremented version is
+still unpublished because its release workflow failed, follow-up workflow-only fixes may retain it
+and pass against the latest published stable baseline. Once that version is published, equality is
+rejected again and maintenance-only work follows the manual-bypass policy above.
+
 A new FMI integration release is required when any of these changes:
 
 - integration code or another HACS-installed user-facing file;

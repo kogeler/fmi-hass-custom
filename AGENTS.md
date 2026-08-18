@@ -145,9 +145,10 @@ set. `tools/lint/pyproject.toml` owns only Ruff. Root `requirements.txt`,
 SHA-256 hashes and must not be hand-edited; no other requirements manifests or `.in` files are
 maintained. The resolver's exact wheel-only bootstrap is the sole inline self-hosting exception in
 the toolbox Containerfile. `make dependency-snapshot` derives the three GitHub Dependency
-Submission manifests from those locks inside the offline toolbox; only the direct trusted
-`master`-push job uploads them with job-scoped `contents: write`. Moving compatibility inputs are
-derived unpinned from PEP 621 inside the resolver container and publish only ignored run evidence.
+Submission manifests from those locks inside the offline toolbox; only the dedicated trusted
+direct-`master`-push workflow uploads them with job-scoped `contents: write`. Moving compatibility
+inputs are derived unpinned from PEP 621 inside the resolver container and publish only ignored run
+evidence.
 Follow `docs/maintenance/DEVELOPMENT.md` for updates and review both vulnerability and license
 results.
 Support, privacy, and accepted-risk boundaries are in `docs/maintenance/COMPATIBILITY_SECURITY.md`.

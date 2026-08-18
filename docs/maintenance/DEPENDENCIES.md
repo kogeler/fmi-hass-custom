@@ -91,13 +91,15 @@ the two PEP 621 owners, requires at least one SHA-256 hash for every resolved pi
 unknown lock syntax. It exports ignored `.artifacts/dependency-snapshot.json`; this is derived
 evidence and must not be committed.
 
-On a direct `master` push, the trusted **Submit dependency graph** CI job uploads exactly three
-manifests through GitHub's Dependency Submission API. Runtime entries have `runtime` scope; the
-toolbox and Ruff graphs have `development` scope. Direct/indirect relationships come from PEP 621
-ownership and the complete locks. The job uses only its standard repository `GITHUB_TOKEN` with
-job-level `contents: write`; no PAT is required, checkout credentials are not persisted, and the
-token is never passed into the offline generator container. PR and reusable Release invocations
-cannot enter this write boundary. A new or renamed lock becomes visible remotely only after the
+On a direct `master` push, the dedicated trusted **Dependency submission / Submit dependency
+graph** workflow uploads exactly three manifests through GitHub's Dependency Submission API.
+Runtime entries have `runtime` scope; the toolbox and Ruff graphs have `development` scope.
+Direct/indirect relationships come from PEP 621 ownership and the complete locks. The job uses only
+its standard repository `GITHUB_TOKEN` with job-level `contents: write`; no PAT is required,
+checkout credentials are not persisted, and the token is never passed into the offline generator
+container. PR, manual, and reusable Release invocations cannot enter this write boundary. Keeping
+the job outside reusable CI also prevents its write request from invalidating the read-only Release
+caller before jobs start. A new or renamed lock becomes visible remotely only after the
 corresponding commit reaches `master` and that job succeeds.
 
 ## Vulnerabilities, Licenses, And External References

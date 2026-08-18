@@ -217,126 +217,6 @@ jobs:
         if: github.event.pull_request.head.repo.full_name != github.repository
         run: make audit
 
-  dependency-submission:
-    name: Submit dependency graph
-    # A reusable invocation inherits its caller's workflow name. Requiring the
-    # direct CI workflow prevents a second Release snapshot; the Release caller
-    # also caps its reusable-workflow token at read-only permissions.
-    if: >-
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/master' &&
-      github.workflow == 'CI'
-    needs: quality
-    runs-on: ubuntu-26.04
-    timeout-minutes: 15
-    permissions:
-      contents: write
-    steps:
-      - name: Check out trusted submission ref
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Verify rootless Podman
-        run: make doctor
-
-      - name: Resolve image cache keys
-        id: images
-        run: make image-key >> "$GITHUB_OUTPUT"
-
-      - name: Restore toolbox image
-        id: toolbox-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .artifacts/images/toolbox.tar
-          key: podman-${{ runner.os }}-${{ runner.arch }}-toolbox-${{ steps.images.outputs.toolbox }}
-
-      - name: Load cached toolbox image
-        if: steps.toolbox-cache.outputs.cache-hit == 'true'
-        run: make image-load-toolbox
-
-      - name: Build exact lock manifests without network access
-        run: make dependency-snapshot
-
-      - name: Submit all three lock manifests
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const fs = await import("node:fs/promises");
-            const snapshot = JSON.parse(
-              await fs.readFile(".artifacts/dependency-snapshot.json", "utf8"),
-            );
-            if (
-              !snapshot ||
-              typeof snapshot !== "object" ||
-              Array.isArray(snapshot) ||
-              Object.keys(snapshot).length !== 1 ||
-              !snapshot.manifests ||
-              typeof snapshot.manifests !== "object" ||
-              Array.isArray(snapshot.manifests)
-            ) {
-              throw new Error("Dependency snapshot has an invalid top-level shape");
-            }
-            const expected = [
-              "requirements-dev.txt",
-              "requirements-lint.txt",
-              "requirements.txt",
-            ];
-            const actual = Object.keys(snapshot.manifests).sort();
-            if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-              throw new Error(`Dependency snapshot has unexpected manifests: ${actual.join(", ")}`);
-            }
-            for (const name of expected) {
-              const manifest = snapshot.manifests[name];
-              if (
-                manifest?.name !== name ||
-                manifest?.file?.source_location !== name ||
-                !manifest?.resolved ||
-                Object.keys(manifest.resolved).length === 0
-              ) {
-                throw new Error(`Dependency snapshot has an invalid ${name} manifest`);
-              }
-            }
-
-            const response = await github.request(
-              "POST /repos/{owner}/{repo}/dependency-graph/snapshots",
-              {
-                ...context.repo,
-                version: 0,
-                sha: context.sha,
-                ref: context.ref,
-                job: {
-                  correlator: "fmi-hass-custom-pip-locks",
-                  id: String(context.runId),
-                  html_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-                },
-                detector: {
-                  name: "fmi-hass-custom-pip-locks",
-                  version: "1",
-                  url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/blob/${context.sha}/.github/scripts/dependency_snapshot.py`,
-                },
-                scanned: new Date().toISOString(),
-                manifests: snapshot.manifests,
-                headers: {
-                  accept: "application/vnd.github+json",
-                  "X-GitHub-Api-Version": "2026-03-10",
-                },
-              },
-            );
-            if (
-              response.status !== 201 ||
-              response.data.result !== "SUCCESS"
-            ) {
-              throw new Error(
-                `Dependency submission failed: HTTP ${response.status}, ` +
-                `result ${response.data.result}: ${response.data.message}`,
-              );
-            }
-            core.notice(
-              `${response.data.message} (result: ${response.data.result})`,
-            );
-
   codeql:
     name: CodeQL (${{ matrix.language }})
     runs-on: ubuntu-26.04
@@ -464,8 +344,52 @@ jobs:
         working-directory: source
         run: make doctor
 
+      - name: Resolve an unpublished same-version recovery baseline
+        id: release-baseline
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          VERSION_PATH: source/.version
+        with:
+          script: |
+            const fs = await import("node:fs/promises");
+            const version = (await fs.readFile(process.env.VERSION_PATH, "utf8")).trim();
+            if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(version)) {
+              throw new Error(".version is not a stable semantic version");
+            }
+
+            try {
+              await github.rest.repos.getReleaseByTag({
+                ...context.repo,
+                tag: version,
+              });
+              core.setOutput("unpublished_base_version", "");
+              return;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            let latestVersion = "0.6.2";
+            try {
+              const latest = await github.rest.repos.getLatestRelease({
+                ...context.repo,
+              });
+              latestVersion = latest.data.tag_name;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(latestVersion)) {
+              throw new Error("latest published release is not a stable semantic version");
+            }
+            core.setOutput("unpublished_base_version", latestVersion);
+
       - name: Require synchronized version increase
         working-directory: source
+        env:
+          UNPUBLISHED_BASE_VERSION: ${{ steps.release-baseline.outputs.unpublished_base_version }}
         run: |
           base_version="$(tr -d '\r\n' < ../base/.version)"
+          current_version="$(tr -d '\r\n' < .version)"
+          if [[ "$current_version" == "$base_version" && -n "$UNPUBLISHED_BASE_VERSION" ]]; then
+            base_version="$UNPUBLISHED_BASE_VERSION"
+          fi
           make version-check VERSION_ARGS="--base-version $base_version"

@@ -32,6 +32,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Kept reusable release CI read-only by moving Dependency Submission to its own trusted master-push workflow, and allowed workflow-only recovery commits to retain a release version until that version is actually published.
 - Prevented valid live daily-precipitation checks from failing when Home Assistant independently rounds hourly values and their daily total for forecast service responses.
 - Preserved the existing CodeQL SARIF identities after workflow consolidation so pull requests remain comparable with the `master` code-scanning baseline.
 
