@@ -2,15 +2,16 @@
 
 # Continuous Integration And Release Gates
 
-Last verified locally: 2026-08-17.
+Last verified locally: 2026-08-18.
 
 ## Workflow Topology
 
-The repository maintains exactly three workflows:
+The repository maintains exactly four workflows:
 
 | Workflow | Trigger | Purpose | Write permission |
 |---|---|---|---|
-| `ci.yml` | PR, `master` push, manual, reusable | Quality, security, live, validation, compatibility, version gates, and the trusted dependency snapshot | CodeQL gets `security-events: write`; direct-`master` dependency submission gets `contents: write` |
+| `ci.yml` | PR, `master` push, manual, reusable | Quality, security, live, validation, compatibility, and version gates | CodeQL gets `security-events: write` only |
+| `dependency-submission.yml` | `master` push | Upload the three validated lock manifests to Dependency graph | Its only job gets `contents: write` |
 | `pr-body.yml` | PR open/reopen/source update | Synchronize the managed PR body block from bounded source-changelog data | `pull-requests: write` only |
 | `release.yml` | `master` push | Skip an existing exact release or reuse CI and publish a new exact-version release | `contents: write` only in `publish` |
 
@@ -33,10 +34,6 @@ credentials are never persisted.
 - **Dependency review** uses the native dependency-diff action for same-repository pull requests.
   Fork pull requests use the exact reviewed `make audit` fallback in the toolbox because GitHub's
   dependency-review API does not expose their dependency diff to this workflow.
-- **Submit dependency graph** exists only on a direct `CI` push to `master`, depends on quality,
-  builds an offline snapshot of all three hash locks through `make dependency-snapshot`, and sends
-  it with GitHub's Dependency Submission API. It is skipped for PR, manual, and reusable Release
-  invocations and is not a pull-request status gate.
 - **CodeQL** runs `security-extended` for both Python and GitHub Actions. Only its matrix job can
   upload security events. Its explicit SARIF categories retain the historical
   `.github/workflows/codeql.yml:analyze/language:*` identities after workflow consolidation, so
@@ -48,7 +45,10 @@ credentials are never persisted.
   informational. No available newer prerelease is an explicit successful skip; a real failure is
   visible through job-level `continue-on-error`.
 - **Version increment** checks out the exact base and head, reads the base version as data, and
-  executes the repository version helper inside the toolbox.
+  executes the repository version helper inside the toolbox. Equality is accepted only while that
+  version has no published GitHub Release and it remains greater than the latest published stable
+  version. This permits a workflow-only recovery commit to finish an interrupted release train;
+  once the version is published, unchanged-version work fails normally.
 
 All project pytest paths reached by these jobs use `-n auto --dist=worksteal`, with xdist deriving
 the automatic worker count from the CPUs visible to its container. The quality job's Make contract
@@ -68,13 +68,14 @@ dependency cache.
 Ordinary PR jobs use `pull_request`, read-only contents, no repository secrets, and no write token.
 Their source is untrusted but runs only through the confined/read-only paths above.
 
-The dependency-submission job is the only `ci.yml` job with `contents: write`. Its three-part
-condition requires a `push`, `refs/heads/master`, and the direct workflow name `CI`; a reusable
-invocation inherits the caller name and therefore cannot enter this boundary. Checkout credentials
-are not persisted. The snapshot helper runs without network access inside the confined toolbox,
-receives no token, validates every exact pin, requires its SHA-256 lock hashes, and returns only
-JSON. The pinned GitHub API action revalidates the expected three-manifest shape before submitting
-it with the job-scoped standard `GITHUB_TOKEN`; no PAT or repository secret is used.
+`dependency-submission.yml` is a separate direct-`master` push boundary because GitHub validates
+the maximum permissions of every nested reusable job before evaluating its `if` condition. Keeping
+the contents-write job inside reusable `ci.yml` would make the read-only Release caller invalid at
+workflow startup. The dedicated workflow has no PR, manual, or reusable trigger. Checkout
+credentials are not persisted. The snapshot helper runs without network access inside the confined
+toolbox, receives no token, validates every exact pin, requires its SHA-256 lock hashes, and returns
+only JSON. The pinned GitHub API action revalidates the expected three-manifest shape before
+submitting it with the job-scoped standard `GITHUB_TOKEN`; no PAT or repository secret is used.
 
 `pr-body.yml` is the sole `pull_request_target` exception. It checks out the trusted default
 branch, reads only the exact head SHA's `CHANGELOG.md` through the GitHub contents API, bounds that
@@ -103,11 +104,12 @@ After the new workflow has run once, select the actual GitHub-rendered names cor
 - `CI / Latest Home Assistant stable`
 - `CI / Version increment`
 
-Do not require `CI / Latest Home Assistant prerelease`, `CI / Submit dependency graph`, or the
-PR-body metadata job. The submission job is deliberately absent from PR runs. Keep pull requests,
-resolved conversations, blocked force pushes/deletions, and read-only default Actions token
-enabled; the workflow grants its one write permission at job scope. Dependency graph, Dependabot
-alerts, and security updates remain owner-controlled repository settings.
+Do not require `CI / Latest Home Assistant prerelease`,
+`Dependency submission / Submit dependency graph`, or the PR-body metadata job. The submission
+workflow is deliberately absent from PR runs. Keep pull requests, resolved conversations, blocked
+force pushes/deletions, and read-only default Actions token enabled; the two trusted workflows grant
+their contents-write permissions only at job scope. Dependency graph, Dependabot alerts, and
+security updates remain owner-controlled repository settings.
 
 Exact check labels exist only after a real GitHub run. Local actionlint, policy tests, and Make
 verification cannot claim that remote branch rules or HACS API access have been applied.
@@ -119,11 +121,13 @@ For a release PR and its `master` push:
 1. Confirm every expected CI job ran on the exact head SHA and stable compatibility was blocking.
 2. Confirm live FMI followed quality and used no secrets.
 3. Confirm HACS reported the exact source repository/ref and no validator received a checkout bind.
-4. Confirm CodeQL produced both language results and only direct-master dependency submission gained
-   the documented CI contents-write permission.
-5. Confirm `CI / Submit dependency graph` accepted `requirements.txt`, `requirements-dev.txt`, and
-   `requirements-lint.txt`, then confirm those source locations appear in Dependency graph.
-6. Confirm the Release run reused CI before its publish job and did not submit a duplicate snapshot.
+4. Confirm CodeQL produced both language results and reusable CI requested no contents-write
+   permission.
+5. Confirm `Dependency submission / Submit dependency graph` accepted `requirements.txt`,
+   `requirements-dev.txt`, and `requirements-lint.txt`, then confirm those source locations appear
+   in Dependency graph.
+6. Confirm the Release run reused read-only CI before its publish job and did not submit a duplicate
+   snapshot.
 7. Confirm the tag, Release name/target, notes, `.version`, manifest mirror, and dated changelog
    section agree.
 8. Confirm the pip and GitHub-Actions Dependabot entries recognize their new manifests/locks.

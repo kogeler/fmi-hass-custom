@@ -2,7 +2,7 @@
 
 # HACS Repository And Releases
 
-Last verified: 2026-08-17.
+Last verified: 2026-08-18.
 
 ## What HACS Installs
 
@@ -106,6 +106,13 @@ The first `.version` release compares against the legacy manifest version `0.6.2
 compare against the base tree's `.version`. Two checkouts are used so the version helper does not
 depend on Git being installed in the supported Python container.
 
+If a version-incrementing change reaches `master` but its GitHub Release is not created because the
+release machinery itself fails, a recovery pull request may retain that still-unpublished version.
+The version job permits equality with the base tree only when GitHub has no Release for that exact
+version and the version remains greater than the latest published stable Release. This narrow
+recovery rule prevents an infrastructure fix from forcing a fictitious patch release. It does not
+apply after publication and does not relax the normal release-bearing increment requirement.
+
 On every push to `master`, `.github/workflows/release.yml` first reads `.version` from the exact
 pushed SHA and looks up its GitHub Release using full-SHA-pinned `actions/github-script` with
 read-only contents permission. If that version already has a correctly named published stable
@@ -140,8 +147,8 @@ The owner must retain these GitHub settings because they are not stored in the c
 - the description states that this is an FMI weather integration for Home Assistant;
 - repository topics include `home-assistant`, `hacs`, and `integration`;
 - `master` protection uses the required checks listed in `docs/maintenance/CI.md`;
-- Actions' default token permission remains read-only; the workflow grants write only to the
-  release publication job.
+- Actions' default token permission remains read-only; only the dedicated direct-master dependency
+  submission job and the release publication job receive contents-write at job scope.
 
 Before each release, verify these remote settings and the HACS validation job instead of assuming
 that checkout-local metadata is sufficient. A push to a release branch runs its pull-request checks

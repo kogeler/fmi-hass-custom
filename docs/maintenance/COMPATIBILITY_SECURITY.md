@@ -6,7 +6,7 @@ This document defines the current support and protection boundaries for maintain
 when the supported Home Assistant line, dependency graph, external services, diagnostics, logging,
 or CI trust model changes. Keep historical audit narrative outside this current contract.
 
-Last verified: 2026-08-17.
+Last verified: 2026-08-18.
 
 ## Support Matrix
 
@@ -91,8 +91,9 @@ defined in `RUNTIME.md`.
   no checkout bind, read-only root, private namespaces, no capabilities, NNP, seccomp, scrubbed
   environment, bounded resources, and offline networking by default. Ruff uses only its separate
   hashed wheel-only host environment.
-- Only the final release job receives `contents: write`; CodeQL receives
-  `security-events: write` only to upload results.
+- Reusable CI never receives `contents: write`. Only the direct-master dependency-submission job
+  and the final release publication job receive that permission in separate workflows; CodeQL
+  receives `security-events: write` only to upload results.
 - The metadata-only `pull_request_target` workflow executes trusted default-branch code and treats
   the source changelog as bounded inert data. Never check out or execute PR-head code with its write
   token.
