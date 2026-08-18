@@ -131,6 +131,21 @@ def _lightning_payload(rows: list[tuple[float, float, float]]) -> bytes:
     ).encode()
 
 
+def _sea_level_payload(
+    *,
+    timestamp: str | None = "2026-05-20T12:00:00+00:00",
+    parameter: str = "SeaLevel",
+    value: str | None = "12.5",
+) -> bytes:
+    time_element = "<time />" if timestamp is None else f"<time>{timestamp}</time>"
+    value_element = "<value />" if value is None else f"<value>{value}</value>"
+    return (
+        "<root><member><record><ignored>synthetic</ignored>"
+        f"{time_element}<parameter>{parameter}</parameter>{value_element}"
+        "</record></member></root>"
+    ).encode()
+
+
 def _parse_lightning(
     coordinator: FMIDataUpdateCoordinator,
     payload: bytes,
@@ -219,6 +234,66 @@ def test_lightning_malformed_timestamp_drops_only_invalid_row(monkeypatch) -> No
     assert lightning_data[0].strikes == 2
 
 
+@pytest.mark.parametrize(
+    ("position", "reason"),
+    [
+        ("60.20 24.90 1779276600", "1 12.5 40.0"),
+        ("91.0 24.90 1779276600", "1 12.5 40.0 1.2"),
+        ("60.20 24.90 1779276600", "1.5 12.5 40.0 1.2"),
+    ],
+)
+def test_lightning_malformed_rows_are_dropped(position: str, reason: str) -> None:
+    """Reject incomplete rows, invalid coordinates, and fractional strike counts."""
+    coordinator = _coordinator()
+    payload = (
+        f"<root><positions>{position}</positions>"
+        f"<doubleOrNilReasonTupleList>{reason}</doubleOrNilReasonTupleList></root>"
+    ).encode()
+
+    assert (
+        _parse_lightning(
+            coordinator,
+            payload,
+            datetime(2026, 5, 20, 12, 0, tzinfo=UTC),
+        )
+        == []
+    )
+
+
+def test_lightning_out_of_range_epoch_is_dropped() -> None:
+    """Isolate a finite numeric epoch that the platform cannot represent."""
+    coordinator = _coordinator()
+    payload = _lightning_payload([(60.20, 24.90, 1e300)])
+
+    assert (
+        _parse_lightning(
+            coordinator,
+            payload,
+            datetime(2026, 5, 20, 12, 0, tzinfo=UTC),
+        )
+        == []
+    )
+
+
+def test_lightning_distance_failure_drops_only_the_invalid_row(monkeypatch) -> None:
+    """Keep a geodesic-library failure inside the optional-source boundary."""
+    coordinator = _coordinator()
+
+    def fail_distance(*_args, **_kwargs):
+        raise ValueError("synthetic geodesic failure")
+
+    monkeypatch.setattr(integration, "geodesic", fail_distance)
+
+    assert (
+        _parse_lightning(
+            coordinator,
+            _lightning_payload([(60.20, 24.90, 1779276600)]),
+            datetime(2026, 5, 20, 12, 0, tzinfo=UTC),
+        )
+        == []
+    )
+
+
 def test_lightning_unequal_arrays_are_rejected() -> None:
     coordinator = _coordinator()
 
@@ -242,6 +317,40 @@ def test_empty_lightning_payload_has_no_strikes() -> None:
         )
         == []
     )
+
+
+def test_sea_level_ignores_unknown_parameter() -> None:
+    """Ignore records outside the two explicitly understood FMI datums."""
+    coordinator_private = cast(Any, _coordinator())
+
+    mareo_data = coordinator_private._FMIDataUpdateCoordinator__parse_mareo_payload(
+        _sea_level_payload(parameter="SyntheticUnsupportedDatum")
+    )
+
+    assert mareo_data.size() == 0
+
+
+@pytest.mark.parametrize(
+    ("timestamp", "value", "message"),
+    [
+        (None, "12.5", "invalid sea-level record values"),
+        ("not-a-timestamp", "12.5", "invalid sea-level record timestamp"),
+        ("2026-05-20T12:00:00", "12.5", "invalid sea-level record timestamp"),
+        ("2026-05-20T12:00:00+00:00", "NaN", "invalid sea-level record value"),
+    ],
+)
+def test_sea_level_rejects_invalid_values(
+    timestamp: str | None,
+    value: str,
+    message: str,
+) -> None:
+    """Reject incomplete, naive, malformed, and non-finite sea-level records."""
+    coordinator_private = cast(Any, _coordinator())
+
+    with pytest.raises(OptionalSourceError, match=message):
+        coordinator_private._FMIDataUpdateCoordinator__parse_mareo_payload(
+            _sea_level_payload(timestamp=timestamp, value=value)
+        )
 
 
 def test_geocoder_failure_keeps_coordinates_and_caches_fallback(monkeypatch) -> None:
@@ -463,3 +572,37 @@ def test_malformed_lightning_xml_is_rejected() -> None:
             load_text_fixture("lightning_malformed.xml").encode(),
             datetime(2026, 5, 28, 21, 0, tzinfo=UTC),
         )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b'<!DOCTYPE root [<!ENTITY value "unsafe">]><root>&value;</root>',
+        (b'<!DOCTYPE root [<!ENTITY value SYSTEM "file:///etc/passwd">]><root>&value;</root>'),
+    ],
+)
+def test_xml_entities_are_rejected(payload: bytes) -> None:
+    """Never expand internal or external entities supplied by FMI XML."""
+    coordinator = _coordinator()
+
+    with pytest.raises(OptionalSourceError, match="invalid XML"):
+        _parse_lightning(
+            coordinator,
+            payload,
+            datetime(2026, 5, 28, 21, 0, tzinfo=UTC),
+        )
+
+
+def test_external_dtd_is_inert() -> None:
+    """An external DTD declaration must not load or add content to the document."""
+    coordinator = _coordinator()
+    payload = b'<!DOCTYPE root SYSTEM "file:///etc/passwd"><root />'
+
+    assert (
+        _parse_lightning(
+            coordinator,
+            payload,
+            datetime(2026, 5, 28, 21, 0, tzinfo=UTC),
+        )
+        == []
+    )

@@ -4,9 +4,11 @@
 
 > **Target repository:** [`kogeler/fmi-hass-custom`](https://github.com/kogeler/fmi-hass-custom)
 > **Intended executor:** OpenAI Codex
-> **Plan baseline date:** 2026-08-02
-> **Execution model:** one bounded session per Codex invocation
-> **Plan status:** `PLANNED`
+> **Plan baseline date:** 2026-08-17 (rebased against the current repository)
+> **Execution model:** sequential green session checkpoints in one owner-requested implementation run
+> **Plan status:** `DONE`
+> **Execution branch:** `feat/map-location` (existing PR branch)
+> **Release train:** existing `1.1.0` section; P02 must not increment it again
 > **Canonical agent entry point:** `AGENTS.md`
 > **Verified baseline:** `plans/P02/BASELINE.md` (created by S00)
 > **Execution reports:** `plans/P02/SXX.md`
@@ -44,21 +46,26 @@ between `docs/`, `docs/maintenance/`, or another plan directory.
 P02 is independent from the completed P01 plan. Read `plans/P01/PLAN.md` and `plans/P01/` only when a
 historical decision is needed; do not update them while executing P02.
 
-For the first execution session, use:
+The owner explicitly requested on 2026-08-17 that S00 through S04 execute sequentially in this
+branch without waiting for a commit or a new Codex invocation between green sessions. Session
+boundaries, prerequisites, reports, and requirement evidence still apply: complete and document
+one session before starting the next, but continue automatically while no blocker exists.
+
+For the current full execution, use:
 
 ```text
-Read AGENTS.md and plans/P02/PLAN.md in full. Inspect the current repository and
-execute Session S00 only. Update the tracker and write plans/P02/BASELINE.md and
-plans/P02/S00.md. Do not start S01.
+Read AGENTS.md and plans/P02/PLAN.md in full. Inspect the current repository and execute
+S00 through S04 in order. At each boundary update the tracker/report and run that
+session's gates. Continue to the next session only when its prerequisite is DONE.
 ```
 
-For subsequent sessions, use:
+If execution is interrupted and later resumed, use:
 
 ```text
 Read AGENTS.md and plans/P02/PLAN.md in full. Inspect git status, relevant current
 maintenance contracts, and the previous plans/P02/SXX.md report. Execute exactly
 the next NOT_STARTED session whose prerequisites are DONE. Update the tracker and
-write its report. Do not start a later session.
+write its report, then continue sequentially while the owner-requested run remains active.
 ```
 
 To request one specific session:
@@ -71,14 +78,15 @@ perform work assigned to another session.
 
 ### Context-safety rule
 
-Each session owns one coherent concern. Never combine sessions unless the repository owner
-explicitly asks for it. If work expands beyond the stated concern:
+Each session owns one coherent concern. The owner's continuous-execution instruction permits
+consecutive sessions, not mixing their scopes or marking later work complete early. If one
+session expands beyond the stated concern:
 
 1. Stop at a green, documented checkpoint that is ready for owner review and commit.
 2. Add sub-sessions such as `S02-A` and `S02-B` to the tracker.
 3. Record why the split was necessary in the current report.
 4. Leave the parent session `IN_PROGRESS` until all required sub-sessions are `DONE`.
-5. Continue in a later Codex invocation.
+5. Continue the split sub-session before advancing to the next numbered session.
 
 Do not silently absorb station-selection work, unrelated config-flow cleanup, dependency upgrades,
 or entity/runtime refactoring into P02.
@@ -187,7 +195,11 @@ based only on inspection when a Home Assistant-level test is possible.
 - Do not record owner coordinates, addresses, cookies, headers, or raw private responses.
 - Only `pytest.mark.live` tests may access FMI.
 - Do not add network access to ordinary config-flow or lifecycle tests.
-- Keep the required live run sequential and inside the documented request budget.
+- Every maintained pytest target, including live and compatibility probes, keeps the current
+  `-n auto --dist=worksteal` default. Preserve the shared file-locked live request counter and
+  two-slot semaphore. S03 raises the suite ceiling from ten to twelve attempts only because the
+  public-place probe adds one place lookup and one validation request, each with the existing
+  single retry policy.
 
 ### 4.3 Home Assistant config-flow correctness
 
@@ -242,22 +254,28 @@ based only on inspection when a Home Assistant-level test is possible.
 
 ### 4.7 Dependency and environment policy
 
-- Prefer the Home Assistant selector API and the selected FMI client already present in the lock.
+- Root `pyproject.toml` owns exact runtime and development direct dependencies;
+  `tools/lint/pyproject.toml` owns Ruff alone. The generated root locks are
+  `requirements.txt` (runtime), `requirements-dev.txt` (toolbox), and
+  `requirements-lint.txt` (host Ruff). Do not add a `requirements/` directory, `.in` file, or
+  another dependency owner.
+- Prefer the Home Assistant selector API and `fmi-weather-client==1.0.0` already present in the
+  runtime/development locks.
 - Do not add a new dependency for mapping or place search.
 - If the selected FMI client cannot safely expose place resolution, implement a narrow adapter over
   its documented public API before considering a direct WFS implementation.
 - Any unavoidable dependency change follows `docs/maintenance/DEPENDENCIES.md` and
-  `docs/maintenance/DEVELOPMENT.md`, including clean `pip freeze` regeneration.
-- Run supported Python/Home Assistant commands through rootless Podman; the host Python is not a
-  fallback.
+  `docs/maintenance/DEVELOPMENT.md`, including regeneration and review of all affected hash locks.
+- All project-aware commands except Ruff run through the confined rootless Podman toolbox without
+  bind mounts; host Python exists only to run exact hash-locked Ruff and is not a fallback.
 
 ### 4.8 Release and documentation policy
 
 - `.version` remains the only human-maintained project version.
-- P02 must not hardcode a future release number. S00 records the target increment strategy; the
-  first implementation session synchronizes `.version`, manifest, and a dated changelog section
-  before the P02 branch is opened as a PR.
-- Subsequent P02 sessions update the same release section with only notable user-facing changes.
+- The owner selected release `1.1.0` before P02 execution. `.version`, the manifest mirror, and the
+  dated `## 1.1.0 - 2026-08-17` changelog section already agree on this existing PR branch.
+- P02 must keep `1.1.0` and add only notable user-facing P02 entries to that existing section. It
+  must not create `1.1.1`, another dated section, or a second version increment.
 - Current-facing documentation links to the latest GitHub Release and must not copy the numeric
   project version.
 - Update the owning files under `docs/maintenance/` when their current contracts change. Store
@@ -273,20 +291,43 @@ based only on inspection when a Home Assistant-level test is possible.
 - Do not run Git operations that may require a hardware token, interactive credentials, or
   authenticated SSH.
 - Do not commit. The repository owner owns all commits.
-- Leave a reviewed working tree and provide exactly one concise suggested commit message beginning
-  with `P02-SXX:` at session end.
-- Use `OWNER_TO_COMMIT` for a completed session until the owner provides its commit SHA. Replace it
-  in the tracker/report when a later session can verify the owner's commit.
+- During continuous execution, record a concise `P02-SXX:` suggested checkpoint message in each
+  session report but do not pause for an owner commit. Use `OWNER_TO_COMMIT` until the owner later
+  supplies commit evidence; session prerequisites depend on green reports, not intermediate Git
+  commits.
+- The final handoff provides one consolidated suggested owner commit message after S04.
 - Never reset, stash, overwrite, or reformat unrelated owner changes.
 
 ---
 
 ## 5. Baseline snapshot to verify in S00
 
-This snapshot records planning evidence from 2026-08-02. S00 must refresh it against the actual
-working tree and current authoritative documentation before implementation, then preserve the
-verified result in `plans/P02/BASELINE.md`. The baseline file is evidence for P02 execution, not a
-current maintenance contract.
+This snapshot was rebased on 2026-08-17 against `feat/map-location` at
+`2c884b0402a00c59e9276ac25610b242b403a849`. S00 must still verify the
+selector and FMI place APIs and preserve the measured pre-P02 state in `plans/P02/BASELINE.md`.
+The baseline file is evidence for P02 execution, not a current maintenance contract.
+
+### Verified current execution baseline
+
+- The release train is already `1.1.0`; `.version`, manifest, and the dated changelog section are
+  synchronized, and the PR Version increment job passes against `master` `1.0.1`.
+- Root PEP 621 metadata plus `tools/lint/pyproject.toml` own every direct dependency. The three
+  generated SHA-256 hash locks contain 9 runtime, 176 development, and 1 Ruff package.
+- All project-aware tools except Ruff execute in content-addressed rootless Podman containers with
+  tar-streamed source, no bind-mounted checkout, private namespaces, no capabilities, NNP,
+  read-only root, bounded resources, scrubbed environment, and no network by default.
+- `PYTEST_WORKERS ?= auto`; offline, network-block, live, and compatibility suites use xdist
+  work-stealing. Before P02, live workers shared a ten-attempt counter and two-request semaphore;
+  S03 raises only the counter ceiling to twelve under D012.
+- The current complete offline suite has 268 tests and a 95% gate; the latest full run measured
+  99.36% combined line/branch coverage. S00 must remeasure rather than copying that result as P02
+  evidence.
+- CI is consolidated in `.github/workflows/ci.yml`; P02 requires no new workflow. Dependency
+  Review, bounded live FMI, HACS/HA validation, CodeQL, stable compatibility, and informational
+  prerelease compatibility remain separately visible jobs.
+- `fmi-weather-client==1.0.0`, `geopy==2.5.0`, and `xmltodict==1.0.4` are the exact runtime direct
+  dependencies. Integration-owned XML parsing is bounded to 2 MiB, entity-disabled, and guarded by
+  the Expat 2.7.2 minimum.
 
 ### Current repository behavior
 
@@ -318,11 +359,12 @@ current maintenance contract.
 ### Available FMI capability
 
 - FMI WFS forecast stored queries accept a `place` parameter.
-- The selected `fmi-weather-client` exposes public place-name weather and forecast functions, but
-  the integration's narrow adapter currently exposes only coordinate weather/forecast plus
-  observation calls.
-- A live planning probe resolved the public names Helsinki, Stockholm, Oslo, and Tallinn to
-  canonical place names and coordinates through the selected client.
+- The integration adapter currently exposes coordinate weather/forecast and place/station
+  observation calls, but no place-name forecast-current resolution method.
+- Planning evidence from 2026-08-02 says the selected client exposed public place-name weather and
+  forecast functions and resolved Helsinki, Stockholm, Oslo, and Tallinn. S00 must reverify the
+  installed 1.0.0 signature, threading, timeout, logging, exceptions, and result shape before this
+  evidence may drive implementation.
 - This proves locations beyond Finland can resolve, but it is not an exhaustive or stable list of
   supported countries or cities.
 - FMI exposes monitoring networks and station metadata separately. A planning query for the active
@@ -343,7 +385,9 @@ current maintenance contract.
    point passed through the common final coordinate validation path.
 6. How will a search result with the same coordinates as an existing entry surface the existing
    `already_configured` abort?
-7. What release increment is appropriate at implementation time, without hardcoding it in P02?
+7. How is P02 recorded in the existing `1.1.0` changelog section without another version bump?
+   The owner-fixed answer is: add notable P02 entries to that section and keep all version mirrors
+   at `1.1.0`.
 
 ---
 
@@ -353,16 +397,16 @@ This table is a living record. Update status, tests, report, and commit evidence
 
 | ID | Required outcome | Owner | Primary evidence | Report | Commit | Status |
 |---|---|---|---|---|---|---|
-| R01 | New setup uses a standard map selector initialized at the Home Assistant location instead of raw coordinate fields | S01 | `tests/test_config_flow.py` | `plans/P02/S01.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
-| R02 | Reconfigure uses the map selector initialized at the entry's current location | S01 | `tests/test_config_flow.py` | `plans/P02/S01.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
-| R03 | Setup and reconfigure both expose a complete alternative FMI place-name search path | S02 | config-flow and FMI contract tests | `plans/P02/S02.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
-| R04 | A resolved place is shown on a confirmation map and any adjusted point receives normal coordinate validation | S02 | config-flow step/default/result assertions | `plans/P02/S02.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
-| R05 | Both paths persist the existing data shape and preserve identity, registry, lifecycle, and multi-entry isolation | S01/S03 | config-flow, migration, lifecycle tests | `plans/P02/S03.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
-| R06 | Duplicate, not-found, transport, server, malformed-result, cancel, back, and concurrent-flow cases never partially mutate an entry | S02/S03 | negative-path Home Assistant tests | `plans/P02/S03.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
-| R07 | Raw search text and exact coordinates remain absent from logs and diagnostics | S03 | privacy/log/diagnostic tests | `plans/P02/S03.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
-| R08 | A bounded public live probe detects FMI place-resolution drift without weakening offline isolation | S03 | `tests/test_live_fmi.py`; request-budget evidence | `plans/P02/S03.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
-| R09 | Strings, user guide, reconfiguration/runtime contracts, changelog, and agent map reflect the proven behavior without duplicating release numbers | S04 | docs review and validation | `plans/P02/S04.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
-| R10 | Full repository gates pass and no station/catalog/manual-coordinate scope entered the implementation | S04 | final verification matrix | `plans/P02/S04.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
+| R01 | New setup uses a standard map selector initialized at the Home Assistant location instead of raw coordinate fields | S01 | `tests/test_config_flow.py` | `plans/P02/S01.md` | `OWNER_TO_COMMIT` | DONE |
+| R02 | Reconfigure uses the map selector initialized at the entry's current location | S01 | `tests/test_config_flow.py` | `plans/P02/S01.md` | `OWNER_TO_COMMIT` | DONE |
+| R03 | Setup and reconfigure both expose a complete alternative FMI place-name search path | S02 | config-flow and FMI contract tests | `plans/P02/S02.md` | `OWNER_TO_COMMIT` | DONE |
+| R04 | A resolved place is shown on a confirmation map and any adjusted point receives normal coordinate validation | S02 | config-flow step/default/result assertions | `plans/P02/S02.md` | `OWNER_TO_COMMIT` | DONE |
+| R05 | Both paths persist the existing data shape and preserve identity, registry, lifecycle, and multi-entry isolation | S01/S03 | config-flow, migration, lifecycle tests | `plans/P02/S03.md` | `OWNER_TO_COMMIT` | DONE |
+| R06 | Duplicate, not-found, transport, server, malformed-result, cancel, back, and concurrent-flow cases never partially mutate an entry | S02/S03 | negative-path Home Assistant tests | `plans/P02/S03.md` | `OWNER_TO_COMMIT` | DONE |
+| R07 | Raw search text and exact coordinates remain absent from logs and diagnostics | S03 | privacy/log/diagnostic tests | `plans/P02/S03.md` | `OWNER_TO_COMMIT` | DONE |
+| R08 | A bounded public live probe detects FMI place-resolution drift without weakening offline isolation | S03 | `tests/test_live_fmi.py`; request-budget evidence | `plans/P02/S03.md` | `OWNER_TO_COMMIT` | DONE |
+| R09 | Strings, user guide, reconfiguration/runtime contracts, changelog, and agent map reflect the proven behavior without duplicating release numbers | S04 | docs review and validation | `plans/P02/S04.md` | `OWNER_TO_COMMIT` | DONE |
+| R10 | Full repository gates pass and no station/catalog/manual-coordinate scope entered the implementation | S04 | final verification matrix | `plans/P02/S04.md` | `OWNER_TO_COMMIT` | DONE |
 
 Status values: `NOT_STARTED`, `IN_PROGRESS`, `BLOCKED`, `DONE`.
 
@@ -382,6 +426,7 @@ Status values: `NOT_STARTED`, `IN_PROGRESS`, `BLOCKED`, `DONE`.
 | Privacy leakage | Place input may be an address and coordinates identify a home | Filter dependency logs; never echo input, coordinates, raw XML, URL parameters, or external payloads |
 | Reconfigure identity regression | A new step structure could accidentally recreate or rename entries | Use `async_update_and_abort` only after final validation and assert all persistent identity/registry fields |
 | Search/client boundary drift | The upstream place method is outside the current integration adapter | Add a narrow contract-tested adapter and a bounded live public-place probe |
+| Place parser bypasses payload ceiling | The upstream convenience call parses its response before integration code can enforce the existing 2 MiB XML limit | Preserve the selected client's request/query/timeout and parser semantics inside the adapter, but validate the response with the existing bounded XML boundary before invoking the upstream parser |
 | Unsupported point | The map permits points outside FMI forecast coverage | Let FMI coordinate validation reject the point with a clear non-destructive error |
 | Back/cancel stale state | Multi-step flow candidates may leak into a later attempt | Keep candidate state per flow instance, replace it on each search, and test cancellation/retry sequences |
 | Translations drift | New menu/step/error keys may pass Python tests but fail hassfest | Update `strings.json` and `translations/en.json` together and run repository validation |
@@ -466,18 +511,22 @@ request explicitly and update `docs/maintenance/LIVE_TESTS.md` if the budget cha
 
 ### 8.5 Coverage and quality
 
-- Keep the repository coverage gate at or above its current threshold.
+- Keep the repository coverage gate at 95% or higher and compare P02 coverage with the measured
+  99.36% current baseline; do not accept a material unexamined drop merely because 95% passes.
 - Do not add exclusions, `noqa`, broad type ignores, xfails, sleeps, retries, or assertion weakening
   merely to make P02 pass.
 - Ruff, Pylint, mypy, network blocking, config-flow tests, migration tests, lifecycle tests,
   hassfest, HACS/layout validation, and actionlint must not regress.
-- Use pytest-xdist only through the existing opt-in Make variable. Live tests remain sequential.
+- Every pytest target keeps automatic xdist through `PYTEST_WORKERS=auto`; fixed worker values are
+  diagnostic overrides only. Preserve live request/concurrency guards rather than serializing the
+  live suite.
 
 ---
 
 ## 9. CI and repository quality target
 
-P02 does not need a new workflow. The existing event matrix remains authoritative.
+P02 does not need a new workflow. The consolidated `.github/workflows/ci.yml` event matrix and
+permission boundaries remain authoritative.
 
 Required P02 verification uses:
 
@@ -492,11 +541,13 @@ Required P02 verification uses:
 - current stable/prerelease compatibility commands if selector/config-flow behavior differs across
   the moving environments
 - `make audit` and `make licenses` only if dependencies change
+- `make check` as the complete local gate, and `make ci` for final reviewed audit parity
 
 CI requirements:
 
 - ordinary config-flow tests remain offline;
-- the live place test runs in the existing bounded live step after offline coverage;
+- the live place test runs with auto-workers in the existing bounded live job after offline
+  coverage and shares the S00-decided twelve-attempt/two-concurrent-request guard;
 - workflow permissions and triggers remain unchanged unless a demonstrated P02 need requires a
   narrowly reviewed update;
 - no inline pip pins, custom CI HTTP calls, mutable action references, or scheduled workflows are
@@ -511,11 +562,11 @@ Update this table at the start and end of every execution session.
 
 | Session | Objective | Prerequisites | Report | Commit | Status |
 |---|---|---|---|---|---|
-| S00 | Refresh baseline, freeze UX/data/error contracts, and add place-boundary characterization evidence | None | `plans/P02/BASELINE.md`; `plans/P02/S00.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
-| S01 | Replace raw-coordinate setup/reconfigure forms with the Home-defaulted standard map path | S00 DONE | `plans/P02/S01.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
-| S02 | Add FMI place-name search and map confirmation to setup and reconfigure | S01 DONE | `plans/P02/S02.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
-| S03 | Prove error, privacy, identity, migration, lifecycle, multi-entry, and live FMI behavior; fix confirmed gaps | S02 DONE | `plans/P02/S03.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
-| S04 | Finalize translations/docs/release notes and run the complete verification matrix | S03 DONE | `plans/P02/S04.md` | `OWNER_TO_COMMIT` | NOT_STARTED |
+| S00 | Refresh baseline, freeze UX/data/error contracts, and add place-boundary characterization evidence | None | `plans/P02/BASELINE.md`; `plans/P02/S00.md` | `OWNER_TO_COMMIT` | DONE |
+| S01 | Replace raw-coordinate setup/reconfigure forms with the Home-defaulted standard map path | S00 DONE | `plans/P02/S01.md` | `OWNER_TO_COMMIT` | DONE |
+| S02 | Add FMI place-name search and map confirmation to setup and reconfigure | S01 DONE | `plans/P02/S02.md` | `OWNER_TO_COMMIT` | DONE |
+| S03 | Prove error, privacy, identity, migration, lifecycle, multi-entry, and live FMI behavior; fix confirmed gaps | S02 DONE | `plans/P02/S03.md` | `OWNER_TO_COMMIT` | DONE |
+| S04 | Finalize translations/docs/release notes and run the complete verification matrix | S03 DONE | `plans/P02/S04.md` | `OWNER_TO_COMMIT` | DONE |
 
 The plan is complete only when every session and every requirement row is `DONE`.
 
@@ -528,7 +579,8 @@ The plan is complete only when every session and every requirement row is `DONE`
 1. Read `AGENTS.md`, this plan, the previous P02 report, and the smallest relevant
    `docs/maintenance/` contracts.
 2. Inspect `git status`, current branch, recent commits, and all unexplained working-tree changes.
-3. Reconcile `OWNER_TO_COMMIT` with any owner commit created since the previous session.
+3. Reconcile `OWNER_TO_COMMIT` only if the owner committed during an interruption; an intermediate
+   commit is not a prerequisite in the continuous run.
 4. Confirm all prerequisites are `DONE`.
 5. Mark only the current session `IN_PROGRESS`.
 6. Recheck external/API assumptions that materially affect this session.
@@ -554,9 +606,10 @@ The plan is complete only when every session and every requirement row is `DONE`
 4. Write or update `plans/P02/SXX.md` using the template below.
 5. Mark the session `DONE` only when all exit criteria pass and no assigned work remains.
 6. Do not mark checks as passed unless the exact command completed successfully.
-7. Leave the working tree for owner review; do not commit.
-8. Provide exactly one concise suggested commit message beginning with `P02-SXX:`.
-9. Do not begin the next session.
+7. Leave all changes in the shared working tree; do not commit.
+8. Record one concise suggested checkpoint message beginning with `P02-SXX:` in the report.
+9. In the owner-requested continuous run, advance immediately to the next session only after the
+   current report and gates are complete; otherwise stop at this green checkpoint.
 
 ---
 
@@ -587,8 +640,8 @@ the user-visible flow.
 8. Add sanitized fixtures and characterization/contract tests needed by S02. Do not expose the new
    UI yet.
 9. Record the live test location and exact incremental request budget.
-10. Record the SemVer increment strategy for the first implementation session based on the current
-    base version and repository policy; do not hardcode the chosen number into this plan.
+10. Verify that `.version`, manifest, and the existing `1.1.0` changelog section remain synchronized;
+    record the owner decision that P02 stays in this release without another increment.
 11. Create `plans/P02/BASELINE.md` containing the verified pre-implementation repository state,
     current selector/config-flow and FMI place-boundary evidence, privacy/request limits, test/CI
     baseline, open questions closed by S00, authoritative references with access dates, and any
@@ -644,8 +697,8 @@ new setup and reconfiguration while preserving the existing stored-data and iden
    from the exposed forms.
 9. Add setup/reconfigure tests for defaults, moved marker, invalid selector data, unsupported point,
    duplicate coordinates, failure, cancel, identity preservation, and reload behavior.
-10. At the first implementation change, apply the S00-approved project version increment, sync the
-    manifest, and open the matching dated changelog section. Do this once for P02, not per session.
+10. Keep `.version` and the manifest at `1.1.0`; add the first notable P02 entry to the existing
+    `## 1.1.0 - 2026-08-17` changelog section without opening another release section.
 11. Update `docs/maintenance/RECONFIGURATION.md` if the current contract changes materially.
 12. Write `plans/P02/S01.md`.
 
@@ -688,8 +741,10 @@ requiring confirmation on the standard map before common final validation and pe
 1. Expose the S00-defined translated choice/menu with exactly map and place-search paths.
 2. Add a translated text-selector form for a city or place name. Keep `name` semantically distinct
    from the search query.
-3. Extend the integration's narrow FMI adapter with the S00-characterized public place-resolution
-   call and validated result model.
+3. Extend the integration's narrow FMI adapter with the S00-characterized place-resolution
+   semantics and validated result model. Do not call the upstream async convenience wrapper
+   directly because it parses before the integration can enforce its 2 MiB XML ceiling; retain the
+   selected request function, ten-second timeout, and parser only after bounded pre-validation.
 4. Keep dependency I/O outside the event loop and preserve cancellation/privacy filters.
 5. On success, retain only the transient canonical place and coordinate candidate needed for the
    confirmation step.
@@ -701,7 +756,9 @@ requiring confirmation on the standard map before common final validation and pe
    sanitized generic error.
 9. Do not echo raw input or coordinates in logs or error text.
 10. Add deterministic setup and reconfigure tests for success, adjustment, ambiguity confirmation,
-    duplicate resolution, all error classes, retry, back, cancel, and repeated search.
+    duplicate resolution, all error classes, retry, cancel, and repeated search. Home Assistant's
+    backend flow API has no separate Back callback: prove that aborting an uncommitted search or
+    confirmation and starting another path writes nothing and carries no transient candidate.
 11. Add notable changelog content to the existing P02 release section.
 12. Update current maintenance contracts affected by the new FMI setup-time boundary.
 13. Write `plans/P02/S02.md`.
@@ -804,30 +861,37 @@ records, and demonstrate that the complete repository remains release-ready.
 2. Update `docs/USER_GUIDE.md` to describe map selection, Home-location default, place search,
    confirmation, reconfiguration, unsupported-point errors, and privacy without numeric release
    duplication.
-3. Keep `README.md` concise; update it only if its capability/limitation summary or documentation
+3. Synchronize `strings.json` and every existing translation locale with the implemented menu,
+   map, search, confirmation, and error keys; S04 audit found that S02's English-only wording had
+   omitted the existing Finnish locale.
+4. Keep `README.md` concise; update it only if its capability/limitation summary or documentation
    index materially changed.
-4. Update the owning current maintenance contracts and the `AGENTS.md` documentation map or rules
+5. Update the owning current maintenance contracts and the `AGENTS.md` documentation map or rules
    only where needed for future maintenance.
-5. Remove the P02 TODO item only after all sessions and requirements are actually complete; do not
+6. Remove the P02 TODO item only after all sessions and requirements are actually complete; do not
    remove unrelated TODO items.
-6. Finalize the existing P02 changelog section with significant user-visible changes only.
-7. Verify `.version`, manifest mirror, changelog section, and latest-release documentation policy.
-8. Run focused tests followed by every required local repository gate.
-9. Run stable/prerelease compatibility when feasible and record exact results without converting
+7. Finalize the existing P02 changelog section with significant user-visible changes only.
+8. Verify `.version`, manifest mirror, changelog section, and latest-release documentation policy.
+9. Run focused tests followed by every required local repository gate.
+10. Run stable/prerelease compatibility when feasible and record exact results without converting
    the informational prerelease signal into a support claim.
-10. Review GitHub workflow diffs only if P02 changed CI; otherwise explicitly record that no new
-    workflow was required.
-11. Update all requirement rows, tracker, decision log, and plan status to `DONE` only after the
-    final matrix passes.
-12. Write `plans/P02/S04.md` with complete verification and remaining non-P02 limitations.
+11. Review GitHub workflow diffs only if P02 changed CI; otherwise explicitly record that no new
+   workflow was required.
+12. Update all requirement rows, tracker, decision log, and plan status to `DONE` only after the
+   final matrix passes.
+13. Write `plans/P02/S04.md` with complete verification and remaining non-P02 limitations.
 
 ### Verification
 
+- `make check`
+- `make ci`
 - `make format-check`
 - `make lint`
 - `make type-check`
+- `make bandit`
 - `make test-full`
 - `make test-network-block`
+- `make confinement-test`
 - `make validate`
 - `make version-check`
 - `make live`
@@ -928,8 +992,17 @@ Update this table when evidence changes a decision.
 | D002 | Owner/P02 | 2026-08-02 | Do not expose a separate manual coordinate form | Retain raw fields under an advanced mode | The map already selects an arbitrary precise point; a second numeric path adds UI and test complexity without demonstrated need | ACCEPTED |
 | D003 | Owner/P02 | 2026-08-02 | Keep station selection outside P02 and separate from forecast-point selection | Country/city/station hierarchy; force forecast to a station | Forecast coverage and observation-station metadata are different FMI concepts; valid forecasts do not require stations | ACCEPTED |
 | D004 | Owner/P02 | 2026-08-02 | Use FMI directly for place resolution and no additional geocoder | Nominatim/Google/Mapbox forward geocoding; scraped city catalog | The selected client and official WFS support `place`; another provider adds privacy, policy, availability, and dependency risk | ACCEPTED |
-| D005 | Plan/P02 | 2026-08-02 | Preserve existing persisted latitude/longitude and identity fields; selector/search state remains transient | Persist a new nested location object or search mode | Runtime and migrations already use stable coordinates plus independent identity; UI input shape does not justify data migration | PROVISIONAL_UNTIL_S00 |
+| D005 | Plan/P02 | 2026-08-02 | Preserve existing persisted latitude/longitude and identity fields; selector/search state remains transient | Persist a new nested location object or search mode | S00 confirmed that runtime, migrations, diagnostics, and registries consume the current top-level coordinates and independent identity; the standard selector mapping needs only transient normalization | ACCEPTED |
 | D006 | Plan/P02 | 2026-08-02 | Reproduce P01's self-contained directory pattern with `PLAN.md`, S00-owned `BASELINE.md`, and `SXX.md` session reports under `plans/P02/` | Reuse `plans/P01/`; put baseline/reports in `docs/maintenance/`; omit a distinct verified baseline | P02 needs an independent plan, pre-implementation snapshot, and chronological history while maintenance docs remain current technical contracts | ACCEPTED |
+| D007 | Owner/P02 | 2026-08-17 | Execute P02 in the existing `feat/map-location` branch and keep the already selected release `1.1.0` | Open another branch; create `1.1.1` or a second changelog section | The owner explicitly grouped the location UX with the current unreleased work; version mirrors and the dated section already pass CI | ACCEPTED |
+| D008 | Owner/P02 | 2026-08-17 | Execute green S00-S04 checkpoints consecutively without waiting for intermediate owner commits | One Codex invocation and owner commit per session | The owner requested uninterrupted sequential execution; reports and gates retain scope/evidence boundaries | ACCEPTED |
+| D009 | Rebase/P02 | 2026-08-17 | Preserve the current two-manifest/three-lock dependency ownership, confined toolbox, and auto-xdist Make contract | Reintroduce legacy requirement inputs, host test environments, opt-in xdist, or serial live tests | Current code, Make, AGENTS, and maintenance docs agree on these enforced repository contracts | ACCEPTED |
+| D010 | S00/P02 | 2026-08-17 | Use `user`/`reconfigure` as translated menus with exactly `map` and `place`; use `place_confirm` for the resolved-map step | Separate Home mode; raw coordinate fallback; silently create after place lookup | The supported HA flow API translates list menu options, and one location selector covers both accepting Home and moving the marker; explicit confirmation protects against ambiguous names | ACCEPTED |
+| D011 | S00/P02 | 2026-08-17 | Wrap the standard `LocationSelector` with integration-owned finite WGS84 validation and validate place results into a narrow immutable value | Trust selector coercion; persist the upstream `Weather`; add a third-party geocoder | HA 2026.8.1 coerces floats but accepts booleans/non-finite/out-of-range values; the selected FMI client returns a wider model than the flow needs | ACCEPTED |
+| D012 | S00/P02 | 2026-08-17 | Reuse public Helsinki for the live place contract and raise the suite ceiling from 10 to 12 attempts in S03 | Add an unbounded probe; remove retries; add another public/private location | Repurposing the southern dependency probe adds exactly one nominal call and two worst-case retry attempts while retaining the existing two-request concurrency limit | ACCEPTED |
+| D013 | S02/P02 | 2026-08-17 | Compose place resolution in the integration adapter from the selected client's request and parser with bounded XML pre-validation, instead of calling its async convenience wrapper directly | Parse directly through `async_weather_by_place_name`; replace the selected client; accept an unbounded parser input | S02 code review found that the convenience wrapper invokes xmltodict before integration code can enforce the existing 2 MiB ceiling. The narrow adapter keeps the same FMI query, ten-second HTTP timeout, executor isolation, exception surface, and parser model while restoring the repository security contract | ACCEPTED |
+| D014 | S02/P02 | 2026-08-17 | Treat frontend Back as abandonment of the current backend flow and prove abort/restart isolation | Invent an `async_step_back`; claim a backend event that HA does not expose; omit abandonment coverage | The supported `FlowManager` validates forms and menu navigation but exposes no previous-step callback. All writes remain at the final boundary, so aborting search/confirmation and starting another route is the executable non-mutation/stale-state contract | ACCEPTED |
+| D015 | S04/P02 | 2026-08-17 | Keep every existing translation locale structurally and semantically synchronized with the new flow | Update only source strings and English; leave Finnish raw-coordinate forms until a later translation pass | S04 inventory found `translations/fi.json` still exposed removed latitude/longitude steps. Hassfest accepts stale optional locale keys, so explicit repository review and correction are required | ACCEPTED |
 
 ---
 
@@ -1045,7 +1118,8 @@ Record access dates in the executing session report.
 The plan is executable without repeated product clarification, but these outputs deserve owner
 review before P02 is merged:
 
-1. **S00:** exact flow state diagram, wording, confirmation behavior, and release increment strategy.
+1. **S00:** exact flow state diagram, wording, confirmation behavior, and confirmation that P02
+   remains in the existing `1.1.0` release section.
 2. **S01:** map-first setup/reconfigure UI and proof that accepting Home location is obvious.
 3. **S02:** place-search result/confirmation UX and error wording.
 4. **S03:** privacy evidence, identity/migration matrix, and live request-budget change.

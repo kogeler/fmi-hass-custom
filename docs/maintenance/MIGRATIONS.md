@@ -2,7 +2,7 @@
 
 # Config And Registry Migrations
 
-Last verified: 2026-08-08 against Home Assistant 2026.8.1 and the local v0.6.2 tag.
+Last verified: 2026-08-17 against Home Assistant 2026.8.1 and the local v0.6.2 tag.
 
 ## Supported source state
 
@@ -51,12 +51,20 @@ When `daily_mode` is disabled, the registry record remains and Home Assistant ex
 
 ## Reconfiguration after migration
 
-After migration, reconfiguration may change coordinates, config-entry title, and device display name. It does not change `entity_identity`, config unique ID, registry IDs, entity unique IDs, or entity IDs. Existing location-derived IDs therefore remain stable even when the resolved place changes, including customized IDs and the optional daily entity.
+After migration, either map reconfiguration or FMI place search followed by map confirmation may
+change coordinates, config-entry title, and device display name. Neither path changes
+`entity_identity`, config unique ID, options, registry IDs, entity unique IDs, or entity IDs.
+Existing location-derived IDs therefore remain stable even when the resolved place changes,
+including customized IDs and the optional daily entity.
 
 Duplicate-coordinate checks compare current coordinates both before and after migration. Stable internal identity never permits two entries to converge on the same configured location.
 
 ## Verification
 
-`tests/test_migrations.py` materializes the serialized fixture through current Home Assistant config-entry, entity-registry, device-registry, setup, reload, state, options, and reconfigure APIs. It verifies config-only migration, combined setup, repeated migration/reload, future-version refusal, custom and ambiguous IDs, target collisions, same-name multi-entry isolation, daily disable/re-enable, and post-migration coordinate changes.
+`tests/test_migrations.py` materializes the serialized fixture through current Home Assistant
+config-entry, entity-registry, device-registry, setup, reload, state, options, and reconfigure APIs.
+It verifies config-only migration, combined setup, repeated migration/reload, future-version
+refusal, custom and ambiguous IDs, target collisions, same-name multi-entry isolation, daily
+disable/re-enable, and a post-migration place-search move with map confirmation.
 
 The fixture is synthetic, uses rounded public city coordinates, and contains no captured FMI payload or owner location.

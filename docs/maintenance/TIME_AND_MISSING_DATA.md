@@ -2,6 +2,8 @@
 
 # Time and Missing-Data Policy
 
+Last verified against current code: 2026-08-16.
+
 ## Sun Events and Weather Symbols
 
 FMI symbol `1` means clear conditions. When Home Assistant supplies both timezone-aware sunrise and sunset values in chronological order, the integration reports `clear-night` at or outside those boundaries and `sunny` between them.

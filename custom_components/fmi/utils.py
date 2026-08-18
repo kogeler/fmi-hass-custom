@@ -22,9 +22,12 @@ class BoundingBox:
 
 def get_bounding_box(latitude_in_degrees, longitude_in_degrees, half_side_in_km):
     """Calculate a finite WGS84 bounding box, including at either pole."""
-    assert 0 < half_side_in_km
-    assert -90.0 <= latitude_in_degrees <= 90.0
-    assert -180.0 <= longitude_in_degrees <= 180.0
+    if half_side_in_km <= 0:
+        raise ValueError("bounding-box half-side must be positive")
+    if not -90.0 <= latitude_in_degrees <= 90.0:
+        raise ValueError("latitude must be between -90 and 90 degrees")
+    if not -180.0 <= longitude_in_degrees <= 180.0:
+        raise ValueError("longitude must be between -180 and 180 degrees")
 
     radius = 6371
     # Radius of the parallel at given latitude

@@ -2,13 +2,23 @@
 
 # Optional Lightning and Sea-Level Sources
 
+Last verified against current code: 2026-08-17.
+
 ## Availability and freshness
 
 Lightning and sea-level data are independent optional sources. A failure, empty result, or malformed response clears that source's previous data and makes only its sensor unavailable. Current weather, observations, and forecasts continue updating. A later valid response restores the optional sensor automatically.
 
 All optional FMI HTTP requests use Home Assistant's shared aiohttp session. Each request has a 2-second connect timeout, a 3-second read timeout, a 5-second total timeout, and a 2 MiB response limit. HTTP client errors, server errors, transport failures, timeouts, empty responses, invalid XML, and invalid data shapes are classified separately in transition logs. The integration does not retry optional requests within one coordinator update.
 
-XML parsing and reverse geocoding run in Home Assistant's executor. Lightning position and value arrays must have equal lengths. Individual malformed lightning rows are discarded; an unsafe array mismatch rejects the complete lightning response. Supported sea-level records require a finite numeric value and a timezone-aware ISO timestamp. All timestamps stored for Home Assistant are aware UTC datetimes.
+XML parsing and reverse geocoding run in Home Assistant's executor. XML uses the direct
+`xmltodict==1.0.4` runtime dependency with entity declarations explicitly disabled. Both internal
+and external entity declarations are rejected. Expat has no external-resource handler in this
+path, so a bare external DTD declaration is accepted as inert metadata but is never loaded. The
+parser rejects Expat older than 2.7.2 and applies the same 2 MiB input ceiling even when invoked
+outside the HTTP fetch path. Lightning position and value arrays must have equal lengths.
+Individual malformed lightning rows are discarded; an unsafe array mismatch rejects the complete
+lightning response. Supported sea-level records require a finite numeric value and a timezone-aware
+ISO timestamp. All timestamps stored for Home Assistant are aware UTC datetimes.
 
 ## Lightning maximum age
 

@@ -4,9 +4,11 @@
 
 This document is the maintenance contract for coordinator ownership, I/O boundaries, availability,
 and runtime side effects. Read it before changing `custom_components/fmi/__init__.py`,
-`fmi_client.py`, or any entity platform. The supported reference environment is declared in
-`hacs.json` and the committed dependency freeze. Keep historical investigation outside this
-current contract.
+`fmi_client.py`, or any entity platform. The current reference environment is declared by root
+PEP 621 metadata and `requirements-dev.txt`; `hacs.json` independently declares the installation
+floor. Keep historical investigation outside this current contract.
+
+Last verified against current code: 2026-08-17.
 
 ## Entry Ownership And Lifecycle
 
@@ -25,12 +27,17 @@ current contract.
 ## Event-Loop And Network Boundaries
 
 - Coordinate current/forecast work in the synchronous FMI client runs outside the event loop
-  through `asyncio.to_thread`. Observation helpers use the client's executor-backed async API.
+  through `asyncio.to_thread`, including forecast XML parsing. Observation helpers use the
+  client's executor-backed async API.
+- Setup/reconfigure place resolution uses the selected client's ten-second request and parser
+  semantics inside `asyncio.to_thread`, after the response passes the same entity-disabled 2 MiB
+  XML boundary as coordinate forecasts.
 - Integration-owned lightning and sea-level HTTP uses Home Assistant's shared aiohttp session.
-  XML parsing and Nominatim reverse geocoding run through `async_add_executor_job`.
-- Cancellation must propagate. Source boundaries catch only the documented finite transport,
-  client/server, parser, and external-shape exceptions; do not replace them with a broad
-  `Exception` catch.
+  Their XML parsing and Nominatim reverse geocoding run through `async_add_executor_job`.
+- Cancellation must propagate. Primary FMI/dependency parsing boundaries catch the documented
+  transport, client/server, parser, and external-shape exceptions. The optional-source wrapper
+  deliberately catches any ordinary `Exception` so an unexpected optional failure cannot disable
+  current weather; cancellation remains outside that catch and propagates.
 - Ordinary tests block sockets. Only the marker-isolated probes described in `LIVE_TESTS.md` may
   use real network access.
 
@@ -54,11 +61,14 @@ Transition logging should report an outage and recovery once, not on every poll.
 - Empty results and `None` are no-data failures. Numeric boundaries accept finite values and reject
   booleans, malformed strings, NaN, and infinities without fabricating zeroes.
 - FMI dependency requests use the client's ten-second HTTP timeout inside the 40-second primary
-  coordinator bound. Optional HTTP uses 2-second connect, 3-second read, and 5-second total
-  timeouts plus a 2 MiB response limit.
+  coordinator bound; transient setup place lookup uses the same ten-second request timeout.
+  Integration-owned optional FMI HTTP uses 2-second connect, 3-second read, and 5-second total
+  timeouts plus a 2 MiB response limit. Nominatim reverse geocoding has its own three-second
+  timeout.
 - Runtime refreshes add no retry loop. A normal primary refresh makes one current request, one
   hourly forecast request, and one sea-level request. Place observation is requested only after a
-  current failure. Station and enabled lightning each add one request on their own cadence.
+  current failure. A station adds one request on its independent cadence. Enabled lightning adds
+  one FMI request and may add at most one rate-limited Nominatim request on a cache miss.
 - Forecast, optional-source timestamp, and missing-value semantics are defined in
   `FORECAST_SEMANTICS.md`, `TIME_AND_MISSING_DATA.md`, and `OPTIONAL_SOURCES.md`.
 
@@ -67,8 +77,8 @@ Transition logging should report an outage and recovery once, not on every poll.
 The integration must not configure the process-wide root logger. Logs may contain source names,
 availability transitions, HTTP status classes, and exception class names, but not configured
 coordinates, coordinate-derived identity, raw FMI/XML responses, or arbitrary external exception
-text. The FMI dependency logger filter must continue to remove coordinate-bearing request records
-and raw parser payloads.
+text. Place-search text has the same protection. The FMI dependency logger filter must continue to
+remove query/coordinate-bearing request records and raw parser payloads.
 
 Diagnostics expose only sanitized configuration/options, config version, poll cadence, coordinator
 success, and source availability flags. They must not expose coordinates, place/weather values,
@@ -83,7 +93,12 @@ privacy boundary.
 - `tests/test_runtime_audit.py`: no process-wide logging configuration.
 - `tests/test_compatibility_security.py`: executor boundaries, logging privacy, diagnostics,
   optional HTTP bounds, and polar bounding boxes.
-- `tests/test_auxiliary_payloads.py`: optional-source parsing, timestamps, freshness, and failures.
+- `tests/test_auxiliary_payloads.py`: bounded entity-disabled optional-source XML parsing,
+  timestamps, freshness, and failures.
+- `tests/test_fmi_contract.py`: bounded entity-disabled forecast/place XML parsing and adapter
+  request semantics.
+- `tests/test_xml_parser.py`: Expat version floor, entity rejection, inert external DTD behavior,
+  byte limits, namespaces, and parser result-shape validation.
 
 Run `make test-full`, `make type-check`, and `make test-network-block` after changing these
 contracts. Use `make live` only when the change can affect the external FMI boundary.

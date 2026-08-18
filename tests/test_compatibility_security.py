@@ -9,13 +9,14 @@ import logging
 from datetime import timedelta
 from types import SimpleNamespace
 from typing import Any, cast
+from unittest.mock import AsyncMock
 
 import pytest
 from fmi_weather_client import models
 from fmi_weather_client.errors import ClientError
 from homeassistant import config_entries
 from homeassistant.components.diagnostics import REDACTED
-from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME
+from homeassistant.const import CONF_LATITUDE, CONF_LOCATION, CONF_LONGITUDE, CONF_NAME
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -125,14 +126,56 @@ async def test_config_flow_does_not_log_external_validation_payload(
     result = await hass.config_entries.flow.async_init(
         const.DOMAIN,
         context={"source": config_entries.SOURCE_USER},
-        data={
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"next_step_id": "map"},
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
             CONF_NAME: "FMI",
-            CONF_LATITUDE: 60.123456,
-            CONF_LONGITUDE: 24.654321,
+            CONF_LOCATION: {
+                CONF_LATITUDE: 60.123456,
+                CONF_LONGITUDE: 24.654321,
+            },
         },
     )
 
     assert result["errors"] == {"base": "unknown"}
+    assert "60.123456" not in caplog.text
+    assert "24.654321" not in caplog.text
+
+
+async def test_place_flow_does_not_log_query_or_malformed_result(
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Keep transient search text and external result details out of normal logs."""
+    private_query = "Private address 60.123456,24.654321"
+    monkeypatch.setattr(
+        fmi_client,
+        "async_resolve_place",
+        AsyncMock(side_effect=ValueError(f"malformed result for {private_query}")),
+    )
+    caplog.set_level(logging.ERROR, logger="custom_components.fmi")
+    result = await hass.config_entries.flow.async_init(
+        const.DOMAIN,
+        context={"source": config_entries.SOURCE_USER},
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"next_step_id": "place"},
+    )
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_NAME: "FMI", const.CONF_PLACE_QUERY: private_query},
+    )
+
+    assert result["errors"] == {"base": "unknown"}
+    assert private_query not in caplog.text
     assert "60.123456" not in caplog.text
     assert "24.654321" not in caplog.text
 
@@ -161,6 +204,7 @@ async def test_diagnostics_redact_location_and_stable_identity(
     assert result["entry"]["data"][CONF_LATITUDE] == REDACTED
     assert result["entry"]["data"][CONF_LONGITUDE] == REDACTED
     assert result["entry"]["data"][const.CONF_ENTITY_IDENTITY] == REDACTED
+    assert const.CONF_PLACE_QUERY not in result["entry"]["data"]
     assert result["coordinators"]["primary"] == {
         "last_update_success": True,
         "poll_interval_seconds": 1800.0,
@@ -171,6 +215,17 @@ async def test_diagnostics_redact_location_and_stable_identity(
     assert "24.654321" not in serialized
 
 
+def test_source_availability_snapshot_cannot_mutate_coordinator_state() -> None:
+    """Keep sanitized diagnostics consumers from changing source health."""
+    coordinator = cast(Any, object.__new__(FMIDataUpdateCoordinator))
+    coordinator._source_available = {"forecast": True}
+
+    snapshot = coordinator.source_availability
+    snapshot["forecast"] = False
+
+    assert coordinator.source_availability == {"forecast": True}
+
+
 @pytest.mark.parametrize("latitude", [-90.0, 90.0])
 def test_lightning_bounding_box_is_valid_at_geographic_poles(latitude: float) -> None:
     """Keep optional FMI bbox coordinates finite and inside WGS84 limits."""
@@ -178,3 +233,24 @@ def test_lightning_bounding_box_is_valid_at_geographic_poles(latitude: float) ->
 
     assert -90 <= bbox.lat_min <= bbox.lat_max <= 90
     assert -180 <= bbox.lon_min <= bbox.lon_max <= 180
+
+
+def test_lightning_bounding_box_spans_globe_when_crossing_antimeridian() -> None:
+    """Avoid an inverted FMI query box when a radius crosses the date line."""
+    bbox = utils.get_bounding_box(0.0, 179.0, half_side_in_km=200)
+
+    assert (bbox.lon_min, bbox.lon_max) == (-180.0, 180.0)
+
+
+@pytest.mark.parametrize(
+    ("latitude", "longitude", "half_side"),
+    [(91.0, 24.94, 200), (60.17, 181.0, 200), (60.17, 24.94, 0)],
+)
+def test_lightning_bounding_box_rejects_invalid_inputs(
+    latitude: float,
+    longitude: float,
+    half_side: int,
+) -> None:
+    """Input validation remains active under optimized Python execution."""
+    with pytest.raises(ValueError):
+        utils.get_bounding_box(latitude, longitude, half_side)

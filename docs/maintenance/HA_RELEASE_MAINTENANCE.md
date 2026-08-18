@@ -2,7 +2,7 @@
 
 # Home Assistant Release Maintenance
 
-Last verified: 2026-08-08.
+Last verified: 2026-08-16.
 
 ## Purpose And Boundaries
 
@@ -15,7 +15,7 @@ Keep these four version contracts separate:
 | Contract | Owner | Meaning |
 |---|---|---|
 | HACS installation floor | `hacs.json` `homeassistant` | Oldest Home Assistant release HACS may install this integration on |
-| Reference test environment | `requirements-direct.txt` and generated `requirements.txt` | Exact graph used by local development and required CI |
+| Reference test environment | Root PEP 621 `dev` extra and generated `requirements-dev.txt` | Exact graph used by local development and required CI |
 | Integration runtime dependencies | `custom_components/fmi/manifest.json` `requirements` | Packages Home Assistant installs for FMI users |
 | FMI integration release | `.version` and generated manifest `version` | Published tag and GitHub/HACS integration version |
 
@@ -24,23 +24,25 @@ change alone is not a user-facing FMI release and is not evidence that the HACS 
 
 ## Stable Refresh Procedure
 
-1. Inspect `git status` and read the current `.version`, `hacs.json`, `requirements-direct.txt`,
-   manifest requirements, dependency-audit exceptions, and relevant `TODO.md` items. Do not mix
+1. Inspect `git status` and read the current `.version`, `hacs.json`, root `pyproject.toml`, manifest
+   requirements, dependency-audit exceptions, and relevant `TODO.md` items. Do not mix
    unrelated work into the refresh.
 2. Confirm the new stable Home Assistant release and matching
    `pytest-homeassistant-custom-component` release from authoritative project metadata. Run
    `make compatibility-stable` before changing the committed graph; its recreated environment and
    complete test run are the first compatibility signal.
-3. Update only the Home Assistant/helper selections in `requirements-direct.txt`. If Home Assistant
+3. Update only the Home Assistant/helper selections in root PEP 621 `dev`. If Home Assistant
    changes its required Python runtime, separately review and update the immutable Python image
    digest. Do not copy selected versions into tests, runtime code, image names, or `hacs.json`.
-4. Run `make lock`, review every direct and transitive change in `requirements.txt`, then run
-   `make dev-build`. The image build must complete with a clean `pip check`.
+4. Run `make lock`, review every direct and transitive change in all three root locks, then run
+   `make dev-build`. The image build must complete with a clean `pip check`; `make freeze-check`
+   must reproduce the locks without upgrades.
 5. Run `make audit-raw` and classify every finding. Do not override a Home Assistant transitive pin.
    Remove fixed exceptions, add only owner-approved exact package/version/advisory exceptions, and
    record any accepted upstream block and removal trigger in `TODO.md`. `make audit` must pass.
 6. Run the complete verification set: `make format-check`, `make lint`, `make type-check`,
-   `make test-full`, `make test-network-block`, `make validate`, `make licenses`, and `make live`.
+   `make bandit`, `make test-full`, `make test-network-block`, `make confinement-test`,
+   `make validate`, `make licenses`, and `make live`.
    Run `make compatibility-stable` again for the final graph. Run
    `make compatibility-prerelease` as an informational signal. Absence of a newer installable
    prerelease produces a successful explicit skip; an actual prerelease failure remains visible but
@@ -65,17 +67,16 @@ For a maintenance-only refresh:
 - leave `.version` and the manifest `version` mirror unchanged;
 - place notable maintenance, compatibility, and security notes under the top `## Unreleased`
   section of `CHANGELOG.md`;
-- commit the refreshed reference requirements, generated full freeze, audit policy, and maintenance
+- commit the refreshed PEP 621 manifest, generated hash locks, audit policy, and maintenance
   documentation, but do not create a tag or GitHub Release;
 - require every functional, validation, live, compatibility-stable, dependency, and security check
   to pass normally.
 
-The current **Version increment** workflow deliberately rejects an unchanged `.version`. For this
+The CI **Version increment** job deliberately rejects an unchanged `.version`. For this
 owner-approved maintenance-only path, the owner manually bypasses only that required check when
-merging. Afterward, the standalone **Version increment** workflow still fails on the resulting
-`master` push. The **Release** workflow independently finds the already published version and exits
-successfully after its read-only release-state job; its version, CI, validation, and publish jobs
-are skipped. The manual bypass must never be used when the release conditions below apply.
+merging. The **Release** workflow independently finds the already published version and exits
+successfully after its read-only release-state job; reusable CI and publication are skipped. The
+manual bypass must never be used when the release conditions below apply.
 
 A new FMI integration release is required when any of these changes:
 
@@ -90,7 +91,7 @@ may publish the tag and GitHub Release.
 
 ## Interpretation
 
-The complete root freeze answers: "Which exact environment did maintainers test?" The HACS floor
+The complete dev hash lock answers: "Which exact environment did maintainers test?" The HACS floor
 answers: "What is the oldest Home Assistant release allowed to install this integration?" The
 manifest requirements answer: "Which additional packages does the integration ask Home Assistant
 to install for a user?" None of those questions, by itself, changes the FMI integration version.

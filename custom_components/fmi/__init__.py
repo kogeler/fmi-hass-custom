@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
 from asyncio import gather, timeout
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -35,6 +34,14 @@ from requests.exceptions import RequestException
 
 from . import const, utils
 from . import fmi_client as fmi
+from .xml_parser import (
+    XMLDocument,
+    XMLPayloadError,
+    iter_xml_elements,
+    parse_xml_document,
+    xml_children,
+    xml_text,
+)
 
 LOGGER = const.LOGGER
 PLATFORMS = ["sensor", "weather"]
@@ -45,13 +52,13 @@ _FMI_SOURCE_ERRORS = (
     fmi_erros.ClientError,
     fmi_erros.ServerError,
     RequestException,
-    ET.ParseError,
     ExpatError,
     AttributeError,
     IndexError,
     KeyError,
     OSError,
     OverflowError,
+    SyntaxError,
     TypeError,
     ValueError,
 )
@@ -121,11 +128,6 @@ class _LightningCandidate:
     peak_current: float
     cloud_cover: float
     ellipse_major: float
-
-
-def base_unique_id(latitude, longitude):
-    """Return unique id for entries in configuration."""
-    return f"{latitude}_{longitude}"
 
 
 def legacy_entity_identity(latitude: float, longitude: float) -> str:
@@ -269,10 +271,6 @@ class FMIMareoStruct:
         """Get the sea level values."""
         return list(self.sea_levels)
 
-    def append(self, sea_level_data: SeaLevelData) -> None:
-        """Append one validated sea-level value."""
-        self.sea_levels.append(sea_level_data)
-
     def append_values(self, time_val: datetime, sea_level: float) -> None:
         """Append validated values as a typed sea-level record."""
         sea_level_data = FMIMareoStruct.SeaLevelData(time_val, sea_level)
@@ -324,7 +322,6 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         self.max_precip = float(
             _options.get(const.CONF_MAX_PRECIPITATION, const.PRECIPITATION_MAX_DEFAULT)
         )
-        self.daily_mode = bool(_options.get(const.CONF_DAILY_MODE, const.DAILY_MODE_DEFAULT))
         self._lightning_state = _LightningState(
             enabled=bool(_options.get(const.CONF_LIGHTNING, const.LIGHTNING_DEFAULT)),
             radius=int(
@@ -510,22 +507,22 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 self.best_precipitation = precipitation_amount
 
     @staticmethod
-    def __xml_rows(root: ET.Element, local_name: str) -> list[str]:
+    def __xml_rows(document: XMLDocument, local_name: str) -> list[str]:
         """Return non-empty whitespace-normalized rows for an XML local name."""
         return [
             row
-            for element in root.iter()
-            if element.tag.rsplit("}", 1)[-1] == local_name and element.text
-            for row in element.text.splitlines()
+            for node in iter_xml_elements(document, local_name)
+            if (text := xml_text(node)) is not None
+            for row in text.splitlines()
             if row.strip()
         ]
 
     @staticmethod
-    def __parse_xml(payload: bytes, source: str) -> ET.Element:
+    def __parse_xml(payload: bytes, source: str) -> XMLDocument:
         """Parse one bounded XML payload with a classified failure."""
         try:
-            return ET.fromstring(payload)
-        except ET.ParseError as error:
+            return parse_xml_document(payload)
+        except XMLPayloadError as error:
             raise OptionalSourceError(f"{source} invalid XML") from error
 
     def __lightning_location(
@@ -661,9 +658,9 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         now: datetime,
     ) -> list[FMILightningStruct]:
         """Validate, age-filter, distance-limit, and label lightning rows."""
-        root = self.__parse_xml(payload, "lightning")
-        positions = self.__xml_rows(root, "positions")
-        reasons = self.__xml_rows(root, "doubleOrNilReasonTupleList")
+        document = self.__parse_xml(payload, "lightning")
+        positions = self.__xml_rows(document, "positions")
+        reasons = self.__xml_rows(document, "doubleOrNilReasonTupleList")
         if not positions and not reasons:
             return []
         if len(positions) != len(reasons):
@@ -686,14 +683,15 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
     def __parse_mareo_payload(self, payload: bytes) -> FMIMareoStruct:
         """Validate supported sea-level records and retain aware timestamps."""
-        root = self.__parse_xml(payload, "sea-level")
+        document = self.__parse_xml(payload, "sea-level")
         mareo_data = FMIMareoStruct()
-        for member in root:
+        for member in iter_xml_elements(document, "member"):
             try:
-                record = member[0]
-                raw_time = record[1].text
-                parameter = record[2].text
-                raw_value = record[3].text
+                record = xml_children(member)[0][1]
+                fields = xml_children(record)
+                raw_time = xml_text(fields[1][1])
+                parameter = xml_text(fields[2][1])
+                raw_value = xml_text(fields[3][1])
             except IndexError as error:
                 raise OptionalSourceError("invalid sea-level record shape") from error
             if parameter == "SeaLevelN2000":
@@ -920,9 +918,7 @@ class FMIObservationUpdateCoordinator(FMIDataUpdateCoordinator):
         )
 
     async def _fetch_observation(self):
-        """Fetch the latest obsevation data from specified station."""
-        if not self.observation_station_id:
-            return None
+        """Fetch the latest observation data from the configured station."""
         try:
             observation = await fmi.async_observation_by_station_id(self.observation_station_id)
         except _FMI_SOURCE_ERRORS as error:

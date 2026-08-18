@@ -18,6 +18,7 @@ from fmi_weather_client.errors import ClientError, ServerError
 from homeassistant.util.loop import protect_loop
 
 from custom_components.fmi import fmi_client as integration_fmi_client
+from custom_components.fmi.xml_parser import XMLPayloadError
 from tests.helpers.fmi import (
     CONSUMED_WEATHER_DATA_FIELDS,
     FIXTURE_DIR,
@@ -40,6 +41,7 @@ def test_consumed_model_shape_matches_installed_client() -> None:
 
 def test_consumed_async_method_signatures_match_installed_client() -> None:
     """Detect incompatible method changes before the dependency upgrade."""
+    assert tuple(inspect.signature(fmi.async_weather_by_place_name).parameters) == ("name",)
     assert tuple(inspect.signature(fmi.async_weather_by_coordinates).parameters) == ("lat", "lon")
     assert tuple(inspect.signature(fmi.async_forecast_by_coordinates).parameters) == (
         "lat",
@@ -49,6 +51,128 @@ def test_consumed_async_method_signatures_match_installed_client() -> None:
     )
     assert tuple(inspect.signature(fmi.async_observation_by_station_id).parameters) == ("fmi_sid",)
     assert tuple(inspect.signature(fmi.async_observation_by_place).parameters) == ("place",)
+
+
+async def test_selected_client_place_lookup_uses_executor_and_weather_model(monkeypatch) -> None:
+    """Characterize the public place resolver selected for the config-flow adapter."""
+    expected = weather_from_fixture("forecast_normal.json")
+    assert expected is not None
+    event_loop_thread = threading.get_ident()
+    worker_threads: list[int] = []
+
+    def weather_by_place_name(name: str) -> models.Weather:
+        worker_threads.append(threading.get_ident())
+        assert name == "Helsinki"
+        return expected
+
+    monkeypatch.setattr(
+        fmi,
+        "weather_by_place_name",
+        protect_loop(weather_by_place_name, event_loop_thread),
+    )
+
+    resolved = await fmi.async_weather_by_place_name("Helsinki")
+
+    assert resolved is expected
+    assert worker_threads and worker_threads[0] != event_loop_thread
+    assert resolved.place == "Helsinki"
+    assert resolved.lat == 60.17
+    assert resolved.lon == 24.94
+
+
+async def test_place_adapter_returns_only_validated_location_fields(monkeypatch) -> None:
+    """Bound and parse one request off-loop, then retain only finite location fields."""
+    forecast = forecast_from_fixture("forecast_normal.json")._replace(place="  Helsinki  ")
+    event_loop_thread = threading.get_ident()
+    worker_threads: list[int] = []
+
+    def request(place: str) -> str:
+        worker_threads.append(threading.get_ident())
+        assert place == "Helsinki"
+        return "<root />"
+
+    request_mock = Mock(side_effect=protect_loop(request, event_loop_thread))
+    parse = Mock(return_value=forecast)
+    monkeypatch.setattr(fmi.http, "request_weather_by_place", request_mock)
+    monkeypatch.setattr(fmi.forecast_parser, "parse_fmi_response", parse)
+
+    result = await integration_fmi_client.async_resolve_place("Helsinki")
+
+    assert result == integration_fmi_client.PlaceResolution("Helsinki", 60.17, 24.94)
+    request_mock.assert_called_once_with("Helsinki")
+    parse.assert_called_once_with("<root />", models.RequestType.WEATHER)
+    assert worker_threads and worker_threads[0] != event_loop_thread
+
+
+async def test_place_adapter_preserves_no_data_result(monkeypatch) -> None:
+    """Let the flow distinguish a recognized call with no usable place data."""
+    forecast = forecast_from_fixture("forecast_normal.json")._replace(forecasts=[])
+    monkeypatch.setattr(fmi.http, "request_weather_by_place", Mock(return_value="<root />"))
+    monkeypatch.setattr(
+        fmi.forecast_parser,
+        "parse_fmi_response",
+        Mock(return_value=forecast),
+    )
+
+    assert await integration_fmi_client.async_resolve_place("Missing") is None
+
+
+@pytest.mark.parametrize(
+    ("place", "latitude", "longitude", "error_type"),
+    [
+        ("", 60.17, 24.94, ValueError),
+        ("   ", 60.17, 24.94, ValueError),
+        (None, 60.17, 24.94, ValueError),
+        ("Helsinki", True, 24.94, TypeError),
+        ("Helsinki", 60.17, False, TypeError),
+        ("Helsinki", float("nan"), 24.94, ValueError),
+        ("Helsinki", 60.17, float("inf"), ValueError),
+        ("Helsinki", 91, 24.94, ValueError),
+        ("Helsinki", 60.17, -181, ValueError),
+    ],
+)
+async def test_place_adapter_rejects_malformed_results(
+    monkeypatch,
+    place: object,
+    latitude: object,
+    longitude: object,
+    error_type: type[Exception],
+) -> None:
+    """Reject unsafe dependency output before it becomes transient flow state."""
+    forecast = forecast_from_fixture("forecast_normal.json")
+    malformed = forecast._replace(place=place, lat=latitude, lon=longitude)
+    monkeypatch.setattr(fmi.http, "request_weather_by_place", Mock(return_value="<root />"))
+    monkeypatch.setattr(
+        fmi.forecast_parser,
+        "parse_fmi_response",
+        Mock(return_value=malformed),
+    )
+
+    with pytest.raises(error_type):
+        await integration_fmi_client.async_resolve_place("Helsinki")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "<root>" + "x" * (2 * 1024 * 1024) + "</root>",
+        '<!DOCTYPE root [<!ENTITY value "unsafe">]><root>&value;</root>',
+    ],
+    ids=["oversized", "entity"],
+)
+async def test_place_adapter_rejects_unsafe_xml_before_upstream_parser(
+    monkeypatch,
+    payload: str,
+) -> None:
+    """Keep the selected convenience semantics behind the integration XML ceiling."""
+    parse = Mock()
+    monkeypatch.setattr(fmi.http, "request_weather_by_place", Mock(return_value=payload))
+    monkeypatch.setattr(fmi.forecast_parser, "parse_fmi_response", parse)
+
+    with pytest.raises(XMLPayloadError):
+        await integration_fmi_client.async_resolve_place("Helsinki")
+
+    parse.assert_not_called()
 
 
 def test_current_client_maps_three_second_wind_gust_field() -> None:
@@ -251,15 +375,15 @@ def test_client_adapter_rejects_non_string_parameter_contract(monkeypatch) -> No
 
 def test_hourly_gust_parser_ignores_absent_and_misaligned_fields() -> None:
     """Return no gusts when the optional field or its aligned value is unavailable."""
-    no_hourly_field = f"""
-        <root xmlns:swe="{integration_fmi_client.SWE_NAMESPACE}">
+    no_hourly_field = """
+        <root xmlns:swe="http://www.opengis.net/swe/2.0">
           <swe:field name="WindGust" />
         </root>
     """
-    missing_aligned_value = f"""
-        <root xmlns:gml="{integration_fmi_client.GML_NAMESPACE}"
-              xmlns:gmlcov="{integration_fmi_client.GMLCOV_NAMESPACE}"
-              xmlns:swe="{integration_fmi_client.SWE_NAMESPACE}">
+    missing_aligned_value = """
+        <root xmlns:gml="http://www.opengis.net/gml/3.2"
+              xmlns:gmlcov="http://www.opengis.net/gmlcov/1.0"
+              xmlns:swe="http://www.opengis.net/swe/2.0">
           <swe:field name="WindGust" />
           <swe:field name="HourlyMaximumGust" />
           <gmlcov:positions>60.17 24.94</gmlcov:positions>
@@ -269,6 +393,28 @@ def test_hourly_gust_parser_ignores_absent_and_misaligned_fields() -> None:
 
     assert integration_fmi_client._hourly_gusts_by_time(no_hourly_field) == {}  # noqa: SLF001
     assert integration_fmi_client._hourly_gusts_by_time(missing_aligned_value) == {}  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '<!DOCTYPE root [<!ENTITY value "unsafe">]><root>&value;</root>',
+        ('<!DOCTYPE root [<!ENTITY value SYSTEM "file:///etc/passwd">]><root>&value;</root>'),
+    ],
+)
+def test_hourly_gust_parser_rejects_entities(payload: str) -> None:
+    """The forecast adapter must reject internal and external entity declarations."""
+
+    with pytest.raises(XMLPayloadError, match="invalid or unsafe XML"):
+        integration_fmi_client._hourly_gusts_by_time(payload)  # noqa: SLF001
+
+
+def test_hourly_gust_parser_bounds_forecast_xml() -> None:
+    """Bound parser memory independently of the synchronous upstream transport."""
+    payload = "<root>" + "x" * (2 * 1024 * 1024) + "</root>"
+
+    with pytest.raises(XMLPayloadError, match="exceeds size limit"):
+        integration_fmi_client._hourly_gusts_by_time(payload)  # noqa: SLF001
 
 
 async def test_client_adapter_preserves_weather_and_forecast_timesteps(monkeypatch) -> None:
@@ -307,6 +453,37 @@ async def test_client_adapter_returns_none_for_empty_current_forecast(monkeypatc
     monkeypatch.setattr(integration_fmi_client, "_request_by_coordinates", lambda *args: empty)
 
     assert await integration_fmi_client.async_weather_by_coordinates(60.17, 24.94) is None
+
+
+async def test_observation_adapters_enforce_safe_expat(monkeypatch) -> None:
+    """Gate upstream observation parsing before it reaches xmltodict."""
+    expected = weather_from_fixture("observation.json", "observation")
+    assert expected is not None
+    gate = Mock()
+
+    async def observation_by_place(place: str):
+        assert place == "Helsinki"
+        return expected
+
+    async def observation_by_station_id(station_id: int):
+        assert station_id == 101004
+        return expected
+
+    monkeypatch.setattr(integration_fmi_client, "ensure_safe_expat", gate)
+    monkeypatch.setattr(
+        integration_fmi_client.upstream,
+        "async_observation_by_place",
+        observation_by_place,
+    )
+    monkeypatch.setattr(
+        integration_fmi_client.upstream,
+        "async_observation_by_station_id",
+        observation_by_station_id,
+    )
+
+    assert await integration_fmi_client.async_observation_by_place("Helsinki") is expected
+    assert await integration_fmi_client.async_observation_by_station_id(101004) is expected
+    assert gate.call_count == 2
 
 
 def test_observation_and_empty_results_use_real_models() -> None:

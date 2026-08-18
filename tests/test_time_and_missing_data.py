@@ -131,14 +131,14 @@ def test_numeric_string_weather_symbol_is_supported() -> None:
 def test_unknown_forecast_symbol_becomes_none() -> None:
     sample = forecast_from_fixture("forecast_normal.json").forecasts[0]._replace(symbol=_value(999))
 
-    assert _entity([sample])._forecast(daily_mode=False)[0][ATTR_FORECAST_CONDITION] is None
+    assert _entity([sample])._hourly_forecast()[0][ATTR_FORECAST_CONDITION] is None
 
 
 def test_empty_forecast_returns_empty_hourly_and_daily_lists() -> None:
     entity = _entity([])
 
-    assert entity._forecast(daily_mode=False) == []
-    assert entity._forecast(daily_mode=True) == []
+    assert entity._hourly_forecast() == []
+    assert entity._daily_forecast() == []
 
 
 def test_hourly_forecast_accepts_numeric_strings_and_rejects_invalid_values() -> None:
@@ -153,7 +153,7 @@ def test_hourly_forecast_accepts_numeric_strings_and_rejects_invalid_values() ->
         )
     )
 
-    result = _entity([sample])._forecast(daily_mode=False)
+    result = _entity([sample])._hourly_forecast()
 
     assert len(result) == 1
     assert result[0][ATTR_FORECAST_NATIVE_TEMP] == 2.5
@@ -168,7 +168,7 @@ def test_hourly_forecast_treats_missing_fields_as_unavailable() -> None:
         temperature=_value(-4.0, "°C"),
     )
 
-    result = _entity([sample])._forecast(daily_mode=False)
+    result = _entity([sample])._hourly_forecast()
 
     assert len(result) == 1
     assert result[0][ATTR_FORECAST_NATIVE_TEMP] == -4.0
@@ -184,7 +184,7 @@ def test_forecast_ignores_missing_and_timezone_naive_timestamps() -> None:
         sample,
     ]
 
-    result = _entity(samples)._forecast(daily_mode=False)
+    result = _entity(samples)._hourly_forecast()
 
     assert len(result) == 1
     assert datetime.fromisoformat(result[0][ATTR_FORECAST_TIME]).tzinfo is not None

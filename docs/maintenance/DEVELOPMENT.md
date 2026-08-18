@@ -2,135 +2,134 @@
 
 # Development Environment
 
-## Reference Environment
+Last verified: 2026-08-17.
 
-All local commands that depend on the selected Python or Home Assistant version run in rootless
-Podman. The Home Assistant 2026.8.1 reference uses Python 3.14.2; the host interpreter is never a
-fallback even when its version happens to match.
+## Execution Boundary
 
-`Containerfile.dev` pins the multi-architecture digest for the official Python 3.14.2 slim image. `requirements-direct.txt` is the reviewed human-maintained dependency source. Root `requirements.txt` is generated from a clean `lock` stage with `python -m pip freeze`, then installed with `--no-deps` in the development image. This is one coherent stable HA development/test reference; it does not contain a second beta or compatibility environment and does not define the HACS installation floor.
+All project-aware commands except Ruff run in rootless Podman. The host Python is used only to
+create `venv-lint/` and execute the exact Ruff version from `requirements-lint.txt`. It is not a
+fallback for tests, Home Assistant, dependency tools, validators, or repository helpers.
 
-`requirements-bootstrap.txt` is the separate exact bootstrap freeze used to upgrade pip before any other installation. Normal `pip freeze` omits pip, so keeping this one-package environment separate makes the bootstrap version reviewable without embedding it in Containerfiles or workflows. Every maintained `pip install` consumes a requirements or generated constraint file; package names and versions are not passed directly by CI, Make, container recipes, or CI helpers.
+`containers/toolbox/Containerfile` has two content-addressed stages:
 
-The committed reference freeze uses `pytest-homeassistant-custom-component==0.13.355`, which maps exactly to Home Assistant 2026.8.1. Newer helper releases target Home Assistant prereleases and are intentionally excluded from that stable lock; the dynamic compatibility targets discover and test them without changing the reference environment.
+- `lock` carries the exact wheel-only pip-tools bootstrap needed to generate its own locks;
+- `dev` installs `requirements-dev.txt` with `--require-hashes`, runs `pip check`, and includes
+  ShellCheck.
 
-Concrete Home Assistant and helper versions are dependency inputs and lock inventory, not test
-assertions or runtime conditions. The suite establishes compatibility by exercising behavior.
-`hacs.json` separately declares the oldest installable Home Assistant release and is not updated
-during a routine reference-lock refresh; raise it only for a reproduced interface or runtime
-incompatibility as defined in `HACS_RELEASES.md`.
+Project source is never copied into either image and never bind-mounted. `make/container.mk`
+streams `git ls-files --cached --others --exclude-standard` as a tar archive into `/work/src` on a
+private tmpfs. The image entrypoint refuses to run unless it proves a non-root UID, zero effective
+capabilities, `NoNewPrivs=1`, and seccomp mode 2.
 
-Local lock/development images use stable `localhost/fmi-hass-custom-*:local` names. Image names and
-the `.cache/podman-dev.stamp` path deliberately do not duplicate the Home Assistant version. The
-stamp depends on the Containerfile, Makefile, bootstrap file, and complete freeze, so a normal
-dependency update invalidates and rebuilds the environment automatically. `LOCAL_IMAGE_PREFIX`,
-`LOCK_IMAGE`, `DEV_IMAGE`, and `DEV_STAMP` remain overridable Make variables for parallel or custom
-local setups.
+Every toolbox run uses a read-only root filesystem, an auto-allocated subordinate user namespace,
+private IPC/PID/UTS/cgroup namespaces, dropped capabilities, scrubbed environment, bounded pids,
+memory, file descriptors, time, and writable tmpfs only. Networking is disabled by default.
+Resolution, audit, HACS, live FMI, compatibility, and outdated-package checks select the explicit
+online variant. The ordinary toolbox is bounded to 8 GiB memory/swap, 512 MiB `/tmp`, and 2 GiB
+`/work`; the measured Home Assistant resolver needs 16 GiB `/tmp` and 4 GiB `/work` while retaining
+the same 8 GiB memory ceiling. Hassfest alone receives a private 64 MiB `/dev/shm` for its internal
+multiprocessing semaphores.
 
-## Commands
+The Make orchestration graph is globally serialized, including when a caller supplies `make -j`.
+Pytest still uses automatic xdist workers inside its one container; serial Make orchestration avoids
+multiplying those worker pools and prevents races on locks, OCI archives, and exported reports.
+
+## Supported Commands
 
 | Task | Command |
 |---|---|
-| Regenerate the complete freeze | `make lock` |
-| Resolve/test latest stable HA | `make compatibility-stable` |
-| Resolve/test latest prerelease HA | `make compatibility-prerelease` |
-| Audit dependencies with reviewed exceptions | `make audit` |
-| Show the raw vulnerability inventory | `make audit-raw` |
-| Build/sync the development image | `make dev-build` |
-| Format | `make format` |
-| Check formatting | `make format-check` |
-| Lint | `make lint` |
-| Type check | `make type-check` |
+| Check host prerequisites and rootless Podman | `make doctor` |
+| Build the toolbox | `make dev-build` or `make toolbox-image` |
+| Build both toolbox and resolver | `make images` |
+| Generate all locks | `make lock` |
+| Upgrade and regenerate all locks | `make refresh-dependencies` |
+| Reproduce locks without upgrades | `make freeze-check` |
+| Format / check formatting | `make format` / `make format-check` |
+| Ruff and Pylint | `make lint` |
+| Mypy / Bandit | `make type-check` / `make bandit` |
+| Python/Bash syntax / ShellCheck | `make syntax` / `make shellcheck` |
 | Fast offline tests | `make test-fast` |
-| Fast offline tests with two worker processes | `make test-fast PYTEST_WORKERS=2` |
-| Full offline tests with coverage | `make test-full` |
-| Full offline tests with two worker processes | `make test-full PYTEST_WORKERS=2` |
-| Prove unexpected network access fails | `make test-network-block` |
-| Local layout and hassfest validation | `make validate` |
-| Opt-in live tests | `make live` |
-| Audit known dependency vulnerabilities | `make audit` |
-| Print the resolved license inventory | `make licenses` |
-| Report outdated packages | `make outdated` |
+| Full offline coverage | `make test-full` |
+| Network-block proof | `make test-network-block` |
+| Confinement proof | `make confinement-test` |
+| HA/actionlint/hassfest validation | `make validate` |
+| HACS validation with explicit remote inputs | `make validate-hacs` |
+| Reviewed/raw vulnerability checks | `make audit` / `make audit-raw` |
+| License / update inventory | `make licenses` / `make outdated` |
+| Build all three Dependency Submission manifests | `make dependency-snapshot` |
+| Latest stable/prerelease HA | `make compatibility-stable` / `make compatibility-prerelease` |
+| Public live FMI probes | `make live` |
+| Complete local gate / CI quality contract | `make check` / `make ci` |
 
-Build, lock, and compatibility commands may access package registries. Formatting, linting, typing, ordinary tests, and local validation run with Podman's `--network=none`; pytest also uses `pytest-socket`. `make live` additionally accesses FMI directly.
+`make validator-images` pulls the three immutable external validator digests. Normal validation
+then runs actionlint and hassfest offline. HACS necessarily remains online and requires
+`INPUT_GITHUB_TOKEN`, `REPOSITORY`, and `REPOSITORY_REF`; it validates that exact remote revision
+without receiving the checkout.
 
-## Dependency Update Process
+`make check` is the complete local gate excluding live FMI, moving compatibility, audit, and
+license inventory. It includes the offline dependency snapshot. Its lock-reproduction step uses
+the resolver's online contour; ordinary analysis, tests, and validators remain offline. HACS runs
+only when its three explicit remote inputs are present and otherwise reports a skip. `make ci` adds
+the reviewed dependency audit and is the quality job contract; CI keeps live FMI, HACS, dependency
+review, CodeQL, and moving compatibility as separately visible jobs with their own permissions and
+failure boundaries.
 
-For a new Home Assistant stable release, follow the complete discovery, lock, audit, verification,
-and release-decision procedure in `HA_RELEASE_MAINTENANCE.md`. The rules below describe the generic
-dependency mechanics used by that runbook and by non-HA dependency updates.
+## Dependency Environments
 
-The repository has three dependency-file roles:
+Direct dependencies have exactly two PEP 621 owners:
 
-- `requirements-direct.txt` contains reviewed exact direct selections for the reference stable
-  development/test environment. Root `requirements.txt` is its generated complete transitive
-  `pip freeze`.
-- `requirements-bootstrap.txt` is the separate exact pip bootstrap environment. It has no
-  third-party transitive packages in the selected Python image.
-- `requirements-compatibility-homeassistant.txt` and
-  `requirements-compatibility-direct.txt` are deliberately unpinned resolver inputs for moving
-  drift checks. Each run generates a separate ignored
-  `requirements-compatibility-*-resolved.txt` full freeze and recreates it before testing.
+- root `pyproject.toml` contains exact integration runtime dependencies plus the `dev` extra;
+- `tools/lint/pyproject.toml` contains Ruff alone.
 
-To update a direct reference dependency:
+`make lock` runs pip-tools in the resolver container and returns output only after all three
+generated root locks succeed:
 
-1. Verify the current stable release and its constraints from the authoritative project/package
-   metadata.
-2. Edit only the selected direct version in `requirements-direct.txt` (and the integration
-   manifest when it is an integration-owned runtime requirement).
-3. Run `make lock`. The clean Podman lock stage installs the bootstrap file and direct input, then
-   replaces root `requirements.txt` with its complete `pip freeze`.
-4. Review the direct change and every transitive lock change, run `make dev-build`, `pip check`
-   through the image build, the full offline gates, audits, and the manual stable/prerelease
-   compatibility targets.
+- `requirements.txt`: integration runtime review/audit graph;
+- `requirements-dev.txt`: runtime plus Home Assistant, its test helper, pytest, and analysis tools;
+- `requirements-lint.txt`: Ruff only.
 
-Do not copy the newly selected Home Assistant or helper version into tests, runtime code, image
-names, or `hacs.json`. The dependency files already record the exact graph. The HACS minimum changes
-only when functional evidence shows that the existing floor can no longer run the integration.
+Every lock has the standard pip-compile header, exact pins, and SHA-256 hashes. The development
+image deliberately permits hash-verified source distributions because Home Assistant's graph
+contains `mock-open` and `PyRIC` without wheels; they build only during the rootless image build.
+The host Ruff install is wheel-only. Ruff and pip-tools must never enter the development lock.
+`make dependency-snapshot` checks these three locks against their PEP 621 owners inside the offline
+toolbox and exports the ignored GitHub API manifest fragment to
+`.artifacts/dependency-snapshot.json`.
 
-No Makefile image tag or stamp name changes during a Home Assistant dependency update. If the new
-Home Assistant release requires a different Python version, review and update the pinned
-`PYTHON_IMAGE` digest separately before regenerating the freeze.
+To change a dependency:
 
-To refresh only transitives, leave `requirements-direct.txt` unchanged and run `make lock` in the
-clean resolver stage. Review why every transitive moved and run the same verification. Never edit
-root `requirements.txt` by hand. To update pip itself, change only
-`requirements-bootstrap.txt`, verify its clean environment with `pip freeze --all`, then rebuild
-both lock and development images; do not place a pip version in a command.
+1. Edit its exact direct requirement in the owning `pyproject.toml`. Keep root runtime requirements
+   identical to `custom_components/fmi/manifest.json`.
+2. Run `make refresh-dependencies` for an upgrade, or `make lock` after a direct pin change.
+3. Review all three lock diffs and confirm only the intended audiences changed.
+4. Run `make freeze-check`, `make dependency-snapshot`, `make test-full`, `make lint`,
+   `make type-check`, `make validate`, `make audit`, and `make licenses`.
+5. Run both compatibility targets for Home Assistant/runtime dependency changes.
 
-The compatibility inputs normally remain unpinned. Their generated freezes are per-run evidence,
-not committed support promises; use the workflow/Make logs to diagnose a newly selected package
-before deciding whether the supported direct set and committed root freeze should be upgraded.
+Never edit a generated lock by hand, add a `requirements/` directory or `.in` file, create another
+host virtual environment, or pass project package/version arguments directly to `pip install`.
 
-Ordinary tests support isolated `pytest-xdist` worker processes through `PYTEST_WORKERS`, for
-example `2`, `4`, or `auto`; `0` keeps the single-process default. Processes are used instead of
-threads because Home Assistant tests create per-test event loops and exercise process-global
-integration state. The 2026-07-31 warm-container benchmark measured 8.871 seconds for `-n 0`,
-13.199 seconds for `-n 2`, and 13.586 seconds for `-n 4`, so forcing parallelism would currently
-slow the suite down. Keep workers opt-in and benchmark again as the suite grows. The live suite and
-deliberate network-block probe remain sequential.
+## Parallel Tests And Artifacts
 
-`make audit` checks the complete Home Assistant development/test graph against exact reviewed
-package/version/advisory exceptions and passes only when that inventory matches. It also fails when
-an exception becomes stale. Home Assistant 2026.8.1 currently pins a vulnerable cryptography
-release; root `TODO.md` records the owner-approved exact temporary exception and upstream removal
-trigger. `make audit-raw` intentionally remains nonzero until upstream fixes the pin. Do not add
-broad audit ignores or override Home Assistant's exact package pins to make it green. The separately
-resolved integration-declared dependency closure has no accepted vulnerability exception; details
-are in `DEPENDENCIES.md`.
+Every maintained pytest command uses `-n auto --dist=worksteal`; xdist derives the worker count
+from the CPU resources visible inside the container. `PYTEST_WORKERS=<N>` is available only for
+diagnosis. Offline tests retain pytest-socket and container-level `--network=none`.
+Coverage configuration and the 95% threshold live only in `pyproject.toml`; `make test-full`
+returns XML, Markdown, and total reports through the entrypoint's explicit export allowlist into
+ignored `.artifacts/`.
 
-The HACS validator checks a GitHub ref through the GitHub API and requires the read-only workflow
-token; it cannot validate an uncommitted local working tree anonymously. CI invokes its reviewed
-container digest directly rather than using the action's mutable nested image tag. Hassfest and
-actionlint validate the mounted local tree and are both part of `make validate`.
+Live tests also use automatic workers. A file-locked counter and two-slot semaphore under the
+container's shared `/tmp` preserve the global twelve-attempt budget. Compatibility creates disposable
+resolver/runner virtual environments only inside the resolver container and derives its unpinned
+package names from root PEP 621 metadata.
 
-## Formatting and linting
+`make licenses` prints the installed graph's license inventory for maintainer review; it is not an
+independent required CI job. Unknown or incompatible licensing must still block a dependency
+update during that review.
 
-Ruff is the sole flake8-style linter and the repository formatter. Its configured rule families are `E`, `F`, `I`, `UP`, `B`, and `ASYNC`: core correctness/style, import ordering, Python upgrades, bugbear checks, and async correctness. `make lint` runs Ruff first and then Pylint as a complementary static analysis pass; Pylint does not duplicate the removed legacy toolchain.
-
-## Layout
-
-The distributed integration lives in `custom_components/fmi/`. Do not move runtime modules back to
-the repository root or re-enable HACS `content_in_root`: the standard layout is required by the
-current hassfest validation and Home Assistant custom-integration loader, and it avoids test-only
-import shims.
+OCI cache archives under `.artifacts/images/` are keyed by the exact image context. Save is atomic;
+load succeeds only if the archive restores the expected content-addressed tag. `make clean` removes
+known reports/caches but never the owner `tmp/` directory. `make clean-containers` removes only
+containers and images owned by this repository. Failed atomic exports return a valid empty tar
+stream without replacing host files, and `make coverage-report` accepts only the complete XML,
+Markdown, and total-report set from an actual coverage run.

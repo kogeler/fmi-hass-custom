@@ -9,8 +9,12 @@ import argparse
 import subprocess
 import sys
 import tempfile
+import tomllib
 import venv
 from pathlib import Path
+
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 HOME_ASSISTANT = "homeassistant"
 TEST_HELPER = "pytest-homeassistant-custom-component"
@@ -93,7 +97,42 @@ def _freeze(python: str, output: Path) -> None:
     result = _run([python, "-m", "pip", "freeze"], capture_output=True)
     if not result.stdout.strip():
         raise CompatibilityError("pip freeze produced an empty environment")
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(result.stdout, encoding="utf-8")
+
+
+def _moving_inputs(project: Path, root: Path) -> tuple[Path, Path]:
+    """Derive unpinned moving inputs from the reviewed PEP 621 direct set."""
+    try:
+        metadata = tomllib.loads(project.read_text(encoding="utf-8"))["project"]
+        runtime = metadata["dependencies"]
+        development = metadata["optional-dependencies"]["dev"]
+    except (KeyError, OSError, tomllib.TOMLDecodeError, TypeError) as error:
+        raise CompatibilityError(f"cannot read project dependency metadata: {error}") from error
+    if not isinstance(runtime, list) or not isinstance(development, list):
+        raise CompatibilityError("project dependencies and dev extra must be lists")
+
+    try:
+        runtime_requirements = [Requirement(item) for item in runtime]
+        development_requirements = [Requirement(item) for item in development]
+    except (TypeError, ValueError) as error:
+        raise CompatibilityError(f"invalid project requirement: {error}") from error
+
+    development_by_name = {
+        canonicalize_name(requirement.name): requirement for requirement in development_requirements
+    }
+    for required in (HOME_ASSISTANT, TEST_HELPER):
+        if canonicalize_name(required) not in development_by_name:
+            raise CompatibilityError(f"dev dependencies omit required moving input: {required}")
+
+    root.mkdir(parents=True, exist_ok=True)
+    homeassistant = root / "requirements-homeassistant.txt"
+    project_inputs = root / "requirements-project.txt"
+    homeassistant.write_text(f"{HOME_ASSISTANT}\n", encoding="utf-8")
+    direct_names = [requirement.name for requirement in runtime_requirements]
+    direct_names.append(TEST_HELPER)
+    project_inputs.write_text("".join(f"{name}\n" for name in direct_names), encoding="utf-8")
+    return homeassistant, project_inputs
 
 
 def _check_dependencies(python: str, channel: str) -> None:
@@ -127,24 +166,22 @@ def _check_dependencies(python: str, channel: str) -> None:
 def _resolve(
     *,
     channel: str,
-    bootstrap: Path,
-    homeassistant: Path,
-    direct: Path,
+    project: Path,
     output: Path,
 ) -> None:
     """Resolve current packages, freeze them, recreate them, and run the suite."""
-    for requirement in (bootstrap, homeassistant, direct):
-        if not requirement.is_file():
-            raise CompatibilityError(f"requirements input is missing: {requirement}")
+    if not project.is_file():
+        raise CompatibilityError(f"project metadata is missing: {project}")
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.unlink(missing_ok=True)
 
     with tempfile.TemporaryDirectory(prefix=f"fmi-{channel}-") as temporary:
         root = Path(temporary)
+        homeassistant, direct = _moving_inputs(project, root)
         resolver = root / "resolver"
         runner = root / "runner"
         venv.EnvBuilder(with_pip=True).create(resolver)
         resolver_python = _python(resolver)
-        _install(resolver_python, "--upgrade", "-r", str(bootstrap))
 
         if channel == "stable":
             _install(resolver_python, "--upgrade", "-r", str(homeassistant))
@@ -172,7 +209,6 @@ def _resolve(
 
         venv.EnvBuilder(with_pip=True).create(runner)
         runner_python = _python(runner)
-        _install(runner_python, "--upgrade", "-r", str(bootstrap))
         _install(runner_python, "--no-deps", "-r", str(output))
         recreated_version = _assert_channel(runner_python, channel)
         if recreated_version != resolved_version:
@@ -185,16 +221,24 @@ def _resolve(
             f"Testing Home Assistant {recreated_version} with {TEST_HELPER} {helper_version}",
             flush=True,
         )
-        _run([runner_python, "-m", "pytest", "-n", "0", "-q"])
+        _run(
+            [
+                runner_python,
+                "-m",
+                "pytest",
+                "-n",
+                "auto",
+                "--dist=worksteal",
+                "-q",
+            ]
+        )
 
 
 def _parser() -> argparse.ArgumentParser:
     """Build the command-line parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("channel", choices=("stable", "prerelease"))
-    parser.add_argument("--bootstrap", type=Path, required=True)
-    parser.add_argument("--homeassistant", type=Path, required=True)
-    parser.add_argument("--direct", type=Path, required=True)
+    parser.add_argument("--project", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     return parser
 
@@ -205,9 +249,7 @@ def main() -> int:
     try:
         _resolve(
             channel=args.channel,
-            bootstrap=args.bootstrap.resolve(),
-            homeassistant=args.homeassistant.resolve(),
-            direct=args.direct.resolve(),
+            project=args.project.resolve(),
             output=args.output.resolve(),
         )
     except CompatibilityUnavailable as error:

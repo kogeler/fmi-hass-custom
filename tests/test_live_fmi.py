@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import asyncio
 import math
+import os
 import socket
 from collections import Counter
 from collections.abc import Awaitable, Callable, Generator
 from datetime import timedelta
+from pathlib import Path
 from typing import Any, cast
-from xml.etree.ElementTree import ParseError
 
 import pytest
 import pytest_socket
@@ -43,6 +44,7 @@ from custom_components.fmi.const import (
     CONF_OBSERVATION_STATION,
     DOMAIN,
 )
+from tests.helpers.live_budget import LiveRequestBudget
 from tests.helpers.live_fmi import (
     LiveContractError,
     validate_daily_precipitation,
@@ -92,7 +94,10 @@ async def _live_call[T](label: str, operation: Callable[[], Awaitable[T]]) -> T:
     """Retry one bounded transport/service failure and classify final output."""
     for attempt in range(2):
         try:
-            async with asyncio.timeout(15):
+            budget = LiveRequestBudget(
+                Path(os.environ.get("FMI_LIVE_BUDGET_DIR", "/tmp/fmi-live-budget"))
+            )
+            async with budget.request(), asyncio.timeout(15):
                 return await operation()
         except ClientError as error:
             pytest.fail(
@@ -110,7 +115,13 @@ async def _live_call[T](label: str, operation: Callable[[], Awaitable[T]]) -> T:
                 f"{type(error).__name__}: {error}",
                 pytrace=False,
             )
-        except (AttributeError, KeyError, ParseError, TypeError, ValueError) as error:
+        except (
+            AttributeError,
+            KeyError,
+            SyntaxError,
+            TypeError,
+            ValueError,
+        ) as error:
             pytest.fail(
                 f"FMI parsing/contract failure for {label}: {type(error).__name__}: {error}",
                 pytrace=False,
@@ -118,17 +129,33 @@ async def _live_call[T](label: str, operation: Callable[[], Awaitable[T]]) -> T:
     raise AssertionError("unreachable live retry state")
 
 
-@pytest.mark.parametrize(
-    ("label", "latitude", "longitude"),
-    [SOUTHERN_LOCATION, NORTHERN_LOCATION],
-    ids=["southern-helsinki", "northern-kilpisjarvi"],
-)
-async def test_dependency_forecast_contract(
-    label: str,
-    latitude: float,
-    longitude: float,
-) -> None:
-    """Detect installed-client or WFS drift at southern and northern points."""
+async def test_dependency_place_resolution_contract() -> None:
+    """Resolve a public name and validate its point through the production boundary."""
+    resolution = await _live_call(
+        "Helsinki place resolution",
+        lambda: fmi_client.async_resolve_place(SOUTHERN_LOCATION[0]),
+    )
+    if resolution is None:
+        raise LiveContractError("Helsinki place resolution returned no forecast point")
+    if not 55 <= resolution.latitude <= 75 or not 5 <= resolution.longitude <= 35:
+        raise LiveContractError("Helsinki place resolution returned a point outside the region")
+    current = await _live_call(
+        "resolved Helsinki coordinate validation",
+        lambda: fmi_client.async_weather_by_coordinates(
+            resolution.latitude,
+            resolution.longitude,
+        ),
+    )
+    validate_model_weather(
+        current,
+        "resolved Helsinki coordinate validation",
+        max_age=timedelta(hours=2),
+    )
+
+
+async def test_dependency_northern_forecast_contract() -> None:
+    """Detect installed-client or WFS drift at a northern public point."""
+    label, latitude, longitude = NORTHERN_LOCATION
     forecast = await _live_call(
         f"{label} forecast",
         lambda: fmi_client.async_forecast_by_coordinates(latitude, longitude, 1, 48),
@@ -204,7 +231,10 @@ async def test_home_assistant_live_entity_and_forecast_contract(
 
     async def traced_weather(latitude: float, longitude: float):
         request_counts["current"] += 1
-        return await original_weather(latitude, longitude)
+        async with LiveRequestBudget(
+            Path(os.environ.get("FMI_LIVE_BUDGET_DIR", "/tmp/fmi-live-budget"))
+        ).request():
+            return await original_weather(latitude, longitude)
 
     async def traced_forecast(
         latitude: float,
@@ -213,20 +243,29 @@ async def test_home_assistant_live_entity_and_forecast_contract(
         forecast_points: int,
     ):
         request_counts["forecast"] += 1
-        return await original_forecast(
-            latitude,
-            longitude,
-            timestep_hours,
-            forecast_points,
-        )
+        async with LiveRequestBudget(
+            Path(os.environ.get("FMI_LIVE_BUDGET_DIR", "/tmp/fmi-live-budget"))
+        ).request():
+            return await original_forecast(
+                latitude,
+                longitude,
+                timestep_hours,
+                forecast_points,
+            )
 
     async def traced_place(place: str):
         request_counts["place_fallback"] += 1
-        return await original_place(place)
+        async with LiveRequestBudget(
+            Path(os.environ.get("FMI_LIVE_BUDGET_DIR", "/tmp/fmi-live-budget"))
+        ).request():
+            return await original_place(place)
 
     async def traced_station(station_id: int):
         request_counts["station"] += 1
-        return await original_station(station_id)
+        async with LiveRequestBudget(
+            Path(os.environ.get("FMI_LIVE_BUDGET_DIR", "/tmp/fmi-live-budget"))
+        ).request():
+            return await original_station(station_id)
 
     async def skip_unrelated_sea_level(self: FMIDataUpdateCoordinator) -> None:
         self.mareo_data = None

@@ -12,12 +12,9 @@ updates:
       timezone: Europe/Helsinki
     open-pull-requests-limit: 5
     groups:
-      python-nonmajor:
+      python-dependencies:
         patterns:
           - "*"
-        update-types:
-          - minor
-          - patch
 
   - package-ecosystem: github-actions
     directory: /
@@ -28,9 +25,6 @@ updates:
       timezone: Europe/Helsinki
     open-pull-requests-limit: 5
     groups:
-      actions-nonmajor:
+      github-actions:
         patterns:
           - "*"
-        update-types:
-          - minor
-          - patch

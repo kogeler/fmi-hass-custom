@@ -5,6 +5,8 @@
 This document defines the current FMI sensor, wind-gust, entity-naming, and location-grouping
 contracts. It applies to Home Assistant 2026.8.1 and `fmi-weather-client==1.0.0`.
 
+Last verified against current code: 2026-08-16.
+
 ## Gust Sources
 
 The selected client still requests `WindGust` from `fmi::forecast::edited::weather::scandinavia::point::multipointcoverage`. FMI returns that field as NaN for this forecast producer, which is the reported cause of the unavailable wind-gust sensor. Current FMI producer metadata lists `HourlyMaximumGust` as the available forecast field. Station observations continue to provide `WindGust` with three-second gust measurements.

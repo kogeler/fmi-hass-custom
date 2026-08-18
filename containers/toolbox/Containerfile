@@ -1,0 +1,59 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
+# Project source is streamed into a private tmpfs at run time and is never
+# baked into either image stage.
+FROM docker.io/library/python@sha256:1a3c6dbfd2173971abba880c3cc2ec4643690901f6ad6742d0827bae6cefc925 AS base
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_ROOT_USER_ACTION=ignore \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN useradd --create-home --uid 1000 --shell /bin/bash box
+
+# The resolver cannot bootstrap from a lock it generates. This complete small
+# wheel-only tree is therefore pinned explicitly, matching the reference model.
+FROM base AS lock
+
+RUN python -m pip install --quiet --only-binary=:all: \
+        pip==26.2.1 \
+        setuptools==84.0.0 \
+        pip-tools==7.6.1 \
+        build==1.5.0 \
+        click==8.4.2 \
+        packaging==26.3 \
+        pyproject-hooks==1.2.0 \
+        wheel==0.48.0
+
+COPY containers/toolbox/entrypoint.sh /usr/local/sbin/toolbox-entrypoint
+RUN chmod 0755 /usr/local/sbin/toolbox-entrypoint
+
+USER box
+WORKDIR /work
+ENTRYPOINT ["/usr/local/sbin/toolbox-entrypoint"]
+
+# All project-aware analysis and tests run from this hash-verified environment.
+# ShellCheck is the only required OS-level checker; project source is supplied
+# at run time and is never copied into the image.
+FROM base AS dev
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+        --no-install-recommends \
+        shellcheck \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-dev.txt /tmp/requirements-dev.txt
+RUN python -m pip install --quiet --require-hashes \
+        --requirement /tmp/requirements-dev.txt \
+    && python -m pip check \
+    && rm -f /tmp/requirements-dev.txt
+
+COPY containers/toolbox/entrypoint.sh /usr/local/sbin/toolbox-entrypoint
+RUN chmod 0755 /usr/local/sbin/toolbox-entrypoint
+
+USER box
+WORKDIR /work
+ENTRYPOINT ["/usr/local/sbin/toolbox-entrypoint"]

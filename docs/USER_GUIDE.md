@@ -19,7 +19,13 @@ but not required.
    Confirm it against the [latest GitHub Release](https://github.com/kogeler/fmi-hass-custom/releases/latest).
 5. Restart Home Assistant.
 6. Open **Settings > Devices & services > Add integration**, search for **Finnish Meteorological
-   Institute**, and enter a name, latitude, and longitude.
+   Institute**, and choose a location method:
+   - **Choose on map** starts at Home Assistant's configured Home location. Accept the marker or
+     move it to another forecast point.
+   - **Search by place name** sends a city or place name to FMI, then shows FMI's result on the map.
+     Confirm that point or adjust the marker before saving.
+7. Enter the display name requested on the selected path. FMI validates the final map point before
+   Home Assistant creates the entry.
 
 Repeat the last step to configure another location. The same coordinates cannot be used by two
 entries.
@@ -56,8 +62,8 @@ during the switch, complete the fork download before restarting Home Assistant.
 5. Add the integration from **Settings > Devices & services** as described above.
 
 Do not copy the whole repository into `custom_components/fmi/`, and do not install packages from
-the root development `requirements.txt` into Home Assistant. Home Assistant installs the two
-runtime requirements declared by the integration manifest.
+any root `requirements*.txt` file into Home Assistant. Those files are generated maintainer locks;
+Home Assistant installs the exact runtime requirements declared by the integration manifest.
 
 ## Upgrade
 
@@ -75,8 +81,9 @@ conflicting IDs are left unchanged.
 
 ## Configure
 
-The initial form accepts a display name and coordinates. FMI resolves the location name used for
-new device and entity names. Open **Settings > Devices & services > Finnish Meteorological
+Initial setup accepts a display name and either a map point or an FMI place search followed by map
+confirmation. FMI resolves the final location name used for new device and entity names. Open
+**Settings > Devices & services > Finnish Meteorological
 Institute**, select an entry, and choose **Configure** to change these options:
 
 - forecast days (`0` disables future samples, otherwise up to 10 days);
@@ -93,9 +100,11 @@ a valid forecast for the configured coordinates.
 ### Move A Location
 
 Changing the Home zone does not update an FMI entry. From the integration entry menu select
-**Reconfigure**, enter the new latitude and longitude, and submit. FMI validates the new location
-before Home Assistant saves and reloads the entry. Existing entity IDs, including customized IDs
-used by dashboards and automations, remain unchanged.
+**Reconfigure**, then choose either the map or place-name search. The map starts at the entry's
+current point, not the current Home location. A search always shows FMI's result on the map before
+anything is changed; confirm it or move the marker. FMI validates the final point before Home
+Assistant saves and reloads only that entry. Existing entity IDs, including customized IDs used by
+dashboards and automations, remain unchanged.
 
 ## Find Your Entities
 
@@ -183,9 +192,16 @@ entities:
 - **The integration is not listed:** verify
   `<Home Assistant config>/custom_components/fmi/manifest.json` exists and restart Home Assistant.
   Review Home Assistant logs for a manifest or import error.
-- **Setup cannot connect:** verify the coordinates and internet access, then check FMI Open Data
-  availability. Home Assistant retries initial setup when every usable current/observation source
-  is unavailable.
+- **A place search finds nothing:** try a more specific city or place name. No entry is created or
+  changed until a result is confirmed and the final point passes validation.
+- **The selected point is already configured:** choose another point. Two FMI entries cannot own
+  the same final coordinates.
+- **Setup or reconfiguration cannot connect:** verify internet access and check FMI Open Data
+  availability. Retry the form after a temporary service failure; failed and canceled flows leave
+  existing entries unchanged.
+- **The map point produces an unexpected error:** choose another point inside normal WGS84 bounds
+  and FMI forecast coverage. Non-finite, out-of-range, or malformed locations are rejected before
+  they can be saved.
 - **Forecast is unavailable but observations work:** sources intentionally fail independently.
   Wait for the next refresh; valid data restores availability automatically without a reload.
 - **Station observation is missing:** confirm that the configured value is a valid numeric FMI
@@ -211,13 +227,15 @@ publish precise home coordinates or raw external responses.
 
 ## External Services And Privacy
 
-FMI receives the configured coordinates needed for validation, weather, lightning-area, and
-sea-level requests. When lightning is enabled, the public Nominatim service can receive a selected
-public strike coordinate for best-effort address enrichment; it does not receive the configured
-home coordinate directly. See the [security and privacy contract](maintenance/COMPATIBILITY_SECURITY.md)
-and [known limitations](../TODO.md) before using lightning beyond a small private deployment.
+FMI receives place-search text when that optional path is used and receives the final coordinates
+needed for validation, weather, lightning-area, and sea-level requests. Search text is transient:
+it is not stored in the config entry, logs, or diagnostics. When lightning is enabled, the public
+Nominatim service can receive a selected public strike coordinate for best-effort address
+enrichment; it does not receive the configured home coordinate directly. See the
+[security and privacy contract](maintenance/COMPATIBILITY_SECURITY.md) and
+[known limitations](../TODO.md) before using lightning beyond a small private deployment.
 
-Documentation references verified 2026-08-01:
+Documentation references verified 2026-08-17:
 
 - [HACS custom repositories](https://www.hacs.xyz/docs/faq/custom_repositories/)
 - [HACS repository download and update behavior](https://www.hacs.xyz/docs/use/repositories/dashboard/)

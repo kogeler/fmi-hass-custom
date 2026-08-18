@@ -4,6 +4,7 @@
 """Home Assistant regressions for wind gusts and sensor location grouping."""
 
 import math
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock
 
@@ -33,6 +34,7 @@ from custom_components.fmi.sensor import (
     SEA_LEVEL_DESCRIPTION,
     SENSOR_DESCRIPTIONS,
     FMIBestConditionSensor,
+    SensorType,
 )
 from tests.helpers.fmi import forecast_from_fixture, weather_from_fixture
 
@@ -168,6 +170,42 @@ def test_wind_gust_finite_precedence_and_missing_values(
     )
 
     assert sensor._attr_native_value == expected
+
+
+@pytest.mark.parametrize("invalid_value", ["not-a-number", object()])
+def test_sensor_numeric_fallback_skips_invalid_runtime_values(invalid_value: object) -> None:
+    """Continue to a valid fallback when an FMI model exposes a non-numeric value."""
+    source_data = SimpleNamespace(
+        primary=SimpleNamespace(value=invalid_value),
+        fallback=SimpleNamespace(value=4.2),
+    )
+
+    assert FMIBestConditionSensor._finite_value(source_data, "primary", "fallback") == 4.2
+
+
+def test_coarse_sensor_clears_value_when_forecast_is_empty() -> None:
+    """Never retain a stale value when a legacy coarse interval has no forecast."""
+    weather = weather_from_fixture("forecast_normal.json")
+    assert weather is not None
+    coordinator = SimpleNamespace(
+        time_step=3,
+        best_time=None,
+        best_temperature=None,
+        best_humidity=None,
+        best_precipitation=None,
+        best_wind_speed=None,
+        get_weather=lambda: weather,
+        get_forecasts=lambda: [],
+    )
+    sensor = cast(Any, object.__new__(FMIBestConditionSensor))
+    sensor.coordinator = coordinator
+    sensor.type = SensorType.TEMPERATURE
+    sensor._attr_native_value = 12.5
+    sensor.update_state_func = lambda _source: pytest.fail("empty forecast must not be evaluated")
+
+    sensor.update()
+
+    assert sensor.native_value is None
 
 
 async def test_two_locations_create_distinct_devices_and_sensor_ids(

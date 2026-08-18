@@ -1,185 +1,199 @@
 # Copyright (c) 2026 kogeler
 # SPDX-License-Identifier: MIT
 
-"""Regression tests for required CI, live-network, and dependency policy."""
+"""Regression tests for CI topology, permissions, and container boundaries."""
 
+from __future__ import annotations
+
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
-PIP_EXECUTORS = [
-    ROOT / "Containerfile.dev",
-    ROOT / ".github" / "workflows" / "ci.yml",
-    ROOT / ".github" / "workflows" / "dependency-review.yml",
-    ROOT / ".github" / "workflows" / "validate.yml",
-    ROOT / ".github" / "scripts" / "compatibility.py",
-]
+ACTION_REFERENCE = re.compile(
+    r"^\s*uses:\s*([^@\s]+)@([0-9a-f]{40})\s+#\s+(v[0-9][^\s]*)$",
+    re.MULTILINE,
+)
 
 
-def test_no_github_actions_workflow_is_scheduled() -> None:
-    """All repository workflows must be event-driven or manually dispatched."""
-    scheduled = [
-        workflow.name
-        for workflow in WORKFLOWS.glob("*.yml")
-        if "\n  schedule:" in workflow.read_text(encoding="utf-8")
-    ]
-
-    assert scheduled == []
+def _workflow(name: str) -> str:
+    return (WORKFLOWS / name).read_text(encoding="utf-8")
 
 
-def test_live_fmi_is_required_after_offline_tests_for_pr_and_master() -> None:
-    """PRs and release-bearing master runs execute bounded live probes before success."""
-    ci = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
-    release = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
+def test_workflow_set_is_minimal_event_driven_and_fully_pinned() -> None:
+    """Superseded workflow files cannot survive as a second execution path."""
+    workflows = sorted(WORKFLOWS.glob("*.yml"))
+    assert [path.name for path in workflows] == ["ci.yml", "pr-body.yml", "release.yml"]
+    for path in workflows:
+        content = path.read_text(encoding="utf-8")
+        external_uses = [
+            line for line in content.splitlines() if "uses:" in line and "uses: ./" not in line
+        ]
+        assert "\n  schedule:" not in content
+        assert "runs-on: ubuntu-24.04" not in content
+        assert len(ACTION_REFERENCE.findall(content)) == len(external_uses)
+        assert "curl " not in content
+        assert "gh api" not in content
 
-    assert not (WORKFLOWS / "live-fmi.yml").exists()
-    assert "pull_request:" in ci
-    assert "workflow_call:" in ci
-    assert ci.index("- name: Offline tests and coverage") < ci.index(
-        "- name: Run bounded live FMI probes"
+
+def test_ci_uses_make_rootless_podman_and_independent_image_caches() -> None:
+    """The workflow invokes the same confined Make contract used locally."""
+    ci = _workflow("ci.yml")
+    for event in ("pull_request:", "push:", "workflow_call:", "workflow_dispatch:"):
+        assert event in ci
+    assert "name: CI" in ci
+    assert "- master" in ci
+    assert "Set up Python for Ruff" in ci
+    assert "cache-dependency-path: requirements-lint.txt" in ci
+    assert "run: make doctor" in ci
+    assert "run: make ci" in ci
+    assert "run: make live" in ci
+    assert "run: make validate" in ci
+    assert "run: make dependency-snapshot" in ci
+    assert "run: make compatibility-stable" in ci
+    assert "run: make compatibility-prerelease" in ci
+    assert "PYTEST_WORKERS" not in ci
+    assert "pip install" not in ci
+    assert "container:" not in ci
+
+    for image in ("toolbox", "resolver"):
+        assert f"steps.images.outputs.{image}" in ci
+        assert f".artifacts/images/{image}.tar" in ci
+        assert "${{ runner.arch }}" in ci
+    assert "make image-load-toolbox" in ci
+    assert "make image-load-resolver" in ci
+    assert "make image-save-toolbox" in ci
+    assert "make image-save-resolver" in ci
+
+
+def test_ci_preserves_hacs_security_and_compatibility_gates() -> None:
+    """HACS/HA-specific checks stay visible after workflow consolidation."""
+    ci = _workflow("ci.yml")
+    assert "name: Bounded live FMI" in ci
+    assert "live-fmi:\n" in ci
+    assert (
+        "needs: quality"
+        in ci.split("\n  live-fmi:\n", maxsplit=1)[1].split("\n  validation:\n", maxsplit=1)[0]
     )
-    assert "--strict-markers" in ci
-    assert "-m live" in ci
+    assert "INPUT_GITHUB_TOKEN: ${{ github.token }}" in ci
+    assert "github.event.pull_request.head.repo.full_name || github.repository" in ci
+    assert "github.event.pull_request.head.sha || github.sha" in ci
+    assert "make validator-images" in ci
 
-    ci_release_job = release.split("\n  ci:\n", maxsplit=1)[1].split("\n  validate:\n", maxsplit=1)[
-        0
-    ]
-    assert "uses: ./.github/workflows/ci.yml" in ci_release_job
-    assert "needs: release-state" in ci_release_job
-    assert "if: needs.release-state.outputs.release_required == 'true'" in ci_release_job
-    assert "push:" in release
-    assert "- master" in release
-
-
-def test_release_workflow_skips_gates_for_an_existing_release() -> None:
-    """An already published current version makes maintenance pushes successful no-ops."""
-    release = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
-
-    state_job = release.split("\n  release-state:\n", maxsplit=1)[1].split(
+    prerelease = ci.split("\n  compatibility-prerelease:\n", maxsplit=1)[1].split(
         "\n  version:\n", maxsplit=1
     )[0]
-    assert "github.rest.repos.getContent" in state_job
-    assert 'path: ".version"' in state_job
-    assert "ref: context.sha" in state_job
-    assert "github.rest.repos.getReleaseByTag" in state_job
-    assert "github.rest.git.getRef" in state_job
-    assert "tag.data.object.type" in state_job
-    assert "tag.data.object.sha !== existing.data.target_commitish" in state_job
-    assert "has no matching Git tag" in state_job
-    assert 'core.setOutput("release_required", "false")' in state_job
-    assert 'core.setOutput("release_required", "true")' in state_job
-    assert "existing.data.draft" in state_job
-    assert "existing.data.prerelease" in state_job
+    assert "continue-on-error: true" in prerelease
+    stable = ci.split("\n  compatibility-stable:\n", maxsplit=1)[1].split(
+        "\n  compatibility-prerelease:\n", maxsplit=1
+    )[0]
+    assert "continue-on-error" not in stable
 
-    for job, next_job in (
-        ("version", "ci"),
-        ("ci", "validate"),
-        ("validate", "publish"),
+    assert "queries: security-extended" in ci
+    assert "- actions" in ci
+    assert "- python" in ci
+    assert "category: .github/workflows/codeql.yml:analyze/language:${{ matrix.language }}" in ci
+    assert "security-events: write" in ci
+    assert "actions/dependency-review-action@" in ci
+    assert "if: github.event.pull_request.head.repo.full_name == github.repository" in ci
+    assert "if: github.event.pull_request.head.repo.full_name != github.repository" in ci
+    assert "github.event.repository.fork" not in ci
+    assert "Audit the frozen fork environment" in ci
+    assert "run: make audit" in ci
+
+
+def test_ci_write_permissions_are_confined_to_trusted_result_jobs() -> None:
+    """Only CodeQL and direct-master dependency submission can write results."""
+    ci = _workflow("ci.yml")
+    assert "permissions:\n  contents: read" in ci
+    assert "pull-requests: write" not in ci
+    assert ci.count("security-events: write") == 1
+    assert ci.count("contents: write") == 1
+    assert "$GITHUB_STEP_SUMMARY" in ci
+    assert "feat/map-location" not in ci
+    assert "TEMPORARY" not in ci
+
+    submission = ci.split("\n  dependency-submission:\n", maxsplit=1)[1].split(
+        "\n  codeql:\n", maxsplit=1
+    )[0]
+    for proof in (
+        "name: Submit dependency graph",
+        "github.event_name == 'push'",
+        "github.ref == 'refs/heads/master'",
+        "github.workflow == 'CI'",
+        "needs: quality",
+        "contents: write",
+        "persist-credentials: false",
+        "run: make dependency-snapshot",
+        "sha: context.sha",
+        "POST /repos/{owner}/{repo}/dependency-graph/snapshots",
+        'correlator: "fmi-hass-custom-pip-locks"',
+        '"X-GitHub-Api-Version": "2026-03-10"',
+        "github-token: ${{ github.token }}",
+        "response.status !== 201",
+        "ref: context.ref",
+        'response.data.result !== "SUCCESS"',
     ):
-        body = release.split(f"\n  {job}:\n", maxsplit=1)[1].split(
-            f"\n  {next_job}:\n", maxsplit=1
-        )[0]
-        assert "needs: release-state" in body
-        assert "if: needs.release-state.outputs.release_required == 'true'" in body
+        assert proof in submission
+    assert 'new Set(["SUCCESS", "ACCEPTED"])' not in submission
+    assert "pull_request" not in submission
+    assert "BOX_" not in submission
+
+
+def test_version_job_compares_exact_base_and_head_through_make() -> None:
+    """Consolidation retains PR, push, reusable, and manual version semantics."""
+    ci = _workflow("ci.yml")
+    version = ci.split("\n  version:\n", maxsplit=1)[1]
+    assert "github.event.pull_request.base.sha ||" in version
+    assert "github.event.before ||" in version
+    assert "inputs.base_ref" in version
+    assert "github.event.pull_request.head.repo.full_name || github.repository" in version
+    assert "github.event.pull_request.head.sha || github.sha" in version
+    assert "base_version=" in version
+    assert 'make version-check VERSION_ARGS="--base-version $base_version"' in version
+
+
+def test_release_reuses_ci_and_writes_only_in_publish_job() -> None:
+    """A new release publishes only after the exact pushed workflow gate succeeds."""
+    release = _workflow("release.yml")
+    state = release.split("\n  release-state:\n", maxsplit=1)[1].split("\n  ci:\n", maxsplit=1)[0]
+    for proof in (
+        "github.rest.repos.getContent",
+        'path: ".version"',
+        "ref: context.sha",
+        "github.rest.repos.getReleaseByTag",
+        "github.rest.git.getRef",
+        "tag.data.object.type",
+        "tag.data.object.sha !== existing.data.target_commitish",
+        'core.setOutput("release_required", "false")',
+        'core.setOutput("release_required", "true")',
+    ):
+        assert proof in state
+
+    ci_gate = release.split("\n  ci:\n", maxsplit=1)[1].split("\n  publish:\n", maxsplit=1)[0]
+    assert "uses: ./.github/workflows/ci.yml" in ci_gate
+    assert "needs: release-state" in ci_gate
+    assert "security-events: write" in ci_gate
 
     publish = release.split("\n  publish:\n", maxsplit=1)[1]
     assert "- release-state" in publish
-    assert "if: needs.release-state.outputs.release_required == 'true'" in publish
+    assert "- ci" in publish
+    assert "contents: write" in publish
+    assert "run: make release-notes" in publish
+    assert "RELEASE_NOTES_PATH: .artifacts/release-notes.md" in publish
+    assert release.count("contents: write") == 1
 
 
-def test_pip_installs_use_requirement_files_without_inline_versions() -> None:
-    """Every maintained pip install consumes files instead of package arguments."""
-    for path in PIP_EXECUTORS:
-        content = path.read_text(encoding="utf-8")
-        for line in content.splitlines():
-            if 'pip", "install"' in line or "pip install" in line:
-                assert "==" not in line, path
-
-    workflows = "\n".join(
-        workflow.read_text(encoding="utf-8") for workflow in WORKFLOWS.glob("*.yml")
-    )
-    assert "pip==" not in workflows
-    assert "homeassistant==" not in workflows
-    assert "pytest-homeassistant-custom-component==" not in workflows
-
-
-def test_local_image_names_remain_stable() -> None:
-    """Dependency refreshes must not require local image-name changes."""
-    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-
-    assert "LOCAL_IMAGE_PREFIX ?= localhost/fmi-hass-custom" in makefile
-    assert "LOCK_IMAGE ?= $(LOCAL_IMAGE_PREFIX)-lock:local" in makefile
-    assert "DEV_IMAGE ?= $(LOCAL_IMAGE_PREFIX)-dev:local" in makefile
-    assert "DEV_STAMP ?= .cache/podman-dev.stamp" in makefile
-
-
-def test_compatibility_resolves_current_channels_and_freezes_before_testing() -> None:
-    """Event/manual compatibility jobs recreate moving graphs without release pins."""
-    workflow = (WORKFLOWS / "compatibility.yml").read_text(encoding="utf-8")
-    helper = (ROOT / ".github" / "scripts" / "compatibility.py").read_text(encoding="utf-8")
-
-    assert "latest-stable:" in workflow
-    assert "latest-prerelease:" in workflow
-    assert "pull_request:" in workflow
-    assert "push:" in workflow
-    assert "workflow_dispatch:" in workflow
-    prerelease_job = workflow.split("\n  latest-prerelease:\n", maxsplit=1)[1]
-    assert "continue-on-error: true" in prerelease_job
-    assert '"--pre"' in helper
-    assert '"freeze"' in helper
-    assert helper.index("_freeze(resolver_python, output)") < helper.index(
-        '_install(runner_python, "--no-deps", "-r", str(output))'
-    )
-
-    for path in (
-        ROOT / "requirements-compatibility-homeassistant.txt",
-        ROOT / "requirements-compatibility-direct.txt",
-    ):
-        packages = [
-            line
-            for line in path.read_text(encoding="utf-8").splitlines()
-            if line and not line.startswith("#")
-        ]
-        assert packages
-        assert all("==" not in package for package in packages)
-
-
-def test_safe_branch_workflows_share_standard_event_matrix() -> None:
-    """Read-only branch checks share PR/push/manual events; exceptions stay narrow."""
-    for name in (
-        "ci.yml",
-        "codeql.yml",
-        "compatibility.yml",
-        "validate.yml",
-        "version.yml",
-    ):
-        workflow = (WORKFLOWS / name).read_text(encoding="utf-8")
-        for event in ("pull_request:", "push:", "workflow_dispatch:"):
-            assert event in workflow, (name, event)
-        assert "- master" in workflow, name
-
-    version = (WORKFLOWS / "version.yml").read_text(encoding="utf-8")
-    assert "base_ref:" in version
-    assert "default: master" in version
-    assert "github.event.pull_request.base.sha || github.event.before || inputs.base_ref" in version
-    assert "github.event.pull_request.head.sha || github.sha" in version
-
-    for name in ("dependency-review.yml", "pr-body.yml", "release.yml"):
-        workflow = (WORKFLOWS / name).read_text(encoding="utf-8")
-        assert "workflow_dispatch:" not in workflow, name
-
-    release = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
-    assert "uses: ./.github/workflows/ci.yml" in release
-    assert "uses: ./.github/workflows/validate.yml" in release
-    assert "- version" in release
-
-
-def test_dependency_review_uses_supported_fork_fallback() -> None:
-    """Forks use the frozen audit; independent repositories retain native review."""
-    workflow = (WORKFLOWS / "dependency-review.yml").read_text(encoding="utf-8")
-
-    assert "actions/dependency-review-action@" in workflow
-    assert "if: github.event.repository.fork == false" in workflow
-    assert workflow.count("if: github.event.repository.fork") == 4
-    assert "python .github/scripts/dependency_audit.py" in workflow
-    assert "python -m pip install --no-deps -r requirements.txt" in workflow
+def test_pr_body_is_the_only_pull_request_target_write_boundary() -> None:
+    """Untrusted head code cannot execute with the metadata write token."""
+    combined = "\n".join(_workflow(name) for name in ("ci.yml", "pr-body.yml", "release.yml"))
+    pr_body = _workflow("pr-body.yml")
+    assert combined.count("pull_request_target:") == 1
+    assert "pull-requests: write" in pr_body
+    assert "contents: write" not in pr_body
+    assert "github.rest.repos.getContent" in pr_body
+    assert "python .github/scripts/pr_body.py" in pr_body
+    assert "repository: ${{ github.event.pull_request.head.repo" not in pr_body
+    assert "ref: ${{ github.event.pull_request.head.sha }}" not in pr_body
+    assert "pip install" not in pr_body
+    assert "secrets." not in pr_body

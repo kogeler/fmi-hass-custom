@@ -1,130 +1,133 @@
 <!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
 
-# Dependency Model And Inventory
+# Dependency Ownership And Review
 
-This document explains which dependency files are authoritative, why the reference environment
-uses its current direct selections, and what must be reviewed when they change. Keep it focused on
-the current dependency contract rather than historical before/after reporting.
+Last verified: 2026-08-17.
 
-Last verified: 2026-08-08. Reference environment: Home Assistant 2026.8.1 on Python 3.14.2.
+## Authoritative Inputs And Generated Outputs
 
-## File Roles
-
-| File | Ownership |
+| File or field | Ownership |
 |---|---|
-| `custom_components/fmi/manifest.json` | Exact direct runtime requirements not guaranteed by Home Assistant Core |
-| `requirements-direct.txt` | Human-reviewed exact direct selections for the reference development/test environment |
-| `requirements.txt` | Generated complete 174-package `pip freeze`; never edit manually |
-| `requirements-bootstrap.txt` | Exact standalone pip bootstrap selection because normal `pip freeze` omits pip |
-| `requirements-compatibility-homeassistant.txt` | Unpinned Home Assistant channel inputs for moving compatibility resolution |
-| `requirements-compatibility-direct.txt` | Unpinned helper/integration inputs for moving compatibility resolution |
-| `requirements-compatibility-*-resolved.txt` | Ignored per-run full freezes generated and recreated by compatibility checks |
+| Root `pyproject.toml` dependencies | Exact integration runtime dependencies; identical to manifest requirements |
+| Root `pyproject.toml` `dev` extra | Exact direct Home Assistant reference, test, audit, and analysis tools |
+| `tools/lint/pyproject.toml` | Exact Ruff-only host environment |
+| `requirements.txt` | Generated hashed runtime closure; submitted to Dependency graph as runtime |
+| `requirements-dev.txt` | Generated hashed toolbox closure; submitted as development |
+| `requirements-lint.txt` | Generated hashed Ruff-only closure; submitted as development |
+| Toolbox `lock` stage | Exact self-hosting pip-tools bootstrap; the only inline install exception |
 
-The committed root freeze is one coherent, reproducible reference environment: Home Assistant
-stable, its exact test helper, integration dependencies, and maintenance tools. It records what CI
-installs; it does not define the HACS installation floor. Stable and prerelease drift checks resolve
-in isolated temporary environments and never mutate this lock.
+There are no maintained `.in` files, `requirements/` directory, compatibility inputs, bootstrap
+requirements file, or additional lock environment. `pip-compile` headers are retained so
+Dependabot can update a direct manifest and regenerate the matching graph. Root lock files are
+generated mode `0644` and are never hand-edited.
 
-Tests validate behavior and dependency-policy structure, not concrete Home Assistant or helper
-version strings. Do not copy selected versions into test assertions or runtime code. The reviewed
-direct input and generated full freeze are the version inventory; `hacs.json` independently owns
-the minimum user-installable Home Assistant release.
+The runtime lock is not installed into Home Assistant and does not replace Home Assistant's own
+constraints. After HACS or a manual installation provides the integration files, Home Assistant
+installs the exact requirements from `custom_components/fmi/manifest.json`. `hacs.json`
+independently owns the minimum supported Home Assistant release.
 
-Every maintained `pip install` in workflows, the Makefile, container recipes, and repository CI
-helpers consumes a requirements or generated constraint file. Do not add inline package names or
-versions.
+## Reviewed Direct Selections
 
-## Reference Direct Selections
-
-| Component | Selected | Role and constraint |
+| Dependency | Selected version | Reason |
 |---|---:|---|
-| Python | 3.14.2 | Required by Home Assistant 2026.8.1; official slim image is pinned by multi-architecture digest |
-| Home Assistant | 2026.8.1 | Reproducible runtime/test reference; not the HACS installation floor |
-| `pytest-homeassistant-custom-component` | 0.13.355 | Recreates the selected Home Assistant test environment |
-| `fmi-weather-client` | 1.0.0 | Direct GPL-3.0 runtime dependency, exact manifest pin |
-| `geopy` | 2.5.0 | Direct MIT runtime dependency, exact manifest pin |
-| `pip` | 26.2 | Isolated in `requirements-bootstrap.txt` |
-| `ruff` | 0.16.1 | Sole flake8-style linter and formatter |
+| `fmi-weather-client` | 1.0.0 | FMI WFS runtime client |
+| `geopy` | 2.5.0 | Optional lightning reverse geocoding |
+| `xmltodict` | 1.0.4 | Maintained Expat-based FMI XML parser with entity declarations disabled |
+| `homeassistant` | 2026.8.1 | Stable reference test environment, not the HACS floor |
+| `pytest-homeassistant-custom-component` | 0.13.355 | Matching Home Assistant test harness |
+| `bandit[toml]` | 1.9.4 | Runtime Python security analysis |
+| `mypy` | 2.3.0 | Type analysis |
+| `packaging` | 26.3 | Directly imported dependency-policy parsing |
+| `pip-audit` | 2.10.1 | Vulnerability inventory and exact exception enforcement |
+| `pip-licenses` | 5.5.5 | Installed graph license inventory |
 | `pylint` | 4.0.6 | Complementary static analysis |
-| `mypy` | 2.3.0 | Type checker; current source tree must remain zero-error |
-| `pip-audit` | 2.10.1 | Vulnerability inventory and exact-exception enforcement |
-| `pip-licenses` | 5.5.5 | Complete resolved license inventory |
+| `pytest` | 9.0.3 | Test runner |
+| `pytest-asyncio` | 1.4.0 | Async test execution |
+| `pytest-cov` | 7.1.0 | Branch coverage |
+| `pytest-socket` | 0.8.0 | Deterministic socket blocking |
+| `pytest-xdist` | 3.8.0 | Automatic parallel workers |
+| `ruff` | 0.16.1 | Sole host formatter/linter |
 
-`requests` and `voluptuous` are supplied by Home Assistant's exact graph. `xmltodict` is supplied
-through the FMI client. `python-dateutil` remains test-transitive only. The removed
-`async-timeout` dependency is replaced by `asyncio.timeout` on the supported Python version.
-Do not promote these packages to direct requirements unless the integration starts owning a
-contract that Home Assistant or the FMI client no longer guarantees.
+The resolver bootstrap pins pip 26.2.1, setuptools 84.0.0, pip-tools 7.6.1, build 1.5.0,
+click 8.4.2, packaging 26.3, pyproject-hooks 1.2.0, and wheel 0.48.0. It is installed wheel-only
+inside the resolver image because a resolver cannot depend on a lock it generates.
 
-The stable FMI client requests `WindGust`, but the selected forecast producer publishes
-`HourlyMaximumGust`. `custom_components/fmi/fmi_client.py` is the explicit private-API adapter that
-adds this field to the same request and maps it by timestamp. It is guarded by request, parser,
-field-precedence, timestep, and one-request contract tests. Do not remove or broaden that boundary
-without rechecking current FMI metadata and upstream client behavior.
+`requests` and `voluptuous` remain Home Assistant contracts. `xmltodict` is direct because the
+integration imports it, explicitly selects its secure parsing mode, and therefore owns its
+version/availability contract. It was already present through `fmi-weather-client`, so promoting it
+does not add another installed runtime package. The integration does not declare or import
+`defusedxml`. It still appears in the complete development lock only as a dependency of
+Home Assistant's `py-serializable` graph; removing that transitive would falsify the reference
+environment rather than remove it from the distributed integration.
 
-## Actions And Images
+The selected `xmltodict` release supports Python 3.14, publishes a platform-independent wheel
+through PyPI Trusted Publishing, disables entity declarations by default, and has a maintained
+security policy for the latest 1.x line. Integration calls also set `disable_entities=True`
+explicitly and refuse Expat versions older than 2.7.2. The reference Python 3.14.2 image contains
+Expat 2.7.3. External DTD declarations are not resolved because Expat has no external-resource
+handler in this parsing path; tests verify both internal/external entity rejection and inert
+external DTD behavior.
 
-All JavaScript actions use immutable commit SHAs and executable containers use immutable registry
-digests. Dependabot tracks action references, but a maintainer must review release notes,
-permissions, runtime changes, and nested actions/images before accepting an update.
+## Hashes, Source Distributions, And Drift
 
-| Action or image | Purpose | Selected reference |
-|---|---|---|
-| `actions/checkout` | Repository checkout | `3d3c42e5aac5ba805825da76410c181273ba90b1` (v7.0.1) |
-| `actions/github-script` | PR metadata and release publication | `3a2844b7e9c422d3c10d287c895573f7108da1b3` (v9.0.0) |
-| `actions/dependency-review-action` | Native dependency diff | `a1d282b36b6f3519aa1f3fc636f609c47dddb294` (v5.0.0) |
-| `github/codeql-action` | Python and Actions security analysis | `7211b7c8077ea37d8641b6271f6a365a22a5fbfa` (v4.36.0) |
-| `ghcr.io/home-assistant/hassfest` | Home Assistant validation | `sha256:a77f1cf7cfc21ad626ebaae52ecb6131a45ab20223f8c2c0750bfca487aa4f05` |
-| `ghcr.io/hacs/action` | HACS validation | `sha256:ea472b182558d08e50221c550fc5cdbba9e1bc1efba53f92bc4fed38e7bc56b9` |
-| `docker.io/rhysd/actionlint` | Workflow syntax and static analysis | `sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667` |
+All three locks use `--generate-hashes`. The dev image installs with `--require-hashes` and runs
+`pip check`. Home Assistant's selected graph contains the source-only `mock-open==1.4.0` and
+`PyRIC==0.1.6.3`; their source archives are hash-verified and their pure-Python wheels are built
+only inside the rootless image build. The host Ruff environment uses both `--require-hashes` and
+`--only-binary=:all:`.
 
-Direct container invocation is intentional for hassfest and HACS: their higher-level actions use
-mutable nested image tags. Only the final release job receives `contents: write`; CodeQL receives
-`security-events: write` solely to upload results.
+`make freeze-check` recompiles without `--upgrade` and compares non-comment lock content. Use
+`make refresh-dependencies` for latest compatible versions. Moving stable/prerelease compatibility
+does not create another committed environment: it derives unpinned runtime/HA/helper names from
+root PEP 621, freezes and recreates a temporary graph inside the resolver container, and exports
+ignored per-run evidence under `.artifacts/compatibility/`.
 
-## Vulnerabilities, Licenses, And Drift
+## GitHub Dependency Graph
 
-- The integration-declared FMI/geopy dependency closure has no accepted vulnerability exception.
-- Home Assistant 2026.8.1 pins cryptography 48.0.1 with three known advisories. The integration does
-  not import or declare it. The owner-approved private-testing exception is exact by package,
-  version, and advisory ID in `.github/dependency-audit-exceptions.json`; `TODO.md` defines the
-  upstream removal trigger.
-- `make audit` passes only when the complete freeze matches the exact reviewed exception set. New
-  findings, changed affected versions, and stale exceptions fail. `make audit-raw` intentionally
-  remains nonzero while the upstream cryptography pin is vulnerable.
-- `make licenses` must report no unknown license. The full development graph includes copyleft
-  packages selected by the FMI client and Home Assistant tooling; the inventory does not relicense
-  this MIT repository. Review redistribution separately from local/CI installation.
-- `make outdated` is diagnostic. Do not override resolver-controlled transitives independently of
-  their Home Assistant/helper parent merely to reduce the list.
-- Current stable and available prerelease checks write independent full freezes, recreate clean
-  environments with `--no-deps`, run `pip check`, verify the selected release channel, and execute
-  the complete offline suite. When no newer installable prerelease exists, that informational check
-  succeeds without producing a freeze. A generated drift freeze is evidence for one run, not a
-  committed support promise.
+GitHub's static pip parser reliably recognizes the conventional `requirements.txt`, but the two
+audience-specific lock names are not the complete graph contract. `make dependency-snapshot` parses
+all three generated files offline, cross-checks their exact direct packages and versions against
+the two PEP 621 owners, requires at least one SHA-256 hash for every resolved pin, and fails on any
+unknown lock syntax. It exports ignored `.artifacts/dependency-snapshot.json`; this is derived
+evidence and must not be committed.
+
+On a direct `master` push, the trusted **Submit dependency graph** CI job uploads exactly three
+manifests through GitHub's Dependency Submission API. Runtime entries have `runtime` scope; the
+toolbox and Ruff graphs have `development` scope. Direct/indirect relationships come from PEP 621
+ownership and the complete locks. The job uses only its standard repository `GITHUB_TOKEN` with
+job-level `contents: write`; no PAT is required, checkout credentials are not persisted, and the
+token is never passed into the offline generator container. PR and reusable Release invocations
+cannot enter this write boundary. A new or renamed lock becomes visible remotely only after the
+corresponding commit reaches `master` and that job succeeds.
+
+## Vulnerabilities, Licenses, And External References
+
+`make audit` audits the installed dev graph and accepts only the exact package/version/advisory
+tuples in `.github/dependency-audit-exceptions.json`. New findings and stale exceptions fail.
+`make audit-raw` intentionally remains nonzero while Home Assistant pins the documented vulnerable
+cryptography release. The integration-owned xmltodict/FMI/geopy runtime closure has no accepted
+exception. `make licenses` prints the installed graph for maintainer review; an unknown or
+incompatible license must block the dependency change even though the command is an inventory,
+not a separate automated CI gate.
+
+JavaScript actions use full commit SHAs. Python, actionlint, hassfest, and HACS images use immutable
+registry digests. Dependabot has one weekly pip entry for root PEP 621/locks and one weekly
+GitHub-Actions entry; it does not track a Docker ecosystem.
 
 ## Change Checklist
 
-Use `HA_RELEASE_MAINTENANCE.md` for the complete new-Home-Assistant-release flow and its explicit
-release/no-release decision. For other dependency changes:
+1. Change only the direct PEP 621 owner and synchronize manifest requirements when runtime changes.
+2. Run `make refresh-dependencies` or `make lock`; review every changed pin and hash audience.
+3. Run `make freeze-check`, build the dev image, and confirm `pip check`.
+4. Run `make dependency-snapshot` and inspect that all three manifest counts remain plausible.
+5. Run format/lint/type/Bandit, full offline coverage, validators, reviewed audit, and licenses.
+6. Run stable and prerelease compatibility for HA/runtime dependency changes.
+7. Keep the HACS minimum unchanged unless the old floor has a reproduced integration failure.
+8. A manifest runtime requirement change is release-bearing: update `.version`, synchronize the
+   manifest mirror, and add the matching dated changelog section.
 
-1. Verify the desired release and constraints from authoritative package/project metadata.
-2. Change `requirements-direct.txt`, `requirements-bootstrap.txt`, or the integration manifest only
-   at the owning boundary; never edit root `requirements.txt` manually.
-3. Run `make lock` for supported direct or transitive changes and review every line of lock drift.
-4. Run `make dev-build`, `make test-full`, `make lint`, `make type-check`, `make validate`,
-   `make audit`, and `make licenses`.
-5. Run both compatibility targets and determine whether a moving-channel failure changes the
-   supported contract or only reports upstream drift.
-6. Do not raise the `hacs.json` minimum unless a reproduced integration incompatibility requires
-   it; a newer reference lock alone is not evidence that older installations are incompatible.
-7. Update this inventory, `DEVELOPMENT.md`, `COMPATIBILITY_SECURITY.md`, `TODO.md`, and
-   `CHANGELOG.md` when their contracts or accepted risks change.
+## XML Parser References
 
-## Sources
-
-- [Home Assistant on PyPI](https://pypi.org/project/homeassistant/)
-- [`pytest-homeassistant-custom-component` on PyPI](https://pypi.org/project/pytest-homeassistant-custom-component/)
-- [`fmi-weather-client` on PyPI](https://pypi.org/project/fmi-weather-client/)
-- [`fmi-weather-client` source](https://codeberg.org/saaste/fmi-weather-client)
-- [geopy on PyPI](https://pypi.org/project/geopy/)
+- [Python 3.14 XML security guidance](https://docs.python.org/3.14/library/xml.html)
+- [`xmltodict` 1.0.4 project metadata and release provenance](https://pypi.org/project/xmltodict/)
+- [`xmltodict` security policy](https://github.com/martinblech/xmltodict/security)

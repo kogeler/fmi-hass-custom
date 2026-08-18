@@ -260,7 +260,6 @@ class _BaseSensorClass(CoordinatorEntity[FMIDataUpdateCoordinator], SensorEntity
         """Initialize an FMI sensor."""
         super().__init__(coordinator)
         self.logger = const.LOGGER.getChild("sensor")
-        self.client_name = name
         self.entity_description = description
         self.type = description.sensor_type
         self._attr_unique_id = _sensor_unique_id(coordinator, name, description)

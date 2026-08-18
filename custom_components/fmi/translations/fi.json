@@ -6,26 +6,58 @@
         },
         "error": {
             "cannot_connect": "Yhteydenotto epäonnistui",
+            "place_not_found": "FMI ei löytänyt ennustetietoja tälle paikalle. Kokeile tarkempaa kaupungin tai paikan nimeä.",
+            "place_required": "Anna kaupungin tai paikan nimi.",
             "unknown": "Odottamaton virhe"
         },
         "step": {
-      "user": {
+            "user": {
+                "description": "Valitse, miten ennusteen sijainti määritetään.",
+                "title": "Ilmatieteen laitos",
+                "menu_options": {
+                    "map": "Valitse kartalta",
+                    "place": "Hae paikan nimellä"
+                },
+                "menu_option_descriptions": {
+                    "map": "Käytä Kodin sijaintia tai valitse toinen piste kartalta.",
+                    "place": "Pyydä FMI:tä etsimään kaupunki tai paikka ja vahvista se kartalla."
+                }
+            },
+            "reconfigure": {
+                "description": "Valitse, miten FMI-merkinnän sijainti muutetaan. Nykyiset entiteetit ja mukautetut entiteettitunnukset säilyvät.",
+                "title": "Vaihda FMI-sijaintia",
+                "menu_options": {
+                    "map": "Valitse kartalta",
+                    "place": "Hae paikan nimellä"
+                },
+                "menu_option_descriptions": {
+                    "map": "Valitse uusi piste kartalta.",
+                    "place": "Pyydä FMI:tä etsimään kaupunki tai paikka ja vahvista se kartalla."
+                }
+            },
+            "map": {
                 "data": {
-                    "latitude": "Leveysaste",
-                    "longitude": "Pituusaste",
+                    "location": "Ennusteen sijainti",
                     "name": "Nimi"
                 },
-        "description": "Ilmatieteen laitos määrittely parametrit",
-        "title": "Ilmatieteen laitos"
-      },
-      "reconfigure": {
-        "data": {
-          "latitude": "Leveysaste",
-          "longitude": "Pituusaste"
-        },
-        "description": "Päivitä tämän FMI-määrityksen koordinaatit. Olemassa olevat entiteetit ja mukautetut entiteettitunnukset säilyvät.",
-        "title": "Vaihda FMI-sijaintia"
-      }
+                "description": "Hyväksy tämä piste tai siirrä merkki toiseen ennustesijaintiin. FMI tarkistaa valitun pisteen ennen tallennusta.",
+                "title": "Valitse ennusteen sijainti kartalta"
+            },
+            "place": {
+                "data": {
+                    "name": "Nimi",
+                    "place": "Kaupunki tai paikka"
+                },
+                "description": "FMI vastaanottaa tämän hakutekstin ja palauttaa sitä vastaavan ennustepisteen. Vahvistat tuloksen ennen tallennusta.",
+                "title": "Hae FMI:stä paikan nimellä"
+            },
+            "place_confirm": {
+                "data": {
+                    "location": "Ennusteen sijainti"
+                },
+                "description": "FMI löysi paikan **{place}**. Vahvista piste tai siirrä merkkiä. Lopullinen piste tarkistetaan uudelleen ennen tallennusta.",
+                "title": "Vahvista ennusteen sijainti"
+            }
         }
     },
     "entity": {

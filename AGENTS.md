@@ -27,6 +27,10 @@ correctness, compatibility, testability, migration, security, privacy, or valida
 - `plans/P02/`: planned location-selection work (`PLAN.md`), its S00-verified baseline, and future
   execution reports, following the same self-contained layout as P01.
 - `.github/scripts/` and `.github/workflows/`: tested Python CI helpers and GitHub Actions policy.
+- `containers/toolbox/` and `make/container.mk`: content-addressed rootless Podman environment,
+  tar-stream transport, confinement policy, and OCI cache operations.
+- `pyproject.toml` and `tools/lint/pyproject.toml`: the only direct Python dependency manifests;
+  the three root `requirements*.txt` files are generated hash locks.
 - `.version`: only human-maintained release version; the manifest is a synchronized mirror.
 
 ## Maintenance Documentation Map
@@ -62,11 +66,14 @@ fallback.
 
 | Task | Command |
 |---|---|
+| Verify rootless Podman | `make doctor` |
 | Build/sync environment | `make dev-build` |
-| Regenerate complete freeze | `make lock` |
+| Regenerate all three hash locks | `make lock` |
+| Check lock reproducibility | `make freeze-check` |
 | Format / check | `make format` / `make format-check` |
 | Ruff and Pylint | `make lint` |
 | Mypy | `make type-check` |
+| Bandit / shell checks | `make bandit` / `make syntax` / `make shellcheck` |
 | Fast offline tests | `make test-fast` |
 | Full offline coverage | `make test-full` |
 | Home Assistant/hassfest/actionlint validation | `make validate` |
@@ -76,16 +83,26 @@ fallback.
 | Stable / prerelease drift | `make compatibility-stable` / `make compatibility-prerelease` |
 | Reviewed vulnerability policy / raw inventory | `make audit` / `make audit-raw` |
 | License inventory | `make licenses` |
+| Build all three Dependency Submission manifests | `make dependency-snapshot` |
+| Prove container confinement | `make confinement-test` |
 
-`PYTEST_WORKERS=2` (or another pytest-xdist value) is opt-in for offline tests. Keep the measured
-faster single-process default unless a new benchmark justifies changing it. Live probes and the
-network-block test stay sequential.
+Every pytest path uses pytest-xdist with `PYTEST_WORKERS=auto` by default and
+`--dist=worksteal`, including offline, network-block, live, and moving compatibility runs. Xdist
+derives the automatic count from the CPU resources visible inside the container. An explicit
+`PYTEST_WORKERS=<N>` is diagnostic only; do not introduce a serial default or a special serial
+suite. Live workers share one cross-process twelve-attempt budget and two-request semaphore. Make
+serializes its target graph even if invoked with `-j`; test parallelism belongs inside xdist, not
+across competing toolbox containers and shared artifacts.
 
 ## Test And Network Rules
 
-Ordinary tests must be deterministic and offline. Pytest blocks sockets, and format, lint, typing,
-offline tests, and local validation run in containers with `--network=none`. Only tests marked
-`live` may contact FMI, using public test locations and the request budget in
+Ordinary tests must be deterministic and offline. Pytest blocks sockets, and every project-aware
+command except Ruff runs in a rootless container. The default test, analysis, and local-validator
+contours use `--network=none`; dependency resolution/audit, HACS validation, moving compatibility,
+outdated-package inventory, and marked live probes use explicit purpose-limited online contours.
+Ruff alone uses the hash-locked host `venv-lint/`. Source is streamed into private tmpfs; never
+bind-mount the checkout, Git metadata, a host virtual environment, or a Podman socket. Only tests
+marked `live` may contact FMI, using public test locations and the request budget in
 `docs/maintenance/LIVE_TESTS.md`. Never use owner coordinates or captured private payloads.
 
 Add coverage proportional to risk. Public behavior, lifecycle, registry migration, source
@@ -122,13 +139,18 @@ coordinates. Follow `docs/maintenance/MIGRATIONS.md` and `RECONFIGURATION.md`.
 
 ## Dependencies And Releases
 
-`requirements-direct.txt` is the reviewed direct input for the reference environment; root
-`requirements.txt` is a generated complete `pip freeze` and must not be hand-edited.
-`requirements-bootstrap.txt` isolates pip. Moving compatibility inputs stay unpinned and generate
-separate per-run freezes. Every automated `pip install` consumes a requirements/constraint file,
-never inline package names or versions. Follow `docs/maintenance/DEVELOPMENT.md` for updates and
-review both vulnerability and license results. Support, privacy, and accepted-risk boundaries are
-in `docs/maintenance/COMPATIBILITY_SECURITY.md`.
+Root `pyproject.toml` owns exact integration runtime dependencies and the complete direct `dev`
+set. `tools/lint/pyproject.toml` owns only Ruff. Root `requirements.txt`,
+`requirements-dev.txt`, and `requirements-lint.txt` are generated `pip-compile` outputs with
+SHA-256 hashes and must not be hand-edited; no other requirements manifests or `.in` files are
+maintained. The resolver's exact wheel-only bootstrap is the sole inline self-hosting exception in
+the toolbox Containerfile. `make dependency-snapshot` derives the three GitHub Dependency
+Submission manifests from those locks inside the offline toolbox; only the direct trusted
+`master`-push job uploads them with job-scoped `contents: write`. Moving compatibility inputs are
+derived unpinned from PEP 621 inside the resolver container and publish only ignored run evidence.
+Follow `docs/maintenance/DEVELOPMENT.md` for updates and review both vulnerability and license
+results.
+Support, privacy, and accepted-risk boundaries are in `docs/maintenance/COMPATIBILITY_SECURITY.md`.
 
 Release-bearing PRs to `master` must increment `.version`, synchronize the manifest, and add the
 matching dated changelog section. A Home Assistant reference-only refresh that meets every

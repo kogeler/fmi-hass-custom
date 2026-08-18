@@ -5,6 +5,8 @@
 This document defines how FMI's one-hour point forecast samples are exposed through Home
 Assistant's hourly and daily weather forecast APIs.
 
+Last verified against current code: 2026-08-16.
+
 ## Source contracts
 
 The installed `fmi-weather-client==1.0.0` model exposes timezone-aware `WeatherData` samples. Its `precipitation_amount` field maps FMI `Precipitation1h` and is documented by the client as the amount during the preceding hour. The client labels the value `mm/h`, while Home Assistant's weather entity contract requires accumulated forecast precipitation in `mm` or `in`. The integration therefore exposes each one-hour amount and its daily sum as millimetres.
@@ -85,7 +87,7 @@ restores the same record. See `MIGRATIONS.md`.
 
 ## References
 
-- [Home Assistant weather entity contract](https://developers.home-assistant.io/docs/core/entity/weather/), checked 2026-07-31.
+- [Home Assistant weather entity contract](https://developers.home-assistant.io/docs/core/entity/weather/), checked 2026-08-16.
 - [Home Assistant forecast-type migration notice](https://developers.home-assistant.io/blog/2023/08/07/weather_entity_forecast_types/), checked 2026-07-31.
 - [FMI WFS examples and timestep guidance](https://en.ilmatieteenlaitos.fi/open-data-manual-wfs-examples-and-guidelines), checked 2026-07-31.
 - [`fmi-weather-client` 1.0.0 source](https://codeberg.org/saaste/fmi-weather-client/src/tag/1.0.0/fmi_weather_client/models.py), checked against the installed package 2026-07-31.
