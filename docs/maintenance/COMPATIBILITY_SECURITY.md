@@ -67,7 +67,7 @@ defined in `RUNTIME.md`.
 ## Accepted Constraints
 
 - Home Assistant 2026.8.1 pins cryptography 48.0.1 with three known advisories. The integration
-  neither imports nor declares it. The owner-approved private-testing exception is exact by
+  neither imports nor declares it. The owner-approved development/test exception is exact by
   package, version, and advisory ID; `TODO.md` records the upstream removal trigger.
 - A live FMI/network outage blocks required CI by explicit policy. Re-run once and classify the
   failure with `LIVE_TESTS.md`; do not weaken assertions or silently make the probe optional.

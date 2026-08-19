@@ -2,7 +2,7 @@
 
 # Continuous Integration And Release Gates
 
-Last verified locally: 2026-08-18.
+Last verified locally: 2026-08-19.
 
 ## Workflow Topology
 
@@ -28,9 +28,11 @@ credentials are never persisted.
   rootless Podman, restores content-addressed toolbox/resolver OCI archives, and runs `make ci`.
   Coverage is written only to `$GITHUB_STEP_SUMMARY`; the job has no PR write token.
 - **Bounded live FMI** depends on quality and runs `make live` online without repository secrets.
-- **Home Assistant and HACS validation** depends on quality, supplies the read-only GitHub token and
-  exact head repository/SHA to HACS, and runs the Make validator contract. Actionlint/hassfest use a
-  tar snapshot, not a checkout bind mount; HACS fetches the exact remote revision itself.
+- **Hassfest** depends on quality and runs the digest-pinned official validator against a private
+  tar-streamed source snapshot. The job is separately linkable and never bind-mounts the checkout.
+- **HACS validation** depends on quality, supplies the read-only GitHub token and exact head
+  repository/SHA to the digest-pinned official validator, and is separately linkable. HACS fetches
+  the exact remote revision itself and receives no checkout mount.
 - **Dependency review** uses the native dependency-diff action for same-repository pull requests.
   Fork pull requests use the exact reviewed `make audit` fallback in the toolbox because GitHub's
   dependency-review API does not expose their dependency diff to this workflow.
@@ -97,7 +99,8 @@ After the new workflow has run once, select the actual GitHub-rendered names cor
 
 - `CI / Confined quality and offline tests`
 - `CI / Bounded live FMI`
-- `CI / Home Assistant and HACS validation`
+- `CI / Hassfest`
+- `CI / HACS validation`
 - `CI / Dependency review`
 - `CI / CodeQL (actions)`
 - `CI / CodeQL (python)`
@@ -120,7 +123,8 @@ For a release PR and its `master` push:
 
 1. Confirm every expected CI job ran on the exact head SHA and stable compatibility was blocking.
 2. Confirm live FMI followed quality and used no secrets.
-3. Confirm HACS reported the exact source repository/ref and no validator received a checkout bind.
+3. Confirm the separately visible HACS and Hassfest jobs passed, HACS reported the exact source
+   repository/ref, and no validator received a checkout bind.
 4. Confirm CodeQL produced both language results and reusable CI requested no contents-write
    permission.
 5. Confirm `Dependency submission / Submit dependency graph` accepted `requirements.txt`,

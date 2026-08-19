@@ -8,7 +8,9 @@ Check that page before installation or upgrade for the current version, release 
 archives. The minimum Home Assistant version is declared in `hacs.json` within that release.
 Current stable and prerelease compatibility checks detect upcoming changes, but do not promise
 support for every future release. The integration needs internet access to FMI. HACS is recommended
-but not required.
+but not required. The supported product geography is Finland; optional observation and sea-level
+datasets can cover only part of that area. A place-search result outside Finland does not establish
+support for that location.
 
 ## Install With HACS
 

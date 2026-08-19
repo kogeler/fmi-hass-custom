@@ -14,7 +14,7 @@
   Assistant Core.
 - Do not override Home Assistant's exact pin locally. It conflicts with Home Assistant and
   pyOpenSSL constraints, makes `pip check` fail, and tests an unsupported environment.
-- The owner-approved private-testing exception is exact by package, version, and advisory ID in
+- The owner-approved development/test exception is exact by package, version, and advisory ID in
   `.github/dependency-audit-exceptions.json`. New findings, changed affected versions, and stale
   exceptions remain blocking.
 - The earlier Pillow/PyJWT exceptions are removed because Home Assistant now selects Pillow 12.3.0

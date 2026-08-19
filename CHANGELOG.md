@@ -23,6 +23,8 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Restricted normal HACS downloads to published releases instead of offering the moving default
+  branch alongside them, while keeping manual source installation available.
 - **Compatibility migration:** the lightning sensor no longer stores a reverse-geocoded address or
   raw-coordinate fallback as its native state, and primary/`OBSERVATIONS` rows no longer contain
   `location`. Templates and automations using those values must migrate to `direction`, `bearing`,
@@ -30,6 +32,10 @@ All notable changes to this project are documented in this file.
   config entries, options, and Recorder history remain unchanged.
 - Enforced the configured lightning radius as an inclusive circle after FMI's square bounding-box
   request prefilter while retaining the five-nearest/newest presentation order.
+- Added a structured bug-report form that requests reproducible versioned evidence and explicitly
+  requires coordinates, secrets, and raw FMI responses to be removed.
+- Split HACS and hassfest into separately visible CI checks while retaining immutable validator
+  image digests, private tar-streamed source snapshots, and read-only workflow permissions.
 
 ### Fixed
 

@@ -61,8 +61,10 @@ multiplying those worker pools and prevents races on locks, OCI archives, and ex
 | Public live FMI probes | `make live` |
 | Complete local gate / CI quality contract | `make check` / `make ci` |
 
-`make validator-images` pulls the three immutable external validator digests. Normal validation
-then runs actionlint and hassfest offline. HACS necessarily remains online and requires
+`make validator-images` pulls the three immutable external validator digests; the individual
+`validator-image-actionlint`, `validator-image-hassfest`, and `validator-image-hacs` targets let
+isolated CI jobs pull only their own validator. Normal validation then runs actionlint and hassfest
+offline. HACS necessarily remains online and requires
 `INPUT_GITHUB_TOKEN`, `REPOSITORY`, and `REPOSITORY_REF`; it validates that exact remote revision
 without receiving the checkout.
 

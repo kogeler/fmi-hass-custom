@@ -43,6 +43,7 @@ include make/container.mk
 	test-network-block coverage-report confinement-test version-check version-sync \
 	validate validate-local validate-actions validate-hassfest validate-hacs live \
 	compatibility-stable compatibility-prerelease audit audit-raw licenses outdated \
+	validator-image-actionlint validator-image-hassfest validator-image-hacs \
 	validator-images dependency-snapshot release-notes check ci clean
 
 help:
@@ -204,10 +205,19 @@ validate-local: toolbox-image
 	$(BOX_RUN) python -m pytest $(PYTEST_XDIST) -q \
 		tests/test_layout.py tests/test_distribution.py tests/test_setup.py
 
-validator-images:
-	@for image in '$(ACTIONLINT_IMAGE)' '$(HASSFEST_IMAGE)' '$(HACS_IMAGE)'; do \
-		$(PODMAN) image exists "$$image" || $(PODMAN) pull --quiet "$$image" >/dev/null; \
-	done
+validator-image-actionlint:
+	@$(PODMAN) image exists '$(ACTIONLINT_IMAGE)' || \
+		$(PODMAN) pull --quiet '$(ACTIONLINT_IMAGE)' >/dev/null
+
+validator-image-hassfest:
+	@$(PODMAN) image exists '$(HASSFEST_IMAGE)' || \
+		$(PODMAN) pull --quiet '$(HASSFEST_IMAGE)' >/dev/null
+
+validator-image-hacs:
+	@$(PODMAN) image exists '$(HACS_IMAGE)' || \
+		$(PODMAN) pull --quiet '$(HACS_IMAGE)' >/dev/null
+
+validator-images: validator-image-actionlint validator-image-hassfest validator-image-hacs
 
 # External validator images receive the same archive snapshot through stdin.
 # Their wrappers unpack only into private tmpfs; the host checkout is never

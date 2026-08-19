@@ -1,0 +1,107 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+
+name: Bug report
+description: Report a reproducible problem with the FMI custom integration
+title: "[Bug]: "
+labels: []
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve the integration. Search existing issues first and use the
+        latest published release when possible. Do not include precise home coordinates, secrets,
+        access tokens, or raw FMI responses.
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration release
+      description: The installed FMI release shown by HACS or manifest.json.
+      placeholder: Copy the installed release exactly
+    validations:
+      required: true
+
+  - type: input
+    id: home_assistant_version
+    attributes:
+      label: Home Assistant version
+      placeholder: e.g. 2026.8.2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation_type
+    attributes:
+      label: Home Assistant installation type
+      options:
+        - Home Assistant OS
+        - Home Assistant Container
+        - Home Assistant Core
+        - Home Assistant Supervised
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: python_version
+    attributes:
+      label: Python version, if relevant
+      description: Usually needed only for Home Assistant Core installations or import failures.
+      placeholder: e.g. 3.14.2
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe what happened and which entity, source, or configuration path failed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: List the smallest reliable sequence that reproduces the problem.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics and logs
+      description: >-
+        Attach Home Assistant diagnostics and relevant FMI integration log lines after removing
+        coordinates, secrets, identifiers, and raw external payloads. Leave this empty when none
+        are available.
+      render: text
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed precise coordinates, secrets, tokens, and raw FMI responses.
+          required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I tested the latest published integration release or explained why I could not.
+          required: true
