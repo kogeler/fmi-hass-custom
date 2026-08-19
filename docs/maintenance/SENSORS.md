@@ -75,8 +75,8 @@ Static attribution remains the entity attribution rather than being duplicated i
 ## Lightning State And Attributes
 
 A successful empty FMI result stores `no_strikes`; Home Assistant can translate that finite state
-for presentation. A qualifying group stores `{DIRECTION} · {distance:.1f} km`, for example
-`SE · 42.3 km`. A coincident group stores `HERE · 0.0 km`. The value remains a textual sensor with
+for presentation. A qualifying group stores `{distance:.1f} km · {DIRECTION}`, for example
+`42.3 km · SE`. A coincident group stores `0.0 km · HERE`. The value remains a textual sensor with
 no device/state class or unit conversion.
 
 The primary group and every nested `OBSERVATIONS` row expose `time`, numeric kilometer `distance`,

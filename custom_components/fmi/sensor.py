@@ -469,7 +469,7 @@ class FMILightningStrikesSensor(_BaseSensorClass):
             self._attr_extra_state_attributes = {}
             return
         direction = data[0].direction.upper()
-        self._attr_native_value = f"{direction} · {data[0].distance:.1f} km"
+        self._attr_native_value = f"{data[0].distance:.1f} km · {direction}"
         self._attr_extra_state_attributes = {
             ha_const.ATTR_TIME: data[0].time,
             const.ATTR_DISTANCE: data[0].distance,

@@ -111,8 +111,8 @@ truthful Home Assistant contract:
 5. The sensor keeps its existing entity registry record, unique ID, customized entity ID, device,
    config entry, options, and update cadence.
 
-The intended visible non-empty state is a concise direction-and-distance value such as
-`SE · 42.3 km`. The exact state token, precision, and supported translation behavior must be
+The intended visible non-empty state is a concise distance-and-direction value such as
+`42.3 km · SE`. The exact state token, precision, and supported translation behavior must be
 frozen in S00 against the current Home Assistant API. Machine-readable `direction` and `bearing`
 attributes are mandatory, and distance remains numeric. A valid empty response must have an
 explicit, translated, automation-testable "no lightning strikes" state.
@@ -281,8 +281,8 @@ evidence.
 
 ### 4.4 User-visible state and translations
 
-- Freeze one stable machine contract before S01 implementation. The intended strike state is a
-  concise direction code plus numeric kilometers, for example `SE · 42.3 km`; state formatting
+- Freeze one stable machine contract before S01 implementation. The intended strike state is
+  numeric kilometers followed by a concise direction code, for example `42.3 km · SE`; formatting
   must not depend on a frontend user's locale or on Home Assistant's configured display units.
 - Store `direction` as a documented stable token/code and `bearing` as a numeric degree value in
   attributes. Preserve `distance` as numeric kilometers for automations.
@@ -482,7 +482,7 @@ remeasure it on the selected branch and write `plans/P03/BASELINE.md`.
    non-convergence case?
 4. Can current Home Assistant translate a stable empty-state token on a sensor that otherwise has
    dynamic composite text? What exact state does the state machine store versus the frontend show?
-5. Is `SE · 42.3 km` with stable compass codes the safest strike state, or does a public API permit
+5. Is `42.3 km · SE` with stable compass codes the safest strike state, or does a public API permit
    full-word presentation without localized machine state? Do not use backend locale strings.
 6. What exact token represents coincident coordinates without inventing a bearing?
 7. Can XML parsing remain in its existing executor boundary after Nominatim removal without extra
@@ -1177,7 +1177,7 @@ Update this table when execution evidence changes a decision.
 | D003 | Owner/P03 | 2026-08-18 | Accept incompatibility for old address/native-state and `location` consumers while preserving registry/entity identity and valid numeric observation fields | Retain misleading alias forever; create a duplicate entity | The new contract is more useful and private; a documented automation migration is acceptable, but entity recreation is not | ACCEPTED |
 | D004 | S00/P03 | 2026-08-19 | Use `homeassistant.util.location.distance` (local WGS84 Vincenty metres); reject its `None` non-convergence result; store kilometers rounded to two decimals; format state distance with one decimal; include candidates whose unrounded metre result is `<= radius_km * 1000` | Keep geopy; add geometry dependency; copy an ellipsoid solver | HA 2026.8.1 matched GeographicLib/geopy within one millimetre for ordinary, antimeridian, high-latitude, and coincident vectors; antipodal non-convergence is explicit and far outside supported radius | ACCEPTED |
 | D005 | S00/P03 | 2026-08-19 | Calculate spherical initial bearing with normalized longitude delta, normalize to `[0, 360)`, round the published bearing to one decimal after selecting a half-open eight-sector bucket, and use `bearing=None`, `direction="here"` for coincident points | Undefined thresholds; arbitrary north at zero distance; duplicate a full ellipsoidal inverse solver | One pure standard-library bearing boundary is network-free and deterministic; sectors are `[337.5, 22.5)` N then 45-degree half-open buckets clockwise, while coincidence has no honest bearing | ACCEPTED |
-| D006 | S00/P03 | 2026-08-19 | Store `no_strikes` for successful empty data and provide English `No lightning strikes` / Finnish `Ei salamaniskuja` state translations; store strike state as `{DIRECTION} · {distance:.1f} km` (for coincidence, `HERE · 0.0 km`) without backend localization | Backend-localized composite state; `None`; numeric sentinel; distance device class | HA state translations support finite exact tokens on unique-ID entities, while arbitrary dynamic composites remain raw; the sensor therefore stays textual with no state class/device class | ACCEPTED |
+| D006 | S00/P03 | 2026-08-19 | Store `no_strikes` for successful empty data and provide English `No lightning strikes` / Finnish `Ei salamaniskuja` state translations; originally store strike state as `{DIRECTION} · {distance:.1f} km` (for coincidence, `HERE · 0.0 km`) without backend localization | Backend-localized composite state; `None`; numeric sentinel; distance device class | HA state translations support finite exact tokens on unique-ID entities, while arbitrary dynamic composites remain raw; the sensor therefore stays textual with no state class/device class | SUPERSEDED IN PART BY D014 |
 | D007 | Owner/P03 | 2026-08-18 | Do not calculate storm movement/closest approach from wind; reconsider only with authoritative FMI motion data in a separate plan | Surface-wind projection; single-strike extrapolation | NWS/NOAA evidence shows storm propagation differs from mean wind and operational motion requires tracking features across radar frames | ACCEPTED |
 | D008 | S00/P03 | 2026-08-19 | Enforce the configured lightning radius as an inclusive circle after the square FMI bbox prefilter | Treat square bbox half-side as radius; silently keep corner points | A deterministic 200 km bbox-corner characterization exceeds 200 km from the configured point, and current parser code contains no post-distance radius comparison | ACCEPTED |
 | D009 | S00/P03 | 2026-08-19 | Remove geopy entirely with Nominatim and regenerate every owned lock/snapshot | Leave unused direct dependency; replace it | Repository-wide active-surface search found geopy only in lightning distance/geocoding, dependency metadata, their tests, and current documentation | ACCEPTED |
@@ -1185,6 +1185,7 @@ Update this table when execution evidence changes a decision.
 | D011 | Plan/P03 | 2026-08-18 | Do not delete Recorder history; replace only current state/attrs on refresh and document retention | Database migration/purge | Recorder ownership/retention belongs to Home Assistant/user, and P03 needs no persisted integration migration | ACCEPTED |
 | D012 | Owner/P03 | 2026-08-19 | Keep deterministic lightning coverage offline, but perform one bounded non-persistent ad hoc current-data check in S04 | Add a permanent weather-dependent test; skip all real non-empty lightning evidence | The owner explicitly requested one end-to-end calculation/presentation check using actual current FMI strike data while keeping the normal suite deterministic | ACCEPTED |
 | D013 | S04/P03 | 2026-08-19 | Permit only the temporary ad hoc probe to use a dedicated SSL-verifying aiohttp session with a current-loop threaded DNS resolver when the test fixture's cached shared session is cross-loop | Change production session ownership; bypass bounded production fetch; abandon live evidence | Two probe attempts failed before FMI I/O completed with `Future attached to a different loop`, and HA's factory rejected a replacement connector; offline/runtime tests already prove unchanged production shared-session ownership, while the harness-only session still passes through the exact production timeout, size, parser, and request-budget boundaries | ACCEPTED |
+| D014 | Maintenance/P03 follow-up | 2026-08-19 | Present non-empty state as `{distance:.1f} km · {DIRECTION}` and coincidence as `0.0 km · HERE`; attributes and all other semantics remain unchanged | Retain direction-first state; localize the composite; change attribute schema | Distance is the primary measured value and reads more naturally first; this improves scan order without changing machine-readable attributes or entity identity | ACCEPTED |
 
 ---
 
@@ -1196,7 +1197,7 @@ P03 is complete only when every statement below is true.
 
 - Valid empty FMI lightning data is available and displays an explicit translated no-strikes state.
 - Real source/payload failure is unavailable and never retains an old strike.
-- A strike displays the frozen local direction-and-distance state.
+- A strike displays the frozen local distance-and-direction state.
 - `direction`, `bearing`, and `distance` are stable automation-facing attributes for primary and
   nested observations.
 - Direction means configured-point-to-strike initial bearing only, never storm motion.

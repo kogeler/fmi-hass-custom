@@ -138,7 +138,7 @@ The current state has three distinct meanings:
 
 - A successful response with no qualifying strike is available with backend state `no_strikes`.
   The frontend displays **No lightning strikes** in English or **Ei salamaniskuja** in Finnish.
-- A qualifying group has a state such as `SE · 42.3 km`. `HERE · 0.0 km` means the strike point and
+- A qualifying group has a state such as `42.3 km · SE`. `0.0 km · HERE` means the strike point and
   configured point coincide, so no bearing exists.
 - A transport, timeout, unsafe payload, parser, or unusable response is `unavailable`. Old strike
   state and dynamic attributes are cleared; the next valid refresh recovers without a reload.

@@ -11,7 +11,7 @@ All notable changes to this project are documented in this file.
 - Made a successful FMI lightning response with no qualifying strikes an available, translated
   `no_strikes` state instead of reporting the sensor unavailable.
 - Replaced best-effort lightning addresses with a concise locally calculated state such as
-  `SE · 42.3 km`, relative to the coordinates stored by that specific FMI entry. Primary and
+  `42.3 km · SE`, relative to the coordinates stored by that specific FMI entry. Primary and
   retained observation attributes now include numeric `distance`, `bearing`, and stable compass
   `direction` without claiming storm motion or arrival.
 - Improved lightning privacy and reliability: FMI, the integration's primary read-only source for

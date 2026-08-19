@@ -58,6 +58,10 @@ config entry, options, and update cadence need no migration for P03.
 
 ## Frozen P03 state and schema
 
+Post-completion contract review superseded only the composite display order recorded below.
+D014 in `PLAN.md` defines the current state as `{distance:.1f} km · {DIRECTION}` and coincidence as
+`0.0 km · HERE`; attributes, precision, translation, availability, and identity remain unchanged.
+
 - Successful empty: stored state token `no_strikes`; frontend translations `No lightning
   strikes` (English) and `Ei salamaniskuja` (Finnish); available; no dynamic strike attributes.
 - Successful strike: stable stored state `{DIRECTION} · {distance:.1f} km`, for example

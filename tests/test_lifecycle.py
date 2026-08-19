@@ -272,7 +272,7 @@ async def test_public_entity_and_forecast_contracts(
     sea_level = hass.states.get("sensor.helsinki_sea_level")
     assert temperature is not None and temperature.state == "-4.0"
     assert temperature.attributes["unit_of_measurement"] == "°C"
-    assert lightning is not None and lightning.state == "SE · 12.5 km"
+    assert lightning is not None and lightning.state == "12.5 km · SE"
     assert lightning.attributes["distance"] == 12.5
     assert lightning.attributes["bearing"] == 135.0
     assert lightning.attributes["direction"] == "SE"
@@ -378,7 +378,7 @@ async def test_lightning_empty_failure_and_recovery_transitions(
     await hass.async_block_till_done()
     lightning = hass.states.get("sensor.helsinki_lightning_strikes")
     assert lightning is not None
-    assert lightning.state == "SE · 12.5 km"
+    assert lightning.state == "12.5 km · SE"
     assert lightning.attributes["distance"] == 12.5
     assert lightning.attributes["bearing"] == 135.0
     assert lightning.attributes["direction"] == "SE"
@@ -413,7 +413,7 @@ async def test_lightning_empty_failure_and_recovery_transitions(
     await hass.async_block_till_done()
     lightning = hass.states.get("sensor.helsinki_lightning_strikes")
     assert lightning is not None
-    assert lightning.state == "SW · 18.0 km"
+    assert lightning.state == "18.0 km · SW"
     assert lightning.attributes["distance"] == 18.0
     assert lightning.attributes["bearing"] == 225.0
     assert lightning.attributes["direction"] == "SW"
@@ -532,7 +532,7 @@ async def test_options_reload_adds_and_removes_optional_entities_once(
         restored_lightning.disabled_by,
     ) == lightning_identity
     restored_state = hass.states.get("sensor.custom_lightning_watch")
-    assert restored_state is not None and restored_state.state == "SE · 12.5 km"
+    assert restored_state is not None and restored_state.state == "12.5 km · SE"
 
 
 async def test_reload_unload_and_remove_do_not_duplicate_lifecycle_state(
@@ -866,10 +866,10 @@ async def test_two_loaded_entries_calculate_one_strike_from_their_own_coordinate
     helsinki_state = hass.states.get("sensor.helsinki_lightning_strikes")
     tampere_state = hass.states.get("sensor.tampere_lightning_strikes")
     assert helsinki_state is not None and tampere_state is not None
-    assert helsinki_state.state == "NW · 4.0 km"
+    assert helsinki_state.state == "4.0 km · NW"
     assert helsinki_state.attributes["direction"] == "NW"
     assert helsinki_state.attributes["distance"] == 4.01
-    assert tampere_state.state.startswith("SE · ")
+    assert tampere_state.state == "157.6 km · SE"
     assert tampere_state.attributes["direction"] == "SE"
     assert 150 < tampere_state.attributes["distance"] < 170
     assert tampere_state.attributes["distance"] != helsinki_state.attributes["distance"]

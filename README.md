@@ -28,7 +28,7 @@ It is not bundled with Home Assistant Core and does not claim an official Core q
 - Changing Home Assistant's Home zone does not move an entry automatically. Use the integration's
   **Reconfigure** action to choose a new map point or search FMI by place name and confirm the
   result on the map.
-- Lightning is opt-in. Its state reports locally calculated direction and distance from that FMI
+- Lightning is opt-in. Its state reports locally calculated distance and direction from that FMI
   entry's configured point to a recent strike group; it does not predict storm movement or safety.
 - Station observations require a valid FMI station ID. Sea-level and lightning sensors can be
   unavailable when an optional external source fails. A successful lightning response with no

@@ -53,7 +53,7 @@ When `daily_mode` is disabled, the registry record remains and Home Assistant ex
 
 An existing lightning entity keeps its internal registry ID, unique ID, customized entity ID,
 enabled/disabled registry state, config entry, and location device. Changing the native value from
-an address to local direction/distance and replacing `location` with `direction`/`bearing` does not
+an address to local distance/direction and replacing `location` with `direction`/`bearing` does not
 require a config-entry or registry migration. Option-driven disable/re-enable and reload attach the
 same record; old current attributes are not restored by the integration.
 
