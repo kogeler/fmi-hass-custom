@@ -575,6 +575,11 @@ async def test_lightning_failure_does_not_disable_current_weather(
     assert coordinator.last_update_success
     assert coordinator.get_weather() is weather
     assert coordinator.lightning_data is None
+    assert coordinator.source_availability["lightning"] is False
+    lightning = hass.states.get("sensor.helsinki_lightning_strikes")
+    assert lightning is not None and lightning.state == STATE_UNAVAILABLE
+    assert "distance" not in lightning.attributes
+    assert "OBSERVATIONS" not in lightning.attributes
 
 
 async def test_partial_outage_unload_reload_cleans_coordinator_listeners(

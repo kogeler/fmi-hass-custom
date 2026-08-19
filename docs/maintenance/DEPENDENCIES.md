@@ -2,7 +2,7 @@
 
 # Dependency Ownership And Review
 
-Last verified: 2026-08-17.
+Last verified: 2026-08-19.
 
 ## Authoritative Inputs And Generated Outputs
 
@@ -31,7 +31,6 @@ independently owns the minimum supported Home Assistant release.
 | Dependency | Selected version | Reason |
 |---|---:|---|
 | `fmi-weather-client` | 1.0.0 | FMI WFS runtime client |
-| `geopy` | 2.5.0 | Optional lightning reverse geocoding |
 | `xmltodict` | 1.0.4 | Maintained Expat-based FMI XML parser with entity declarations disabled |
 | `homeassistant` | 2026.8.1 | Stable reference test environment, not the HACS floor |
 | `pytest-homeassistant-custom-component` | 0.13.355 | Matching Home Assistant test harness |
@@ -67,6 +66,10 @@ explicitly and refuse Expat versions older than 2.7.2. The reference Python 3.14
 Expat 2.7.3. External DTD declarations are not resolved because Expat has no external-resource
 handler in this parsing path; tests verify both internal/external entity rejection and inert
 external DTD behavior.
+
+Lightning distance uses Home Assistant's local WGS84 helper and bearing/direction uses
+standard-library trigonometry. The integration does not add a geometry or geocoding dependency and
+does not perform reverse geocoding.
 
 ## Hashes, Source Distributions, And Drift
 
@@ -107,7 +110,7 @@ corresponding commit reaches `master` and that job succeeds.
 `make audit` audits the installed dev graph and accepts only the exact package/version/advisory
 tuples in `.github/dependency-audit-exceptions.json`. New findings and stale exceptions fail.
 `make audit-raw` intentionally remains nonzero while Home Assistant pins the documented vulnerable
-cryptography release. The integration-owned xmltodict/FMI/geopy runtime closure has no accepted
+cryptography release. The integration-owned xmltodict/FMI runtime closure has no accepted
 exception. `make licenses` prints the installed graph for maintainer review; an unknown or
 incompatible license must block the dependency change even though the command is an inventory,
 not a separate automated CI gate.

@@ -53,7 +53,6 @@ def test_pep621_owns_every_direct_python_dependency() -> None:
     assert runtime == manifest_runtime
     assert runtime == {
         "fmi-weather-client": "1.0.0",
-        "geopy": "2.5.0",
         "xmltodict": "1.0.4",
     }
 

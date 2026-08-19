@@ -2,7 +2,7 @@
 
 # Config And Registry Migrations
 
-Last verified: 2026-08-17 against Home Assistant 2026.8.1 and the local v0.6.2 tag.
+Last verified: 2026-08-19 against Home Assistant 2026.8.1 and the local v0.6.2 tag.
 
 ## Supported source state
 
@@ -49,6 +49,14 @@ The legacy daily weather entity is intentionally retained. It is redundant with 
 
 When `daily_mode` is disabled, the registry record remains and Home Assistant exposes its restored state as unavailable. Re-enabling the option attaches the same internal registry ID, unique ID, and customized entity ID. No migration silently deletes or renames it.
 
+## Optional lightning entity
+
+An existing lightning entity keeps its internal registry ID, unique ID, customized entity ID,
+enabled/disabled registry state, config entry, and location device. Changing the native value from
+an address to local direction/distance and replacing `location` with `direction`/`bearing` does not
+require a config-entry or registry migration. Option-driven disable/re-enable and reload attach the
+same record; old current attributes are not restored by the integration.
+
 ## Reconfiguration after migration
 
 After migration, either map reconfiguration or FMI place search followed by map confirmation may
@@ -64,7 +72,8 @@ Duplicate-coordinate checks compare current coordinates both before and after mi
 `tests/test_migrations.py` materializes the serialized fixture through current Home Assistant
 config-entry, entity-registry, device-registry, setup, reload, state, options, and reconfigure APIs.
 It verifies config-only migration, combined setup, repeated migration/reload, future-version
-refusal, custom and ambiguous IDs, target collisions, same-name multi-entry isolation, daily
-disable/re-enable, and a post-migration place-search move with map confirmation.
+refusal, custom and ambiguous IDs (including a customized legacy lightning entity), target
+collisions, same-name multi-entry isolation, daily disable/re-enable, and a post-migration
+place-search move with map confirmation.
 
 The fixture is synthetic, uses rounded public city coordinates, and contains no captured FMI payload or owner location.

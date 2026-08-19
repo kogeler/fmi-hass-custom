@@ -166,12 +166,20 @@ gates. Do not publish manually. See `docs/maintenance/CI.md` and `HACS_RELEASES.
 
 Inspect `git status`, relevant code/tests/docs, and unexplained user changes before editing. Never
 reset, stash, overwrite, or reformat unrelated work. Do not run Git operations that can require a
-hardware token, interactive credentials, or authenticated SSH. Do not commit; the owner commits.
+hardware token, interactive credentials, or authenticated SSH. Never create a commit unless the
+owner explicitly commands it in the current conversation. Never push under any circumstances;
+only the owner pushes. Never override or bypass values inherited from global Git configuration,
+including author, committer, identity, signing, hooks, credentials, or transport settings (for
+example through command-line `-c`, environment variables, or repository-local configuration).
+Commit messages and suggested commit messages must describe the completed change without plan,
+session, or step identifiers such as `P03`, `S04`, or `P03-S04`.
 
 For follow-up maintenance, current code, tests, and the owning `docs/maintenance/` contract are the
 sources of truth. Use `plans/*` only to understand historical decisions and verification; do
 not extend it as a tracker for unrelated future work. A new implementation plan
-gets its own plan/handoff namespace and must be corrected immediately when verified reality differs.
+gets its own plan/handoff namespace. When execution finds a plan error or deliberately departs from
+the plan, correct the plan immediately before continuing the affected work; do not defer that
+correction to a report or final review.
 Record only notable release-level or unreleased HA-reference maintenance changes in
 `CHANGELOG.md`. New human-authored files use `Copyright (c) 2026 kogeler` and
 `SPDX-License-Identifier: MIT` where comments are supported.
@@ -179,5 +187,5 @@ Record only notable release-level or unreleased HA-reference maintenance changes
 Work is done only when the requested behavior is implemented and documented, relevant offline and
 Home Assistant tests pass, format/lint/type checks do not regress, migrations and privacy remain
 safe, required validation is run, the diff contains no unrelated change, and remaining risk is
-stated precisely. End a planned session with one concise suggested owner commit message beginning
-with its session ID; do not create the commit yourself.
+stated precisely. End a planned session with one concise suggested owner commit message; that
+suggestion does not authorize creating the commit.

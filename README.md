@@ -25,10 +25,11 @@ integration, not as an official Home Assistant Core integration.
 - Changing Home Assistant's Home zone does not move an entry automatically. Use the integration's
   **Reconfigure** action to choose a new map point or search FMI by place name and confirm the
   result on the map.
-- Lightning is opt-in and its address enrichment uses the public Nominatim service. This is
-  accepted only for small private deployments until the tracked provider limitation is resolved.
+- Lightning is opt-in. Its state reports locally calculated direction and distance from that FMI
+  entry's configured point to a recent strike group; it does not predict storm movement or safety.
 - Station observations require a valid FMI station ID. Sea-level and lightning sensors can be
-  unavailable where FMI returns no applicable data or an optional external source fails.
+  unavailable when an optional external source fails. A successful lightning response with no
+  qualifying strikes remains available and says so explicitly.
 
 ## Documentation
 

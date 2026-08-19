@@ -67,7 +67,7 @@ def test_moving_inputs_are_derived_from_project_metadata(tmp_path: Path) -> None
     project.write_text(
         """
 [project]
-dependencies = ["fmi-weather-client==1.0.0", "geopy==2.5.0"]
+dependencies = ["fmi-weather-client==1.0.0", "xmltodict==1.0.4"]
 [project.optional-dependencies]
 dev = ["homeassistant==2026.8.1", "pytest-homeassistant-custom-component==0.13.355"]
 """.strip(),
@@ -79,6 +79,6 @@ dev = ["homeassistant==2026.8.1", "pytest-homeassistant-custom-component==0.13.3
     assert homeassistant.read_text(encoding="utf-8") == "homeassistant\n"
     assert direct.read_text(encoding="utf-8").splitlines() == [
         "fmi-weather-client",
-        "geopy",
+        "xmltodict",
         "pytest-homeassistant-custom-component",
     ]

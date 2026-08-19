@@ -6,8 +6,9 @@
 from __future__ import annotations
 
 import logging
+from asyncio import CancelledError
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -86,18 +87,6 @@ class _ExecutorHass:
         return target(*args)
 
 
-class _SyntheticGeocoder:
-    def __init__(self, error: Exception | None = None) -> None:
-        self.error = error
-        self.calls: list[tuple[Any, dict[str, Any]]] = []
-
-    def reverse(self, location, **kwargs):
-        self.calls.append((location, kwargs))
-        if self.error is not None:
-            raise self.error
-        return SimpleNamespace(address=f"Synthetic location {location}")
-
-
 def _coordinator(
     *,
     session: _FakeSession | None = None,
@@ -119,7 +108,7 @@ def _coordinator(
     return coordinator
 
 
-def _lightning_payload(rows: list[tuple[float, float, float]]) -> bytes:
+def _lightning_payload(rows: Sequence[tuple[float, float, float]]) -> bytes:
     positions = "\n".join(f"{lat} {lon} {timestamp}" for lat, lon, timestamp in rows)
     reasons = "\n".join("1 12.5 40.0 1.2" for _row in rows)
     return (
@@ -155,11 +144,8 @@ def _parse_lightning(
     return coordinator_private._FMIDataUpdateCoordinator__parse_lightning_payload(payload, now)
 
 
-def test_lightning_success_payload_builds_aware_structures(monkeypatch) -> None:
+def test_lightning_success_payload_builds_aware_local_structures() -> None:
     coordinator = _coordinator()
-    geocoder = _SyntheticGeocoder()
-    monkeypatch.setattr(integration, "Nominatim", lambda **kwargs: geocoder)
-    monkeypatch.setattr(integration, "_reserve_nominatim_request", lambda: True)
     now = datetime.fromtimestamp(1780000600, UTC)
 
     lightning_data = _parse_lightning(
@@ -173,8 +159,10 @@ def test_lightning_success_payload_builds_aware_structures(monkeypatch) -> None:
     assert lightning_data[0].time.tzinfo is UTC
     assert lightning_data[0].strikes == 2
     assert lightning_data[0].peak_current == -8.0
-    assert lightning_data[0].location.startswith("Synthetic location")
-    assert len(geocoder.calls) == 1
+    assert lightning_data[0].distance == 9.51
+    assert lightning_data[0].bearing == 20.4
+    assert lightning_data[0].direction == "N"
+    assert not hasattr(lightning_data[0], "location")
 
 
 def test_sea_level_success_payload_uses_aware_supported_datum() -> None:
@@ -192,11 +180,10 @@ def test_sea_level_success_payload_uses_aware_supported_datum() -> None:
     ]
 
 
-def test_lightning_max_age_boundary_is_inclusive(monkeypatch) -> None:
+def test_lightning_max_age_boundary_is_inclusive() -> None:
     now = datetime(2026, 5, 20, 12, 0, tzinfo=UTC)
     coordinator = _coordinator()
     cast(Any, coordinator)._lightning_state.max_age_minutes = 60
-    monkeypatch.setattr(integration, "_reserve_nominatim_request", lambda: False)
     payload = _lightning_payload(
         [
             (60.20, 24.90, (now - timedelta(minutes=60) + timedelta(seconds=1)).timestamp()),
@@ -213,9 +200,8 @@ def test_lightning_max_age_boundary_is_inclusive(monkeypatch) -> None:
     ]
 
 
-def test_lightning_malformed_timestamp_drops_only_invalid_row(monkeypatch) -> None:
+def test_lightning_malformed_timestamp_drops_only_invalid_row() -> None:
     coordinator = _coordinator()
-    monkeypatch.setattr(integration, "_reserve_nominatim_request", lambda: False)
     valid_timestamp = datetime(2026, 5, 20, 11, 30, tzinfo=UTC).timestamp()
     payload = (
         "<root><positions>60.20 24.90 not-a-timestamp\n"
@@ -276,13 +262,9 @@ def test_lightning_out_of_range_epoch_is_dropped() -> None:
 
 
 def test_lightning_distance_failure_drops_only_the_invalid_row(monkeypatch) -> None:
-    """Keep a geodesic-library failure inside the optional-source boundary."""
+    """Keep local geometry non-convergence inside the optional-source boundary."""
     coordinator = _coordinator()
-
-    def fail_distance(*_args, **_kwargs):
-        raise ValueError("synthetic geodesic failure")
-
-    monkeypatch.setattr(integration, "geodesic", fail_distance)
+    monkeypatch.setattr(integration, "lightning_geometry", lambda *_args: None)
 
     assert (
         _parse_lightning(
@@ -292,6 +274,29 @@ def test_lightning_distance_failure_drops_only_the_invalid_row(monkeypatch) -> N
         )
         == []
     )
+
+
+def test_lightning_geometry_failure_log_omits_strike_coordinates(
+    monkeypatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Classify invalid geometry without copying FMI coordinates into logs."""
+    coordinator = _coordinator()
+    monkeypatch.setattr(integration, "lightning_geometry", lambda *_args: None)
+    caplog.set_level(logging.WARNING)
+
+    assert (
+        _parse_lightning(
+            coordinator,
+            _lightning_payload([(60.201234, 24.901234, 1779276600)]),
+            datetime(2026, 5, 20, 12, 0, tzinfo=UTC),
+        )
+        == []
+    )
+
+    assert "Skipping invalid lightning geometry" in caplog.text
+    assert "60.201234" not in caplog.text
+    assert "24.901234" not in caplog.text
 
 
 def test_lightning_unequal_arrays_are_rejected() -> None:
@@ -353,44 +358,106 @@ def test_sea_level_rejects_invalid_values(
         )
 
 
-def test_geocoder_failure_keeps_coordinates_and_caches_fallback(monkeypatch) -> None:
+def test_lightning_circular_radius_rejects_bbox_corner() -> None:
+    """Use the square request bbox only as a prefilter for the true circle."""
     coordinator = _coordinator()
-    geocoder = _SyntheticGeocoder(integration.GeocoderServiceError("synthetic outage"))
-    monkeypatch.setattr(integration, "Nominatim", lambda **kwargs: geocoder)
-    monkeypatch.setattr(integration, "_reserve_nominatim_request", lambda: True)
-    payload = _lightning_payload([(60.20, 24.90, 1780000000)])
-
-    first = _parse_lightning(
-        coordinator,
-        payload,
-        datetime.fromtimestamp(1780000300, UTC),
+    bbox = integration.utils.get_bounding_box(
+        coordinator.latitude,
+        coordinator.longitude,
+        half_side_in_km=coordinator.lightning_radius,
     )
-    second = _parse_lightning(
-        coordinator,
-        payload,
-        datetime.fromtimestamp(1780000300, UTC),
+    payload = _lightning_payload([(bbox.lat_max, bbox.lon_max, 1780000000)])
+
+    assert (
+        _parse_lightning(
+            coordinator,
+            payload,
+            datetime.fromtimestamp(1780000300, UTC),
+        )
+        == []
     )
 
-    assert first[0].location == "60.2, 24.9"
-    assert second[0].location == "60.2, 24.9"
-    assert len(geocoder.calls) == 1
 
-
-def test_geocoder_resolves_at_most_one_new_coordinate_per_update(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("longitude", "retained"),
+    [
+        (0.89831, True),
+        (0.8983152841195215, True),
+        (0.89832, False),
+    ],
+)
+def test_lightning_circular_radius_is_inclusive(longitude: float, retained: bool) -> None:
+    """Retain an exact 100 km result and reject the first tested point outside it."""
     coordinator = _coordinator()
-    geocoder = _SyntheticGeocoder()
-    monkeypatch.setattr(integration, "Nominatim", lambda **kwargs: geocoder)
-    monkeypatch.setattr(integration, "_reserve_nominatim_request", lambda: True)
+    coordinator.latitude = 0.0
+    coordinator.longitude = 0.0
+    cast(Any, coordinator)._lightning_state.radius = 100
+    now = datetime.fromtimestamp(1780000300, UTC)
+
+    data = _parse_lightning(
+        coordinator,
+        _lightning_payload([(0.0, longitude, 1780000000)]),
+        now,
+    )
+
+    assert bool(data) is retained
+    if retained:
+        assert data[0].distance <= 100.0
+
+
+def test_lightning_retains_five_nearest_then_presents_newest_first() -> None:
+    """Keep the established distance limit and presentation ordering."""
+    coordinator = _coordinator()
+    coordinator.latitude = 0.0
+    coordinator.longitude = 0.0
+    now = datetime.fromtimestamp(1780000600, UTC)
+    rows = [
+        (0.0, longitude, 1780000000 + index * 100)
+        for index, longitude in enumerate((0.1, 0.2, 0.3, 0.4, 0.5, 0.6))
+    ]
+
+    data = _parse_lightning(coordinator, _lightning_payload(rows), now)
+
+    assert len(data) == 5
+    assert [item.time.timestamp() for item in data] == [
+        1780000400,
+        1780000300,
+        1780000200,
+        1780000100,
+        1780000000,
+    ]
+
+
+def test_lightning_parser_is_deterministic_and_network_free() -> None:
+    """Produce identical local records without address lookup or raw coordinates."""
+    coordinator = _coordinator()
     payload = load_text_fixture("lightning_success.xml").encode()
     now = datetime.fromtimestamp(1780000600, UTC)
 
     first = _parse_lightning(coordinator, payload, now)
     second = _parse_lightning(coordinator, payload, now)
 
-    assert len(geocoder.calls) == 2
-    assert first[0].location.startswith("Synthetic location")
-    assert first[1].location == "60.2, 24.9"
-    assert all(item.location.startswith("Synthetic location") for item in second)
+    assert first == second
+    assert [item.direction for item in first] == ["N", "NW"]
+    assert all(not hasattr(item, "location") for item in first)
+
+
+def test_lightning_geometry_uses_each_coordinators_reference_point() -> None:
+    """Calculate the same FMI group independently for two configured entries."""
+    now = datetime.fromtimestamp(1780000300, UTC)
+    payload = _lightning_payload([(60.20, 24.90, 1780000000)])
+    helsinki = _coordinator()
+    tampere = _coordinator()
+    tampere.latitude = 61.50
+    tampere.longitude = 23.76
+
+    helsinki_data = _parse_lightning(helsinki, payload, now)
+    tampere_data = _parse_lightning(tampere, payload, now)
+
+    assert helsinki_data[0].direction == "NW"
+    assert tampere_data[0].direction == "SE"
+    assert helsinki_data[0].distance == 4.01
+    assert tampere_data[0].distance > 100
 
 
 @pytest.mark.parametrize(
@@ -475,7 +542,6 @@ async def test_lightning_request_uses_configured_max_age(monkeypatch) -> None:
     cast(Any, coordinator)._lightning_state.max_age_minutes = 60
     coordinator_private = cast(Any, coordinator)
     monkeypatch.setattr(integration.dt_util, "utcnow", lambda: now)
-    monkeypatch.setattr(integration, "_reserve_nominatim_request", lambda: False)
 
     await coordinator_private._FMIDataUpdateCoordinator__async_update_lightning_strikes()
 
@@ -513,21 +579,9 @@ async def test_optional_content_length_rejects_oversized_response_before_read() 
     assert session.response.content.offset == 0
 
 
-def test_nominatim_reservation_enforces_four_per_minute(monkeypatch) -> None:
-    monkeypatch.setattr(integration, "_NOMINATIM_NEXT_REQUEST_AT", 0.0)
-    clock = iter((100.0, 100.0, 114.9, 115.0))
-    monkeypatch.setattr(integration, "monotonic", lambda: next(clock))
-
-    assert integration._reserve_nominatim_request()
-    assert not integration._reserve_nominatim_request()
-    assert not integration._reserve_nominatim_request()
-    assert integration._reserve_nominatim_request()
-
-
 async def test_optional_failure_clears_stale_data_and_success_recovers(monkeypatch) -> None:
     coordinator = _coordinator()
     coordinator._source_available = {}
-    monkeypatch.setattr(integration, "_reserve_nominatim_request", lambda: False)
     now = datetime.fromtimestamp(1780000600, UTC)
     valid_data = _parse_lightning(
         coordinator,
@@ -561,6 +615,46 @@ async def test_optional_failure_clears_stale_data_and_success_recovers(monkeypat
 
     assert coordinator.lightning_data == valid_data
     assert coordinator._source_available["lightning"] is True
+
+
+async def test_successful_empty_lightning_data_marks_source_available() -> None:
+    """Keep a valid empty lightning observation distinct from source failure."""
+    coordinator = _coordinator()
+    coordinator._source_available = {}
+
+    async def empty_success() -> None:
+        coordinator.lightning_data = []
+
+    await coordinator._async_update_optional_source(
+        "lightning",
+        empty_success,
+        "lightning_data",
+        lambda data: data is not None,
+    )
+
+    assert coordinator.lightning_data == []
+    assert coordinator.source_availability["lightning"] is True
+
+
+async def test_optional_source_cancellation_propagates() -> None:
+    """Never convert task cancellation into an optional-source outage."""
+    coordinator = _coordinator()
+    coordinator._source_available = {}
+    coordinator.lightning_data = []
+
+    async def cancel() -> None:
+        raise CancelledError
+
+    with pytest.raises(CancelledError):
+        await coordinator._async_update_optional_source(
+            "lightning",
+            cancel,
+            "lightning_data",
+            lambda data: data is not None,
+        )
+
+    assert coordinator.lightning_data == []
+    assert "lightning" not in coordinator.source_availability
 
 
 def test_malformed_lightning_xml_is_rejected() -> None:

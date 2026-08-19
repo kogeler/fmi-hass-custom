@@ -452,37 +452,39 @@ class FMIBestConditionSensor(_BaseSensorClass):
 class FMILightningStrikesSensor(_BaseSensorClass):
     """Expose the latest FMI lightning strike group."""
 
-    def __init__(
-        self,
-        name: str,
-        coordinator: FMIDataUpdateCoordinator,
-        description: FMISensorEntityDescription,
-    ) -> None:
-        """Initialize lightning state with FMI and OpenStreetMap attribution."""
-        super().__init__(name, coordinator, description)
-        self._attr_attribution = f"{const.ATTRIBUTION}; {const.OPENSTREETMAP_ATTRIBUTION}"
+    @property
+    def available(self) -> bool:
+        """Distinguish a valid empty observation from a failed lightning source."""
+        return super().available and self.coordinator.source_availability.get("lightning", False)
 
     def update(self) -> None:
         """Update the lightning sensor state."""
         data = self.coordinator.lightning_data
-        if not data:
+        if data is None:
             self._attr_native_value = None
             self._attr_extra_state_attributes = {}
             return
-        self._attr_native_value = data[0].location
+        if not data:
+            self._attr_native_value = const.LIGHTNING_NO_STRIKES
+            self._attr_extra_state_attributes = {}
+            return
+        direction = data[0].direction.upper()
+        self._attr_native_value = f"{direction} · {data[0].distance:.1f} km"
         self._attr_extra_state_attributes = {
-            ha_const.ATTR_LOCATION: data[0].location,
             ha_const.ATTR_TIME: data[0].time,
             const.ATTR_DISTANCE: data[0].distance,
+            const.ATTR_BEARING: data[0].bearing,
+            const.ATTR_DIRECTION: data[0].direction,
             const.ATTR_STRIKES: data[0].strikes,
             const.ATTR_PEAK_CURRENT: data[0].peak_current,
             const.ATTR_CLOUD_COVER: data[0].cloud_cover,
             const.ATTR_ELLIPSE_MAJOR: data[0].ellipse_major,
             "OBSERVATIONS": [
                 {
-                    ha_const.ATTR_LOCATION: strike.location,
                     ha_const.ATTR_TIME: strike.time,
                     const.ATTR_DISTANCE: strike.distance,
+                    const.ATTR_BEARING: strike.bearing,
+                    const.ATTR_DIRECTION: strike.direction,
                     const.ATTR_STRIKES: strike.strikes,
                     const.ATTR_PEAK_CURRENT: strike.peak_current,
                     const.ATTR_CLOUD_COVER: strike.cloud_cover,

@@ -2,7 +2,7 @@
 
 # HACS Repository And Releases
 
-Last verified: 2026-08-18.
+Last verified: 2026-08-19.
 
 ## What HACS Installs
 

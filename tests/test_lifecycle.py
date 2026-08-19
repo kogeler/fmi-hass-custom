@@ -25,12 +25,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import translation
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.fmi import (
     FMIDataUpdateCoordinator,
     FMILightningStruct,
     FMIMareoStruct,
+    OptionalSourceError,
     async_unload_entry,
 )
 from custom_components.fmi import fmi as fmi_client
@@ -117,8 +119,9 @@ def _patch_optional_success(monkeypatch) -> None:
         self.lightning_data = [
             FMILightningStruct(
                 time=strike_time,
-                location="Synthetic lightning location",
                 distance=12.5,
+                bearing=135.0,
+                direction="SE",
                 strikes=2,
                 peak_current=-8.0,
                 cloud_cover=40.0,
@@ -126,8 +129,9 @@ def _patch_optional_success(monkeypatch) -> None:
             ),
             FMILightningStruct(
                 time=strike_time,
-                location="Second synthetic location",
                 distance=18.0,
+                bearing=225.0,
+                direction="SW",
                 strikes=1,
                 peak_current=-4.0,
                 cloud_cover=30.0,
@@ -151,6 +155,20 @@ def _patch_optional_success(monkeypatch) -> None:
         "_FMIDataUpdateCoordinator__async_update_mareo_data",
         update_sea_level,
     )
+
+
+def _lightning_payload(
+    latitude: float,
+    longitude: float,
+    timestamp: datetime,
+) -> bytes:
+    """Build one aligned synthetic FMI lightning group for HA lifecycle tests."""
+    return (
+        "<root>"
+        f"<positions>{latitude} {longitude} {timestamp.timestamp()}</positions>"
+        "<doubleOrNilReasonTupleList>1 12.5 40.0 1.2</doubleOrNilReasonTupleList>"
+        "</root>"
+    ).encode()
 
 
 async def _forecast_service(
@@ -254,9 +272,15 @@ async def test_public_entity_and_forecast_contracts(
     sea_level = hass.states.get("sensor.helsinki_sea_level")
     assert temperature is not None and temperature.state == "-4.0"
     assert temperature.attributes["unit_of_measurement"] == "°C"
-    assert lightning is not None and lightning.state == "Synthetic lightning location"
+    assert lightning is not None and lightning.state == "SE · 12.5 km"
     assert lightning.attributes["distance"] == 12.5
+    assert lightning.attributes["bearing"] == 135.0
+    assert lightning.attributes["direction"] == "SE"
+    assert lightning.attributes["attribution"] == "Weather Data provided by FMI"
+    assert "location" not in lightning.attributes
     assert len(lightning.attributes["OBSERVATIONS"]) == 1
+    assert lightning.attributes["OBSERVATIONS"][0]["direction"] == "SW"
+    assert "location" not in lightning.attributes["OBSERVATIONS"][0]
     assert sea_level is not None and sea_level.state == "12.5"
     assert sea_level.attributes["unit_of_measurement"] == "cm"
     assert len(sea_level.attributes["FORECASTS"]) == 1
@@ -269,6 +293,131 @@ async def test_public_entity_and_forecast_contracts(
     assert device is not None
     assert device.name == "Helsinki"
     assert device.manufacturer == "Finnish Meteorological Institute"
+
+
+async def test_lightning_empty_state_translations_load_from_integration(
+    hass: HomeAssistant,
+) -> None:
+    """Expose the finite empty token in both shipped frontend languages."""
+    key = "component.fmi.entity.sensor.lightning_strikes.state.no_strikes"
+
+    english = await translation.async_get_translations(hass, "en", "entity", {DOMAIN})
+    finnish = await translation.async_get_translations(hass, "fi", "entity", {DOMAIN})
+
+    assert english[key] == "No lightning strikes"
+    assert finnish[key] == "Ei salamaniskuja"
+
+
+async def test_lightning_empty_failure_and_recovery_transitions(
+    hass: HomeAssistant,
+    monkeypatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Replace every lightning state and attribute across source transitions."""
+    weather = weather_from_fixture("forecast_normal.json")
+    forecast = forecast_from_fixture("forecast_normal.json")
+    assert weather is not None
+    _patch_sources(monkeypatch, weather=weather, forecast=forecast)
+    strike_time = datetime(2026, 5, 20, 12, 0, tzinfo=UTC)
+    first = FMILightningStruct(
+        time=strike_time,
+        distance=12.5,
+        bearing=135.0,
+        direction="SE",
+        strikes=2,
+        peak_current=-8.0,
+        cloud_cover=40.0,
+        ellipse_major=1.2,
+    )
+    second = FMILightningStruct(
+        time=strike_time.replace(minute=30),
+        distance=18.0,
+        bearing=225.0,
+        direction="SW",
+        strikes=1,
+        peak_current=-4.0,
+        cloud_cover=30.0,
+        ellipse_major=0.8,
+    )
+    outcomes: list[list[FMILightningStruct] | Exception] = [
+        [],
+        [first],
+        [],
+        OptionalSourceError("synthetic outage"),
+        OptionalSourceError("synthetic outage"),
+        [],
+        [second],
+    ]
+
+    async def update_lightning(self: FMIDataUpdateCoordinator) -> None:
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        self.lightning_data = outcome
+
+    monkeypatch.setattr(
+        FMIDataUpdateCoordinator,
+        "_FMIDataUpdateCoordinator__async_update_lightning_strikes",
+        update_lightning,
+    )
+    entry = _entry(hass, options={CONF_LIGHTNING: True})
+    caplog.set_level("INFO", logger="custom_components.fmi.coordinator")
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data.coordinator
+
+    lightning = hass.states.get("sensor.helsinki_lightning_strikes")
+    assert lightning is not None
+    assert lightning.state == "no_strikes"
+    assert coordinator.source_availability["lightning"] is True
+    assert "distance" not in lightning.attributes
+    assert "OBSERVATIONS" not in lightning.attributes
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    lightning = hass.states.get("sensor.helsinki_lightning_strikes")
+    assert lightning is not None
+    assert lightning.state == "SE · 12.5 km"
+    assert lightning.attributes["distance"] == 12.5
+    assert lightning.attributes["bearing"] == 135.0
+    assert lightning.attributes["direction"] == "SE"
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    lightning = hass.states.get("sensor.helsinki_lightning_strikes")
+    assert lightning is not None
+    assert lightning.state == "no_strikes"
+    assert "distance" not in lightning.attributes
+    assert "OBSERVATIONS" not in lightning.attributes
+
+    for _ in range(2):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        lightning = hass.states.get("sensor.helsinki_lightning_strikes")
+        assert lightning is not None
+        assert lightning.state == STATE_UNAVAILABLE
+        assert "distance" not in lightning.attributes
+        assert "OBSERVATIONS" not in lightning.attributes
+
+    assert caplog.messages.count("FMI: lightning source unavailable: synthetic outage") == 1
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    lightning = hass.states.get("sensor.helsinki_lightning_strikes")
+    assert lightning is not None
+    assert lightning.state == "no_strikes"
+    assert caplog.messages.count("FMI: lightning source recovered") == 1
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    lightning = hass.states.get("sensor.helsinki_lightning_strikes")
+    assert lightning is not None
+    assert lightning.state == "SW · 18.0 km"
+    assert lightning.attributes["distance"] == 18.0
+    assert lightning.attributes["bearing"] == 225.0
+    assert lightning.attributes["direction"] == "SW"
+    assert lightning.attributes["strikes"] == 1
 
 
 async def test_options_reload_adds_and_removes_optional_entities_once(
@@ -322,6 +471,20 @@ async def test_options_reload_adds_and_removes_optional_entities_once(
         len([state for state in hass.states.async_all() if state.entity_id == "weather.helsinki"])
         == 1
     )
+    lightning_entry = registry.async_get("sensor.helsinki_lightning_strikes")
+    assert lightning_entry is not None
+    lightning_entry = registry.async_update_entity(
+        lightning_entry.entity_id,
+        new_entity_id="sensor.custom_lightning_watch",
+    )
+    lightning_identity = (
+        lightning_entry.id,
+        lightning_entry.unique_id,
+        lightning_entry.config_entry_id,
+        lightning_entry.device_id,
+        lightning_entry.disabled_by,
+    )
+    assert hass.states.get("sensor.custom_lightning_watch") is not None
     enabled_coordinator = entry.runtime_data.coordinator
 
     await _configure_options(
@@ -338,7 +501,7 @@ async def test_options_reload_adds_and_removes_optional_entities_once(
     assert len(entry.update_listeners) == 1
     assert not enabled_coordinator._listeners
     for entity_id in (
-        "sensor.helsinki_lightning_strikes",
+        "sensor.custom_lightning_watch",
         "weather.helsinki_daily",
         "weather.helsinki_kaisaniemi_observation",
     ):
@@ -347,6 +510,29 @@ async def test_options_reload_adds_and_removes_optional_entities_once(
     main_after_disable = registry.async_get("weather.helsinki")
     assert main_after_disable is not None
     assert main_after_disable.id == main_registry_entry.id
+    disabled_lightning = registry.async_get("sensor.custom_lightning_watch")
+    assert disabled_lightning is not None
+    assert (
+        disabled_lightning.id,
+        disabled_lightning.unique_id,
+        disabled_lightning.config_entry_id,
+        disabled_lightning.device_id,
+        disabled_lightning.disabled_by,
+    ) == lightning_identity
+
+    await _configure_options(hass, entry, **{CONF_LIGHTNING: True})
+
+    restored_lightning = registry.async_get("sensor.custom_lightning_watch")
+    assert restored_lightning is not None
+    assert (
+        restored_lightning.id,
+        restored_lightning.unique_id,
+        restored_lightning.config_entry_id,
+        restored_lightning.device_id,
+        restored_lightning.disabled_by,
+    ) == lightning_identity
+    restored_state = hass.states.get("sensor.custom_lightning_watch")
+    assert restored_state is not None and restored_state.state == "SE · 12.5 km"
 
 
 async def test_reload_unload_and_remove_do_not_duplicate_lifecycle_state(
@@ -607,6 +793,90 @@ async def test_two_locations_fail_and_recover_independently(
     tampere_state = hass.states.get("sensor.tampere_temperature")
     assert tampere_state is not None and tampere_state.state == STATE_UNAVAILABLE
     assert hass.states.get("sensor.helsinki_temperature") is not None
+
+
+async def test_two_loaded_entries_calculate_one_strike_from_their_own_coordinates(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Run one FMI group through each loaded entry's parser and public sensor."""
+    helsinki = weather_from_fixture("forecast_normal.json")
+    helsinki_forecast = forecast_from_fixture("forecast_normal.json")
+    assert helsinki is not None
+    tampere = helsinki._replace(place="Tampere", lat=61.5, lon=23.76)
+    tampere_forecast = helsinki_forecast._replace(place="Tampere", lat=61.5, lon=23.76)
+    weather_by_location = {(60.17, 24.94): helsinki, (61.5, 23.76): tampere}
+    forecast_by_location = {
+        (60.17, 24.94): helsinki_forecast,
+        (61.5, 23.76): tampere_forecast,
+    }
+    monkeypatch.setattr(
+        fmi_client,
+        "async_weather_by_coordinates",
+        AsyncMock(side_effect=lambda lat, lon: weather_by_location[(lat, lon)]),
+    )
+    monkeypatch.setattr(
+        fmi_client,
+        "async_forecast_by_coordinates",
+        AsyncMock(side_effect=lambda lat, lon, *_: forecast_by_location[(lat, lon)]),
+    )
+    monkeypatch.setattr(fmi_client, "async_observation_by_place", AsyncMock(return_value=None))
+    now = datetime(2026, 5, 20, 12, 0, tzinfo=UTC)
+    payload = _lightning_payload(60.20, 24.90, now)
+
+    async def parse_same_strike(self: FMIDataUpdateCoordinator) -> None:
+        coordinator = cast(Any, self)
+        self.lightning_data = coordinator._FMIDataUpdateCoordinator__parse_lightning_payload(
+            payload,
+            now,
+        )
+
+    async def empty_sea_level(self: FMIDataUpdateCoordinator) -> None:
+        self.mareo_data = None
+
+    monkeypatch.setattr(
+        FMIDataUpdateCoordinator,
+        "_FMIDataUpdateCoordinator__async_update_lightning_strikes",
+        parse_same_strike,
+    )
+    monkeypatch.setattr(
+        FMIDataUpdateCoordinator,
+        "_FMIDataUpdateCoordinator__async_update_mareo_data",
+        empty_sea_level,
+    )
+    helsinki_entry = _entry(
+        hass,
+        entry_id="lightning-helsinki",
+        options={CONF_LIGHTNING: True},
+    )
+    tampere_entry = _entry(
+        hass,
+        title="Synthetic Tampere",
+        latitude=61.5,
+        longitude=23.76,
+        entry_id="lightning-tampere",
+        options={CONF_LIGHTNING: True},
+    )
+
+    for entry in (helsinki_entry, tampere_entry):
+        if entry.state is ConfigEntryState.NOT_LOADED:
+            assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    helsinki_state = hass.states.get("sensor.helsinki_lightning_strikes")
+    tampere_state = hass.states.get("sensor.tampere_lightning_strikes")
+    assert helsinki_state is not None and tampere_state is not None
+    assert helsinki_state.state == "NW · 4.0 km"
+    assert helsinki_state.attributes["direction"] == "NW"
+    assert helsinki_state.attributes["distance"] == 4.01
+    assert tampere_state.state.startswith("SE · ")
+    assert tampere_state.attributes["direction"] == "SE"
+    assert 150 < tampere_state.attributes["distance"] < 170
+    assert tampere_state.attributes["distance"] != helsinki_state.attributes["distance"]
+    assert helsinki_state.attributes["OBSERVATIONS"] == []
+    assert tampere_state.attributes["OBSERVATIONS"] == []
+    assert helsinki_entry.runtime_data.coordinator.latitude == 60.17
+    assert tampere_entry.runtime_data.coordinator.latitude == 61.5
 
 
 async def test_wind_direction_updates_cover_public_compass_states(

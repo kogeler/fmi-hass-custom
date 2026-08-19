@@ -168,6 +168,15 @@ def _patch_sources(
         "_FMIDataUpdateCoordinator__async_update_mareo_data",
         AsyncMock(return_value=None),
     )
+
+    async def empty_lightning(self: FMIDataUpdateCoordinator) -> None:
+        self.lightning_data = []
+
+    monkeypatch.setattr(
+        FMIDataUpdateCoordinator,
+        "_FMIDataUpdateCoordinator__async_update_lightning_strikes",
+        empty_lightning,
+    )
     return mocks
 
 
@@ -281,6 +290,13 @@ async def test_registry_reconciliation_runs_after_separate_config_migration(
     assert migrated.unique_id == original.unique_id
     assert migrated.device_id == snapshot.devices["helsinki"].id
     assert registry.async_get("sensor.temperature") is None
+    legacy_lightning = registry.async_get("sensor.custom_lightning_history")
+    assert legacy_lightning is not None
+    assert legacy_lightning.id == snapshot.entities["helsinki_lightning"].id
+    assert legacy_lightning.unique_id == snapshot.entities["helsinki_lightning"].unique_id
+    assert legacy_lightning.device_id == snapshot.devices["helsinki"].id
+    lightning_state = hass.states.get(legacy_lightning.entity_id)
+    assert lightning_state is not None and lightning_state.state == "no_strikes"
     customized = registry.async_get("sensor.outdoor_humidity")
     assert customized is not None
     assert customized.id == snapshot.entities["helsinki_humidity"].id

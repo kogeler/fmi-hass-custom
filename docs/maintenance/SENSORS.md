@@ -5,7 +5,7 @@
 This document defines the current FMI sensor, wind-gust, entity-naming, and location-grouping
 contracts. It applies to Home Assistant 2026.8.1 and `fmi-weather-client==1.0.0`.
 
-Last verified against current code: 2026-08-16.
+Last verified against current code: 2026-08-19.
 
 ## Gust Sources
 
@@ -71,6 +71,19 @@ an entry only when its entity ID is exactly the known v0.6.2 generated default s
 | place, condition, compass direction, forecast time, best time, lightning | string values without an incompatible numeric device or state class |
 
 Static attribution remains the entity attribution rather than being duplicated in extra state attributes. Dynamic best-condition, lightning, and sea-level details remain extra attributes.
+
+## Lightning State And Attributes
+
+A successful empty FMI result stores `no_strikes`; Home Assistant can translate that finite state
+for presentation. A qualifying group stores `{DIRECTION} · {distance:.1f} km`, for example
+`SE · 42.3 km`. A coincident group stores `HERE · 0.0 km`. The value remains a textual sensor with
+no device/state class or unit conversion.
+
+The primary group and every nested `OBSERVATIONS` row expose `time`, numeric kilometer `distance`,
+`direction`, `bearing`, `strikes`, `peak_current`, `cloud_cover`, and `ellipse_major`. Bearing is
+`None` only for `direction=here`. No row exposes address, `location`, latitude, longitude, or raw
+coordinates. Static attribution is FMI only. A failed source is unavailable and clears all dynamic
+attributes; successful empty data is available and has no dynamic strike attributes.
 
 ## References
 

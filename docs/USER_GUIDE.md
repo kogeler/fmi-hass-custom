@@ -79,6 +79,11 @@ Existing unique IDs and customized entity IDs are retained. Some exact legacy ge
 can be renamed to a location-aware default when that target is free; ambiguous, customized, or
 conflicting IDs are left unchanged.
 
+The lightning direction release intentionally changes the existing lightning sensor value and
+attributes in place. An old address/native-state comparison or template reading `location` must be
+updated to use `direction`, `bearing`, or `distance`. The entity-registry record, unique ID,
+customized entity ID, device, config entry, options, and Recorder history remain intact.
+
 ## Configure
 
 Initial setup accepts a display name and either a map point or an FMI place search followed by map
@@ -118,6 +123,43 @@ temperature, wind speed/direction/gust, humidity, cloud coverage, rain, forecast
 of day, and sea level. Enabling lightning adds a lightning sensor. A configured station creates a
 separate observation device and weather entity. Enabling legacy daily mode adds another weather
 entity, but it is not needed to request daily forecasts from the main entity.
+
+## Lightning State And Automations
+
+The optional lightning sensor describes recent FMI strike groups relative to the coordinates
+stored by its own integration entry. Home Assistant's global Home coordinates are only the initial
+map position during setup; they are not substituted for the entry's point. The configured radius
+is an inclusive circle, and the maximum age controls both the FMI query window and local freshness
+filter.
+
+The current state has three distinct meanings:
+
+- A successful response with no qualifying strike is available with backend state `no_strikes`.
+  The frontend displays **No lightning strikes** in English or **Ei salamaniskuja** in Finnish.
+- A qualifying group has a state such as `SE · 42.3 km`. `HERE · 0.0 km` means the strike point and
+  configured point coincide, so no bearing exists.
+- A transport, timeout, unsafe payload, parser, or unusable response is `unavailable`. Old strike
+  state and dynamic attributes are cleared; the next valid refresh recovers without a reload.
+
+For a non-empty result, the primary attributes are `time`, numeric kilometer `distance`,
+`direction` (`N`, `NE`, `E`, `SE`, `S`, `SW`, `W`, `NW`, or `here`), numeric degree `bearing`
+(`null` for `here`), `strikes`, `peak_current`, `cloud_cover`, and `ellipse_major`.
+`OBSERVATIONS` contains the same fields for retained secondary groups. No state or row contains an
+address, raw coordinates, or the old `location` field. FMI remains the only lightning network
+provider.
+
+Use attributes for automations instead of parsing the display state. For example:
+
+```yaml
+direction: "{{ state_attr('sensor.helsinki_lightning_strikes', 'direction') }}"
+bearing: "{{ state_attr('sensor.helsinki_lightning_strikes', 'bearing') }}"
+distance_km: "{{ state_attr('sensor.helsinki_lightning_strikes', 'distance') }}"
+empty: "{{ is_state('sensor.helsinki_lightning_strikes', 'no_strikes') }}"
+```
+
+Direction is only the initial bearing from the configured point to an observed strike group. It
+does not identify or track a storm cell, show whether a storm is approaching, estimate arrival or
+closest approach, or provide safety guidance.
 
 ## Dashboard Examples
 
@@ -206,8 +248,9 @@ entities:
   Wait for the next refresh; valid data restores availability automatically without a reload.
 - **Station observation is missing:** confirm that the configured value is a valid numeric FMI
   station ID and that the station currently publishes observations.
-- **Lightning is missing:** enable it in **Configure**. Empty, stale, malformed, or failed lightning
-  data makes only that sensor unavailable. Address lookup can fall back to raw strike coordinates.
+- **Lightning is missing:** enable it in **Configure**. A successful response with no qualifying
+  strikes remains available as `no_strikes`; stale, malformed, or failed data makes only that
+  sensor unavailable. Wait for the next refresh to recover automatically.
 - **Sea level is unavailable:** the configured location may be outside FMI sea-level forecast
   coverage, or the optional response may be empty or unavailable.
 - **A dashboard example reports an unknown entity:** replace the sample ID with the entity ID shown
@@ -229,13 +272,12 @@ publish precise home coordinates or raw external responses.
 
 FMI receives place-search text when that optional path is used and receives the final coordinates
 needed for validation, weather, lightning-area, and sea-level requests. Search text is transient:
-it is not stored in the config entry, logs, or diagnostics. When lightning is enabled, the public
-Nominatim service can receive a selected public strike coordinate for best-effort address
-enrichment; it does not receive the configured home coordinate directly. See the
-[security and privacy contract](maintenance/COMPATIBILITY_SECURITY.md) and
-[known limitations](../TODO.md) before using lightning beyond a small private deployment.
+it is not stored in the config entry, logs, or diagnostics. FMI lightning strike coordinates are
+processed transiently in memory for local distance/bearing calculation. They are not sent to a
+second provider and are not exposed in state, attributes, logs, or diagnostics. See the
+[security and privacy contract](maintenance/COMPATIBILITY_SECURITY.md).
 
-Documentation references verified 2026-08-17:
+Documentation references verified 2026-08-19:
 
 - [HACS custom repositories](https://www.hacs.xyz/docs/faq/custom_repositories/)
 - [HACS repository download and update behavior](https://www.hacs.xyz/docs/use/repositories/dashboard/)

@@ -4,6 +4,45 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.2.0 - 2026-08-19
+
+### User-facing features
+
+- Made a successful FMI lightning response with no qualifying strikes an available, translated
+  `no_strikes` state instead of reporting the sensor unavailable.
+- Replaced best-effort lightning addresses with a concise locally calculated state such as
+  `SE · 42.3 km`, relative to the coordinates stored by that specific FMI entry. Primary and
+  retained observation attributes now include numeric `distance`, `bearing`, and stable compass
+  `direction` without claiming storm motion or arrival.
+- Improved lightning privacy and reliability: FMI, the integration's primary read-only source for
+  weather and geospatial observations, is now the only external data service needed at runtime.
+  After an FMI response arrives, strike coordinates remain inside Home Assistant and all distance
+  and direction calculations happen locally. This keeps subsequent data processing under the
+  user's control while eliminating disclosure to a secondary provider and removing Nominatim's
+  availability, usage-policy, and rate-limit failure modes.
+
+### Changed
+
+- **Compatibility migration:** the lightning sensor no longer stores a reverse-geocoded address or
+  raw-coordinate fallback as its native state, and primary/`OBSERVATIONS` rows no longer contain
+  `location`. Templates and automations using those values must migrate to `direction`, `bearing`,
+  or `distance`. Existing entity-registry records, unique IDs, customized entity IDs, devices,
+  config entries, options, and Recorder history remain unchanged.
+- Enforced the configured lightning radius as an inclusive circle after FMI's square bounding-box
+  request prefilter while retaining the five-nearest/newest presentation order.
+
+### Fixed
+
+- Cleared every stale lightning state and dynamic attribute on empty or failed refreshes, kept
+  optional-source failures independent from weather/forecast/observation/sea-level availability,
+  and allowed later valid refreshes to recover without reloading the entry.
+
+### Security
+
+- Removed Nominatim, OpenStreetMap address attribution, strike-coordinate disclosure to a second
+  service, geocoder caches/rate limiting, and the unused geopy/geographiclib dependency graph.
+  Lightning geometry is now local and network-free after the bounded FMI response is received.
+
 ## 1.1.0 - 2026-08-17
 
 ### User-facing features

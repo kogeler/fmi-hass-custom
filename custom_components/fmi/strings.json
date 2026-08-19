@@ -73,7 +73,12 @@
       "rain": {"name": "Rain"},
       "forecast_time": {"name": "Time"},
       "best_time_of_day": {"name": "Best time of day"},
-      "lightning_strikes": {"name": "Lightning strikes"},
+      "lightning_strikes": {
+        "name": "Lightning strikes",
+        "state": {
+          "no_strikes": "No lightning strikes"
+        }
+      },
       "sea_level": {"name": "Sea level"}
     }
   },
