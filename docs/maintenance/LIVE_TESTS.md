@@ -2,7 +2,7 @@
 
 # Live FMI Tests
 
-Live suite last verified: 2026-08-17 against Home Assistant 2026.8.1 and
+Live suite last verified: 2026-08-19 against Home Assistant 2026.8.1 and
 `fmi-weather-client` 1.0.0. FMI WFS documentation/metadata last reviewed: 2026-08-17.
 
 ## Purpose And Selection

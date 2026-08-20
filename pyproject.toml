@@ -7,7 +7,6 @@ version = "0"
 requires-python = ">=3.14"
 dependencies = [
   "fmi-weather-client==1.0.0",
-  "geopy==2.5.0",
   "xmltodict==1.0.4",
 ]
 

@@ -8,7 +8,7 @@ and runtime side effects. Read it before changing `custom_components/fmi/__init_
 PEP 621 metadata and `requirements-dev.txt`; `hacs.json` independently declares the installation
 floor. Keep historical investigation outside this current contract.
 
-Last verified against current code: 2026-08-17.
+Last verified against current code: 2026-08-19.
 
 ## Entry Ownership And Lifecycle
 
@@ -33,7 +33,8 @@ Last verified against current code: 2026-08-17.
   semantics inside `asyncio.to_thread`, after the response passes the same entity-disabled 2 MiB
   XML boundary as coordinate forecasts.
 - Integration-owned lightning and sea-level HTTP uses Home Assistant's shared aiohttp session.
-  Their XML parsing and Nominatim reverse geocoding run through `async_add_executor_job`.
+  Their XML parsing runs through `async_add_executor_job`; local lightning geometry remains inside
+  that pure parser job and performs no I/O.
 - Cancellation must propagate. Primary FMI/dependency parsing boundaries catch the documented
   transport, client/server, parser, and external-shape exceptions. The optional-source wrapper
   deliberately catches any ordinary `Exception` so an unexpected optional failure cannot disable
@@ -58,17 +59,18 @@ Transition logging should report an outage and recovery once, not on every poll.
 
 ## Data, Timeouts, And Request Volume
 
-- Empty results and `None` are no-data failures. Numeric boundaries accept finite values and reject
+- A successful empty lightning collection is valid available data with the `no_strikes` state;
+  `None` means the lightning source failed. Empty or `None` remains failure/no-data for sources
+  without an explicit empty-success contract. Numeric boundaries accept finite values and reject
   booleans, malformed strings, NaN, and infinities without fabricating zeroes.
 - FMI dependency requests use the client's ten-second HTTP timeout inside the 40-second primary
   coordinator bound; transient setup place lookup uses the same ten-second request timeout.
   Integration-owned optional FMI HTTP uses 2-second connect, 3-second read, and 5-second total
-  timeouts plus a 2 MiB response limit. Nominatim reverse geocoding has its own three-second
-  timeout.
+  timeouts plus a 2 MiB response limit.
 - Runtime refreshes add no retry loop. A normal primary refresh makes one current request, one
   hourly forecast request, and one sea-level request. Place observation is requested only after a
   current failure. A station adds one request on its independent cadence. Enabled lightning adds
-  one FMI request and may add at most one rate-limited Nominatim request on a cache miss.
+  exactly one FMI request and no geocoder/provider request.
 - Forecast, optional-source timestamp, and missing-value semantics are defined in
   `FORECAST_SEMANTICS.md`, `TIME_AND_MISSING_DATA.md`, and `OPTIONAL_SOURCES.md`.
 

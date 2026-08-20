@@ -2,8 +2,8 @@
 
 # fmi-hass-custom
 
-`fmi-hass-custom` is a custom Home Assistant integration maintained at
-[github.com/kogeler/fmi-hass-custom](https://github.com/kogeler/fmi-hass-custom). It uses
+`fmi-hass-custom` is a maintained community custom integration for Home Assistant. It is developed
+at [github.com/kogeler/fmi-hass-custom](https://github.com/kogeler/fmi-hass-custom) and uses
 [Finnish Meteorological Institute (FMI) Open Data](https://en.ilmatieteenlaitos.fi/open-data)
 to provide current conditions, hourly and daily forecasts, weather sensors, optional station
 observations, lightning data, and sea-level forecasts for a configured location.
@@ -12,23 +12,27 @@ Check the [latest published GitHub Release](https://github.com/kogeler/fmi-hass-
 for the current integration version and its release notes. The minimum Home Assistant version is
 declared in `hacs.json` for each release. Moving compatibility checks exercise the current stable
 and prerelease channels as early warnings, but do not create a blanket support promise for future
-releases. This fork is intended for owner testing as a HACS custom repository or a manual custom
-integration, not as an official Home Assistant Core integration.
+releases. Install it through HACS as a custom repository or copy the released integration manually.
+It is not bundled with Home Assistant Core and does not claim an official Core quality tier.
 
 ## Main Limitations
 
 - Data depends on FMI and network availability. Forecast/current data refresh every 30 minutes;
   configured station observations refresh every 10 minutes.
+- The supported product geography is Finland. An FMI place search result outside Finland does not
+  expand that boundary, and optional station or sea-level products can have narrower local
+  coverage.
 - The committed reference graph and the moving current-stable graph are continuously checked. The
   installation floor remains the value in `hacs.json` until a real integration incompatibility
   requires raising it.
 - Changing Home Assistant's Home zone does not move an entry automatically. Use the integration's
   **Reconfigure** action to choose a new map point or search FMI by place name and confirm the
   result on the map.
-- Lightning is opt-in and its address enrichment uses the public Nominatim service. This is
-  accepted only for small private deployments until the tracked provider limitation is resolved.
+- Lightning is opt-in. Its state reports locally calculated distance and direction from that FMI
+  entry's configured point to a recent strike group; it does not predict storm movement or safety.
 - Station observations require a valid FMI station ID. Sea-level and lightning sensors can be
-  unavailable where FMI returns no applicable data or an optional external source fails.
+  unavailable when an optional external source fails. A successful lightning response with no
+  qualifying strikes remains available and says so explicitly.
 
 ## Documentation
 
@@ -62,3 +66,10 @@ integration, not as an official Home Assistant Core integration.
 
 [@kogeler](https://github.com/kogeler) maintains this fork. Report integration problems in the
 [canonical repository issue tracker](https://github.com/kogeler/fmi-hass-custom/issues).
+
+## Project History
+
+This repository continues the work originally published by
+[Anand Radhakrishnan](https://github.com/anand-p-r/fmi-hass-custom), retains its contributor
+history, and preserves the original MIT attribution. Current maintenance and support belong to
+this repository; the upstream project is not responsible for this fork.

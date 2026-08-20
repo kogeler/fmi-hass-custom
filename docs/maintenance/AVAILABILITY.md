@@ -5,7 +5,7 @@
 This policy defines how the integration behaves when one FMI data source is unavailable. It is
 the current source-isolation contract for the supported Home Assistant environment.
 
-Last verified against current code: 2026-08-16.
+Last verified against current code: 2026-08-19.
 
 ## Current conditions and setup
 
@@ -43,8 +43,14 @@ isolated; cancellation still propagates.
 
 Lightning and sea-level work remains optional to current weather. An exception at either optional
 update boundary clears only that source and does not fail the primary coordinator. Detailed
-transport, parsing, freshness, geocoding, and option behavior is defined in
+transport, parsing, freshness, local geometry, and option behavior is defined in
 `OPTIONAL_SOURCES.md`.
+
+A successful lightning response with no qualifying strikes is valid empty data: the lightning
+sensor remains available with the stable `no_strikes` state and no dynamic strike attributes. A
+lightning transport, payload, parser, or unusable-data failure makes only that sensor unavailable
+and clears its prior state and dynamic attributes. Either state can recover on the next successful
+coordinator refresh without reload.
 
 Verification: `tests/test_availability.py` and `tests/test_lifecycle.py` cover setup matrices,
 source-local failure, stale clearing, transition logs, and recovery.

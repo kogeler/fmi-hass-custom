@@ -133,8 +133,28 @@ jobs:
         if: steps.toolbox-cache.outputs.cache-hit != 'true'
         run: make image-save-toolbox
 
-  validation:
-    name: Home Assistant and HACS validation
+  hassfest:
+    name: Hassfest
+    needs: quality
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify rootless Podman
+        run: make doctor
+
+      - name: Pull immutable hassfest image
+        run: make validator-image-hassfest
+
+      - name: Run hassfest against a private source snapshot
+        run: make validate-hassfest
+
+  hacs-validation:
+    name: HACS validation
     needs: quality
     runs-on: ubuntu-26.04
     timeout-minutes: 20
@@ -151,26 +171,11 @@ jobs:
       - name: Verify rootless Podman
         run: make doctor
 
-      - name: Resolve image cache keys
-        id: images
-        run: make image-key >> "$GITHUB_OUTPUT"
+      - name: Pull immutable HACS validator image
+        run: make validator-image-hacs
 
-      - name: Restore toolbox image
-        id: toolbox-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .artifacts/images/toolbox.tar
-          key: podman-${{ runner.os }}-${{ runner.arch }}-toolbox-${{ steps.images.outputs.toolbox }}
-
-      - name: Load cached toolbox image
-        if: steps.toolbox-cache.outputs.cache-hit == 'true'
-        run: make image-load-toolbox
-
-      - name: Pull immutable validator images
-        run: make validator-images
-
-      - name: Run confined validators
-        run: make validate
+      - name: Validate the exact source repository and revision
+        run: make validate-hacs
 
   dependency-review:
     name: Dependency review

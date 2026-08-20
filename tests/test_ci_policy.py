@@ -53,7 +53,8 @@ def test_ci_uses_make_rootless_podman_and_independent_image_caches() -> None:
     assert "run: make doctor" in ci
     assert "run: make ci" in ci
     assert "run: make live" in ci
-    assert "run: make validate" in ci
+    assert "run: make validate-hassfest" in ci
+    assert "run: make validate-hacs" in ci
     assert "run: make dependency-snapshot" not in ci
     assert "run: make compatibility-stable" in ci
     assert "run: make compatibility-prerelease" in ci
@@ -78,12 +79,28 @@ def test_ci_preserves_hacs_security_and_compatibility_gates() -> None:
     assert "live-fmi:\n" in ci
     assert (
         "needs: quality"
-        in ci.split("\n  live-fmi:\n", maxsplit=1)[1].split("\n  validation:\n", maxsplit=1)[0]
+        in ci.split("\n  live-fmi:\n", maxsplit=1)[1].split("\n  hassfest:\n", maxsplit=1)[0]
     )
+    hassfest = ci.split("\n  hassfest:\n", maxsplit=1)[1].split(
+        "\n  hacs-validation:\n", maxsplit=1
+    )[0]
+    assert "name: Hassfest" in hassfest
+    assert "needs: quality" in hassfest
+    assert "run: make validator-image-hassfest" in hassfest
+    assert "run: make validate-hassfest" in hassfest
+
+    hacs = ci.split("\n  hacs-validation:\n", maxsplit=1)[1].split(
+        "\n  dependency-review:\n", maxsplit=1
+    )[0]
+    assert "name: HACS validation" in hacs
+    assert "needs: quality" in hacs
     assert "INPUT_GITHUB_TOKEN: ${{ github.token }}" in ci
     assert "github.event.pull_request.head.repo.full_name || github.repository" in ci
     assert "github.event.pull_request.head.sha || github.sha" in ci
-    assert "make validator-images" in ci
+    assert "run: make validator-image-hacs" in hacs
+    assert "run: make validate-hacs" in hacs
+    assert "hacs/action@" not in ci
+    assert "home-assistant/actions/hassfest@" not in ci
 
     prerelease = ci.split("\n  compatibility-prerelease:\n", maxsplit=1)[1].split(
         "\n  version:\n", maxsplit=1

@@ -2,7 +2,7 @@
 
 # HACS Repository And Releases
 
-Last verified: 2026-08-18.
+Last verified: 2026-08-19.
 
 ## What HACS Installs
 
@@ -21,13 +21,24 @@ README.md
 
 HACS recognizes `custom_components/fmi/` as the integration directory and installs it as
 `<Home Assistant config>/custom_components/fmi/`. Root `hacs.json` supplies the HACS display
-name, country, and minimum supported Home Assistant release. It intentionally does not set
-`content_in_root`, `zip_release`, or `filename`: the repository already uses the native layout,
-and a normal GitHub source archive contains everything HACS needs.
+name, supported country, minimum Home Assistant release, and release-channel visibility. It sets
+`hide_default_branch: true`, so normal HACS downloads use published stable releases instead of the
+moving `master` branch. It intentionally does not set `content_in_root`, `zip_release`, or
+`filename`: the repository already uses the native layout, and a normal GitHub source archive
+contains everything HACS needs.
 
 The repository can be added in HACS as a custom repository with category **Integration** and
 repository URL `https://github.com/kogeler/fmi-hass-custom`. Inclusion in HACS's default catalog
 is a different, optional process; a custom repository does not require default-catalog approval.
+
+## Supported Geography
+
+`country: FI` is deliberate. The maintained product boundary is Finland, matching FMI weather
+services and the integration's advertised observation, lightning, and sea-level capabilities.
+FMI place search may resolve a text query outside Finland, but one successful lookup does not
+expand the supported geography. Optional products can still have narrower coverage inside
+Finland. Change the country value only after the broader advertised feature set is intentionally
+supported and verified for another country.
 
 ## Home Assistant Minimum
 
@@ -133,7 +144,9 @@ release. Later maintenance pushes use the earlier read-only release-state check 
 an already published release or its notes.
 
 HACS uses the tag name of the latest published GitHub Release as the remote version and offers
-recent releases to users. A tag without a published Release is not sufficient for this behavior.
+recent releases to users. Because `hide_default_branch` is enabled, the moving default branch is
+not an ordinary download choice. A tag without a published Release is not sufficient for this
+behavior.
 An unchanged-version maintenance PR still fails the CI version job, which the owner explicitly
 bypasses under the narrow maintenance policy. Its release workflow succeeds after the
 existing-release check and does not run version, CI, validation, or publication; its `Unreleased`

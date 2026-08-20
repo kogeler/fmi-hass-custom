@@ -2,15 +2,20 @@
 
 # Optional Lightning and Sea-Level Sources
 
-Last verified against current code: 2026-08-17.
+Last verified against current code: 2026-08-19.
 
 ## Availability and freshness
 
-Lightning and sea-level data are independent optional sources. A failure, empty result, or malformed response clears that source's previous data and makes only its sensor unavailable. Current weather, observations, and forecasts continue updating. A later valid response restores the optional sensor automatically.
+Lightning and sea-level data are independent optional sources. A successful lightning response
+with no qualifying strikes is available empty data and exposes the stable `no_strikes` state with
+no dynamic strike attributes. A lightning failure or malformed/unusable response clears previous
+data and makes only its sensor unavailable. Sea-level failure, empty data, or malformed data clears
+that source and makes only its sensor unavailable. Current weather, observations, and forecasts
+continue updating. A later valid response restores either optional sensor automatically.
 
 All optional FMI HTTP requests use Home Assistant's shared aiohttp session. Each request has a 2-second connect timeout, a 3-second read timeout, a 5-second total timeout, and a 2 MiB response limit. HTTP client errors, server errors, transport failures, timeouts, empty responses, invalid XML, and invalid data shapes are classified separately in transition logs. The integration does not retry optional requests within one coordinator update.
 
-XML parsing and reverse geocoding run in Home Assistant's executor. XML uses the direct
+XML parsing runs in Home Assistant's executor. XML uses the direct
 `xmltodict==1.0.4` runtime dependency with entity declarations explicitly disabled. Both internal
 and external entity declarations are rejected. Expat has no external-resource handler in this
 path, so a bare external DTD declaration is accepted as inert metadata but is never loaded. The
@@ -26,20 +31,22 @@ ISO timestamp. All timestamps stored for Home Assistant are aware UTC datetimes.
 
 The age boundary is inclusive. A strike exactly the configured age is retained; a strike one second older is discarded. Future, missing, malformed, non-finite, or millisecond-scale timestamps are discarded. The configured age also determines the FMI query start time, reducing unnecessary response data for shorter windows.
 
-## Reverse geocoding
+## Local lightning geometry
 
-Lightning remains useful without address lookup: UTC time, coordinates, distance, strike count, peak current, cloud cover, and ellipse size are preserved. Address lookup is best effort and never controls sensor availability.
+Each valid FMI row is calculated locally relative to the coordinates stored by its owning config
+entry. Distance uses Home Assistant's local WGS84 helper. The configured radius is enforced as an
+inclusive circle on the unrounded metre result after the square FMI bbox prefilter. A geometry
+non-convergence result discards only that row. Up to five nearest qualifying groups are retained,
+then presented newest first.
 
-The public Nominatim service is limited process-wide to one request every 15 seconds, and at most one previously unseen coordinate is submitted per coordinator update. Results and failures are cached in memory for the coordinator lifetime. When the cache or rate limit cannot provide an address, the sensor displays raw strike coordinates. Requests use an identifying project user agent, and the lightning sensor exposes OpenStreetMap attribution.
-
-This bounded behavior follows the public Nominatim usage policy, which discourages periodic bulk geocoding, requires caching and an identifying user agent, and limits regularly running jobs to four requests per minute. The policy and Home Assistant async guidance were checked on 2026-07-31:
-
-- <https://operations.osmfoundation.org/policies/nominatim/>
-- <https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/inject-websession/>
-- <https://developers.home-assistant.io/docs/asyncio_blocking_operations/>
-
-Nominatim is a best-effort external service without an availability guarantee. Its address enrichment may remain unresolved while FMI data continues to work.
+Initial bearing is normalized to `[0, 360)` and mapped through half-open 45-degree sectors to `N`,
+`NE`, `E`, `SE`, `S`, `SW`, `W`, or `NW`. Coincident coordinates expose `direction=here` and no
+bearing rather than inventing north. Distance is stored in kilometers to two decimals and bearing
+to one decimal. Direction describes the configured-point-to-strike observation only; it does not
+represent storm motion, path, arrival, or safety.
 
 ## Coordinate disclosure
 
-Lightning queries send the configured bounding box to FMI, and sea-level queries send the configured latitude/longitude to FMI. Reverse geocoding sends only selected lightning-strike coordinates to Nominatim; it does not send the configured Home Assistant coordinates directly.
+Lightning queries send the configured bounding box to FMI, and sea-level queries send the
+configured latitude/longitude to FMI. Lightning makes no other network request. Raw strike
+coordinates are used transiently for local geometry and are not exposed in state or attributes.

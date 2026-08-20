@@ -6,7 +6,7 @@ This document defines the current support and protection boundaries for maintain
 when the supported Home Assistant line, dependency graph, external services, diagnostics, logging,
 or CI trust model changes. Keep historical audit narrative outside this current contract.
 
-Last verified: 2026-08-18.
+Last verified: 2026-08-19.
 
 ## Support Matrix
 
@@ -47,9 +47,9 @@ defined in `RUNTIME.md`.
   path or configured coordinates for final setup validation, current/forecast, lightning-area,
   and sea-level requests. Search text is transient and is not stored in the config entry, logs, or
   diagnostics. Responses are processed in memory and are not copied to diagnostics.
-- When lightning is enabled, Nominatim receives only a selected public FMI strike coordinate on a
-  cache miss, never the configured home coordinate. The returned address may be shown as the
-  lightning sensor value; raw strike coordinates are its documented fallback.
+- Lightning strike coordinates remain inside the FMI response/parser boundary. They are used only
+  to calculate local distance, bearing, and direction relative to the owning entry and are not
+  exposed in entity state/attributes or sent to another provider.
 - Logs contain source names, transitions, HTTP status classes, and exception class names only.
   Configured coordinates, coordinate-derived identity, raw responses, and arbitrary external
   exception content are prohibited.
@@ -67,12 +67,8 @@ defined in `RUNTIME.md`.
 ## Accepted Constraints
 
 - Home Assistant 2026.8.1 pins cryptography 48.0.1 with three known advisories. The integration
-  neither imports nor declares it. The owner-approved private-testing exception is exact by
+  neither imports nor declares it. The owner-approved development/test exception is exact by
   package, version, and advisory ID; `TODO.md` records the upstream removal trigger.
-- Public Nominatim usage is accepted only for the owner's small private deployment. It is disabled
-  unless lightning is enabled, cached, attributed, limited to one lookup per update, and globally
-  bounded to four requests/minute. Before broader distribution, follow the provider/removal work in
-  `TODO.md`.
 - A live FMI/network outage blocks required CI by explicit policy. Re-run once and classify the
   failure with `LIVE_TESTS.md`; do not weaken assertions or silently make the probe optional.
 
@@ -82,7 +78,7 @@ defined in `RUNTIME.md`.
   new findings and stale exceptions fail. `make audit-raw` remains nonzero while the upstream
   cryptography pin is vulnerable. `make licenses` is a maintainer-reviewed inventory; an unknown
   or incompatible license blocks the dependency change.
-- The integration-declared xmltodict/FMI/geopy runtime closure has no accepted vulnerability
+- The integration-declared xmltodict/FMI runtime closure has no accepted vulnerability
   exception.
 - Workflows use read-only permissions by default, full-SHA action references, immutable container
   digests, and bounded timeouts. CI and PR-body runs cancel superseded executions; release runs use
@@ -118,4 +114,3 @@ targets for a support-policy change, and inspect CodeQL/HACS results on the pull
 - [Sensor entity API](https://developers.home-assistant.io/docs/core/entity/sensor/)
 - [Python XML security guidance](https://docs.python.org/3.14/library/xml.html)
 - [`xmltodict` supported security line](https://github.com/martinblech/xmltodict/security)
-- [OSMF Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/)

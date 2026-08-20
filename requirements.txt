@@ -186,14 +186,6 @@ fmi-weather-client==1.0.0 \
     --hash=sha256:22888b797718100080d4688b3be84f6dc6fdf1d5496efb39db73c0d9e853bcfb \
     --hash=sha256:979d3327e19497b1d4ed0c82c6e51abf59f81e48de9f9af366bb050f08396f3a
     # via fmi-hass-custom-environment (pyproject.toml)
-geographiclib==2.1 \
-    --hash=sha256:6a6545e6262d0ed3522e13c515713718797e37ed8c672c31ad7b249f372ef108 \
-    --hash=sha256:e2a873b9b9e7fc38721ad73d5f4e6c9ed140d428a339970f505c07056997d40b
-    # via geopy
-geopy==2.5.0 \
-    --hash=sha256:7b6c849f18108dcce4faa3d614e2801107b465f7b05fd3c1db9db12e225ae950 \
-    --hash=sha256:8ad8cc226b505ca4d272ae9a2eeba08b8a2c565fc9a04eaefc33ad49c32b51aa
-    # via fmi-hass-custom-environment (pyproject.toml)
 idna==3.18 \
     --hash=sha256:7f952cbe720b688055e3f87de14f5c3e5fdaa8bc3928985c4077ca689de849a2 \
     --hash=sha256:ffb385a7e039654cef1ab9ef32c6fafe283c0c0467bba1d9029738ce4a14a848

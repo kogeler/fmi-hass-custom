@@ -24,8 +24,9 @@ correctness, compatibility, testability, migration, security, privacy, or valida
   progress, session reports, or before/after summaries here.
 - `plans/P01/`: completed implementation plan (`PLAN.md`), baseline, decisions, verification, and
   historical handoffs. Use these only when the reason or history of a current contract matters.
-- `plans/P02/`: planned location-selection work (`PLAN.md`), its S00-verified baseline, and future
-  execution reports, following the same self-contained layout as P01.
+- `plans/P02/`: completed location-selection plan, verified baseline, and execution reports.
+- `plans/P03/`: completed local-lightning and availability plan, verified baseline, and execution
+  reports.
 - `.github/scripts/` and `.github/workflows/`: tested Python CI helpers and GitHub Actions policy.
 - `containers/toolbox/` and `make/container.mk`: content-addressed rootless Podman environment,
   tar-stream transport, confinement policy, and OCI cache operations.
@@ -36,7 +37,7 @@ correctness, compatibility, testability, migration, security, privacy, or valida
 ## Maintenance Documentation Map
 
 Read the smallest relevant set before changing code, then update the owning document when its
-current contract changes. These files describe what must remain true, not how plan P01 was
+current contract changes. These files describe what must remain true, not how completed plans were
 executed.
 
 | File | Read or update when working on |
@@ -51,7 +52,7 @@ executed.
 | `HACS_RELEASES.md` | HACS layout/discovery, `.version`, manifest synchronization, changelog rules, tags, releases, or remote settings |
 | `LIVE_TESTS.md` | Public live locations, request budget, network marker isolation, assertions, or failure classification |
 | `MIGRATIONS.md` | Config-entry versioning, registry migration, legacy IDs, collisions, daily entity retention, or upgrade fixtures |
-| `OPTIONAL_SOURCES.md` | Lightning/sea-level HTTP, freshness, bounding boxes, geocoding, optional availability, or coordinate disclosure |
+| `OPTIONAL_SOURCES.md` | Lightning/sea-level HTTP, freshness, bounding boxes, local geometry, optional availability, or coordinate disclosure |
 | `RECONFIGURATION.md` | Location changes, duplicate checks, mutable coordinates, immutable identity, or reconfigure failures |
 | `RUNTIME.md` | Coordinator ownership, lifecycle, executor/I/O boundaries, request cadence, timeout policy, logs, or diagnostics |
 | `SENSORS.md` | Sensor metadata, gust-source adapter, device/entity naming, native units, or conservative ID migration |
@@ -119,7 +120,7 @@ passed unless that exact command/run completed successfully.
 - Keep forecast/current, configured station observations, lightning, and sea-level failure
   boundaries independent. Clear invalid stale data and allow later coordinator refreshes to recover.
 - Use Home Assistant's shared async HTTP session and bounded timeouts for integration-owned I/O.
-  Move unavoidable blocking dependency/parser/geocoder work to the executor; never block the event
+  Move unavoidable blocking dependency or parser work to the executor; never block the event
   loop or swallow cancellation.
 - Keep logs and diagnostics free of configured coordinates, raw external responses, and
   coordinate-derived identity.
@@ -166,12 +167,20 @@ gates. Do not publish manually. See `docs/maintenance/CI.md` and `HACS_RELEASES.
 
 Inspect `git status`, relevant code/tests/docs, and unexplained user changes before editing. Never
 reset, stash, overwrite, or reformat unrelated work. Do not run Git operations that can require a
-hardware token, interactive credentials, or authenticated SSH. Do not commit; the owner commits.
+hardware token, interactive credentials, or authenticated SSH. Never create a commit unless the
+owner explicitly commands it in the current conversation. Never push under any circumstances;
+only the owner pushes. Never override or bypass values inherited from global Git configuration,
+including author, committer, identity, signing, hooks, credentials, or transport settings (for
+example through command-line `-c`, environment variables, or repository-local configuration).
+Commit messages and suggested commit messages must describe the completed change without plan,
+session, or step identifiers such as `P03`, `S04`, or `P03-S04`.
 
 For follow-up maintenance, current code, tests, and the owning `docs/maintenance/` contract are the
 sources of truth. Use `plans/*` only to understand historical decisions and verification; do
 not extend it as a tracker for unrelated future work. A new implementation plan
-gets its own plan/handoff namespace and must be corrected immediately when verified reality differs.
+gets its own plan/handoff namespace. When execution finds a plan error or deliberately departs from
+the plan, correct the plan immediately before continuing the affected work; do not defer that
+correction to a report or final review.
 Record only notable release-level or unreleased HA-reference maintenance changes in
 `CHANGELOG.md`. New human-authored files use `Copyright (c) 2026 kogeler` and
 `SPDX-License-Identifier: MIT` where comments are supported.
@@ -179,5 +188,5 @@ Record only notable release-level or unreleased HA-reference maintenance changes
 Work is done only when the requested behavior is implemented and documented, relevant offline and
 Home Assistant tests pass, format/lint/type checks do not regress, migrations and privacy remain
 safe, required validation is run, the diff contains no unrelated change, and remaining risk is
-stated precisely. End a planned session with one concise suggested owner commit message beginning
-with its session ID; do not create the commit yourself.
+stated precisely. End a planned session with one concise suggested owner commit message; that
+suggestion does not authorize creating the commit.

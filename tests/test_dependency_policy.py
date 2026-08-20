@@ -53,7 +53,6 @@ def test_pep621_owns_every_direct_python_dependency() -> None:
     assert runtime == manifest_runtime
     assert runtime == {
         "fmi-weather-client": "1.0.0",
-        "geopy": "2.5.0",
         "xmltodict": "1.0.4",
     }
 
@@ -234,6 +233,9 @@ def test_make_target_surface_has_no_legacy_or_duplicate_execution_path() -> None
         "validate-hacs",
         "validate-hassfest",
         "validate-local",
+        "validator-image-actionlint",
+        "validator-image-hacs",
+        "validator-image-hassfest",
         "validator-images",
         "version-check",
         "version-sync",

@@ -73,7 +73,12 @@
             "rain": {"name": "Sade"},
             "forecast_time": {"name": "Ennusteen aika"},
             "best_time_of_day": {"name": "Päivän paras aika"},
-            "lightning_strikes": {"name": "Salamaniskut"},
+            "lightning_strikes": {
+                "name": "Salamaniskut",
+                "state": {
+                    "no_strikes": "Ei salamaniskuja"
+                }
+            },
             "sea_level": {"name": "Merenpinnan korkeus"}
         }
     },

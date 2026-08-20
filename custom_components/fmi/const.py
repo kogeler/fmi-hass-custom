@@ -58,6 +58,8 @@ FORECAST_OFFSET = [1, 2, 3, 4, 6, 8, 12, 24]  # Based on API test runs
 DEFAULT_NAME = "FMI"
 
 ATTR_DISTANCE = "distance"
+ATTR_BEARING = "bearing"
+ATTR_DIRECTION = "direction"
 ATTR_STRIKES = "strikes"
 ATTR_PEAK_CURRENT = "peak_current"
 ATTR_CLOUD_COVER = "cloud_cover"
@@ -75,10 +77,7 @@ BEST_CONDITION_NOT_AVAIL = "not_available"
 # Constants for Lightning strikes
 BOUNDING_BOX_HALF_SIDE_KM = 200
 LIGHTNING_LIMIT = 5
-NOMINATIM_REQUEST_INTERVAL_SECONDS = 15.0
-NOMINATIM_TIMEOUT_SECONDS = 3
-NOMINATIM_USER_AGENT = "fmi-hass-custom/1.0 (+https://github.com/kogeler/fmi-hass-custom)"
-OPENSTREETMAP_ATTRIBUTION = "Address data © OpenStreetMap contributors"
+LIGHTNING_NO_STRIKES = "no_strikes"
 
 URL_FMI_BASE = (
     "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id="
