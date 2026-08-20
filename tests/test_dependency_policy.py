@@ -219,6 +219,7 @@ def test_make_target_surface_has_no_legacy_or_duplicate_execution_path() -> None
         "lock",
         "lock-image",
         "outdated",
+        "reference-contracts",
         "refresh-dependencies",
         "release-notes",
         "shellcheck",

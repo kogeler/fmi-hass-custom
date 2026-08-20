@@ -2,7 +2,7 @@
 
 # Development Environment
 
-Last verified: 2026-08-17.
+Last verified: 2026-08-20.
 
 ## Execution Boundary
 
@@ -40,6 +40,7 @@ multiplying those worker pools and prevents races on locks, OCI archives, and ex
 |---|---|
 | Check host prerequisites and rootless Podman | `make doctor` |
 | Build the toolbox | `make dev-build` or `make toolbox-image` |
+| Inspect locked FMI client and Home Assistant contracts | `make reference-contracts` |
 | Build both toolbox and resolver | `make images` |
 | Generate all locks | `make lock` |
 | Upgrade and regenerate all locks | `make refresh-dependencies` |
@@ -67,6 +68,12 @@ isolated CI jobs pull only their own validator. Normal validation then runs acti
 offline. HACS necessarily remains online and requires
 `INPUT_GITHUB_TOKEN`, `REPOSITORY`, and `REPOSITORY_REF`; it validates that exact remote revision
 without receiving the checkout.
+
+`make reference-contracts` is the offline, confined inspection surface for facts provided by the
+locked `fmi-weather-client` and Home Assistant packages. It reports only model, field, enum, unit,
+and request-parameter contracts; it performs no request and emits no coordinates or payload data.
+Agents must extend this or another suitable Make target instead of invoking Podman or an image
+directly when a new package-level inspection is required.
 
 `make check` is the complete local gate excluding live FMI, moving compatibility, audit, and
 license inventory. It includes the offline dependency snapshot. Its lock-reproduction step uses

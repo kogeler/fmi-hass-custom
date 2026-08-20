@@ -11,7 +11,7 @@ import os
 import socket
 from collections import Counter
 from collections.abc import Awaitable, Callable, Generator
-from datetime import timedelta
+from datetime import UTC, timedelta
 from pathlib import Path
 from typing import Any, cast
 
@@ -48,9 +48,12 @@ from tests.helpers.live_budget import LiveRequestBudget
 from tests.helpers.live_fmi import (
     LiveContractError,
     validate_daily_precipitation,
+    validate_first_available_local_day_ha_metrics,
+    validate_first_available_local_day_probability_supplements,
     validate_ha_forecast,
     validate_model_forecast,
     validate_model_weather,
+    validate_probabilities,
 )
 
 pytestmark = pytest.mark.live
@@ -139,28 +142,39 @@ async def test_dependency_place_resolution_contract() -> None:
         raise LiveContractError("Helsinki place resolution returned no forecast point")
     if not 55 <= resolution.latitude <= 75 or not 5 <= resolution.longitude <= 35:
         raise LiveContractError("Helsinki place resolution returned a point outside the region")
-    current = await _live_call(
+    current_result = await _live_call(
         "resolved Helsinki coordinate validation",
         lambda: fmi_client.async_weather_by_coordinates(
             resolution.latitude,
             resolution.longitude,
         ),
     )
+    if current_result is None:
+        raise LiveContractError("resolved Helsinki coordinate validation returned no data")
     validate_model_weather(
-        current,
+        current_result.weather,
         "resolved Helsinki coordinate validation",
         max_age=timedelta(hours=2),
+    )
+    validate_probabilities(
+        current_result.probabilities,
+        "resolved Helsinki coordinate validation",
     )
 
 
 async def test_dependency_northern_forecast_contract() -> None:
     """Detect installed-client or WFS drift at a northern public point."""
     label, latitude, longitude = NORTHERN_LOCATION
-    forecast = await _live_call(
+    forecast_result = await _live_call(
         f"{label} forecast",
         lambda: fmi_client.async_forecast_by_coordinates(latitude, longitude, 1, 48),
     )
-    validate_model_forecast(forecast, f"{label} forecast")
+    samples = validate_model_forecast(forecast_result.forecast, f"{label} forecast")
+    validate_first_available_local_day_probability_supplements(
+        samples,
+        forecast_result.probabilities_by_time,
+        f"{label} forecast",
+    )
 
 
 async def test_dependency_observation_contract() -> None:
@@ -334,6 +348,12 @@ async def test_home_assistant_live_entity_and_forecast_contract(
     assert observation_state.attributes.get("temperature_unit") == UnitOfTemperature.CELSIUS
     assert observation_state.attributes.get("pressure_unit") == UnitOfPressure.HPA
     current_temperature = _finite_attribute(main.attributes, "temperature", -90.0, 60.0)
+    current_apparent_temperature = _finite_attribute(
+        main.attributes,
+        "apparent_temperature",
+        -120.0,
+        80.0,
+    )
     observation_temperature = _finite_attribute(
         observation_state.attributes,
         "temperature",
@@ -355,8 +375,20 @@ async def test_home_assistant_live_entity_and_forecast_contract(
         max_age=timedelta(minutes=45),
     )
     assert current_temperature == pytest.approx(float(current_sample.temperature.value), abs=0.1)
+    assert current_apparent_temperature == pytest.approx(
+        float(current_sample.feels_like.value), abs=0.6
+    )
     assert observation_temperature == pytest.approx(
         float(raw_observation.temperature.value), abs=0.1
+    )
+    forecast_samples = coordinator.get_hourly_forecasts()
+    validate_first_available_local_day_probability_supplements(
+        forecast_samples,
+        {
+            sample.time.astimezone(UTC): coordinator.get_forecast_probabilities(sample.time)
+            for sample in forecast_samples
+        },
+        "Home Assistant Helsinki forecast source",
     )
 
     registry_entries = er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
@@ -381,10 +413,33 @@ async def test_home_assistant_live_entity_and_forecast_contract(
     if not math.isfinite(sensor_temperature) or not -90.0 <= sensor_temperature <= 60.0:
         raise LiveContractError("Home Assistant temperature sensor state is implausible")
 
+    metric_ranges = {
+        "Feels_like": (-120.0, 80.0),
+        "Dew_point": (-100.0, 60.0),
+        "Atmospheric_pressure": (800.0, 1200.0),
+        "Low_cloud_cover": (0.0, 100.0),
+        "Medium_cloud_cover": (0.0, 100.0),
+        "High_cloud_cover": (0.0, 100.0),
+        "Precipitation_probability": (0.0, 100.0),
+        "Thunderstorm_probability": (0.0, 100.0),
+    }
+    by_unique_suffix = {
+        suffix: hass.states.get(registry_entry.entity_id)
+        for suffix in metric_ranges
+        for registry_entry in registry_entries
+        if registry_entry.unique_id.endswith(suffix)
+    }
+    for suffix, (minimum, maximum) in metric_ranges.items():
+        state = by_unique_suffix.get(suffix)
+        if state is None or state.state == STATE_UNAVAILABLE:
+            raise LiveContractError(f"Home Assistant omitted live {suffix} sensor data")
+        _finite_attribute({"state": state.state}, "state", minimum, maximum)
+
     hourly_items = await _forecast_service(hass, main.entity_id, "hourly")
     daily_items = await _forecast_service(hass, main.entity_id, "daily")
     hourly = validate_ha_forecast(hourly_items, "hourly")
     daily = validate_ha_forecast(daily_items, "daily")
+    validate_first_available_local_day_ha_metrics(hourly, "hourly")
     validate_daily_precipitation(hourly, daily)
 
     assert await hass.config_entries.async_unload(entry.entry_id)

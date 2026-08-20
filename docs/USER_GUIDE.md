@@ -86,6 +86,12 @@ attributes in place. An old address/native-state comparison or template reading 
 updated to use `direction`, `bearing`, or `distance`. The entity-registry record, unique ID,
 customized entity ID, device, config entry, options, and Recorder history remain intact.
 
+The useful forecast-metrics release keeps the existing **Best time of day** entity and its IDs,
+but improves its selection in place. Temperature limits now mean acceptable **feels-like**
+temperature, the current time is no longer a fallback, and a healthy day with no matching hour has
+the translated `no_suitable_time` state. Review automations that assumed this sensor always
+contained an `HH:MM` value or selected the warmest hour.
+
 ## Configure
 
 Initial setup accepts a display name and either a map point or an FMI place search followed by map
@@ -95,7 +101,7 @@ Institute**, select an entry, and choose **Configure** to change these options:
 
 - forecast days (`0` disables future samples, otherwise up to 10 days);
 - forecast interval used by the **Best time of day** calculation;
-- temperature, humidity, wind, and precipitation limits used by that calculation;
+- feels-like temperature, humidity, wind, and precipitation limits used by that calculation;
 - legacy daily weather entity, which is optional because the main weather entity already supplies
   both hourly and daily forecasts;
 - lightning sensor, search radius, and inclusive maximum age from 1 to 1440 minutes;
@@ -121,10 +127,73 @@ Helsinki entry usually has IDs such as `weather.helsinki` and
 produce different IDs. Always use the IDs shown in your own entity registry.
 
 The main location device normally contains a weather entity and sensors for place, condition,
-temperature, wind speed/direction/gust, humidity, cloud coverage, rain, forecast time, best time
-of day, and sea level. Enabling lightning adds a lightning sensor. A configured station creates a
-separate observation device and weather entity. Enabling legacy daily mode adds another weather
-entity, but it is not needed to request daily forecasts from the main entity.
+temperature, feels like, dew point, atmospheric pressure, wind speed/direction/gust, humidity,
+total/low/medium/high cloud cover, rain, precipitation probability, thunderstorm probability,
+forecast time, best time of day, and sea level. Enabling lightning adds a lightning sensor. A
+configured station creates a separate observation device and weather entity; it does not duplicate
+the main forecast-backed metric sensors. Enabling legacy daily mode adds another weather entity,
+but it is not needed to request daily forecasts from the main entity.
+
+## Useful Weather Metrics
+
+The dedicated numeric sensors can be graphed, recorded, and used directly in automations:
+
+| Sensor | Native unit | Meaning |
+|---|---:|---|
+| Feels like | °C | Apparent temperature calculated by `fmi-weather-client` from FMI temperature, humidity, and wind data. Home Assistant converts it to the configured unit system. |
+| Dew point | °C | Temperature at which air with the forecast moisture content would reach saturation. A value close to air temperature indicates moist air and a greater condensation/fog potential. |
+| Atmospheric pressure | hPa | FMI mean-sea-level pressure, suitable for comparing weather-system pressure between locations; it is not unadjusted station pressure. |
+| Low cloud cover | % | Forecast fraction of the sky covered by low cloud. |
+| Medium cloud cover | % | Forecast fraction covered by middle cloud. |
+| High cloud cover | % | Forecast fraction covered by high cloud. |
+| Precipitation probability | % | FMI `PoP`: probability of at least 0.1 mm during the preceding forecast hour. It is a chance, not a precipitation amount. |
+| Thunderstorm probability | % | FMI forecast probability of thunder at the point/hour. It does not mean lightning has been observed. |
+
+Cloud layers can overlap vertically, so low, medium, and high percentages must not be added. A
+valid `0%` is a real forecast value; `unavailable` means that field was missing or invalid. A
+missing metric does not disable unrelated sensors or optional sources, and a later valid refresh
+recovers the same entity without reload.
+
+The main weather entity exposes apparent temperature for current conditions when finite. A
+configured observation weather entity exposes it only when the selected client supplies a finite
+observation value. Hourly forecasts include apparent temperature and PoP. Daily forecasts include
+the maximum apparent temperature for that local day, but no daily PoP: hourly event probabilities
+cannot be combined correctly without a dependence model that FMI does not provide.
+
+Thunderstorm probability and the optional lightning sensor answer different questions. The
+probability is a forecast for an hour; the lightning sensor reports recent FMI-observed strike
+groups within the configured radius and age.
+
+## Best Time Of Day
+
+**Best time of day** selects one complete forecast hour that is not in the past, belongs to the
+current Home Assistant local calendar day, and matches the configured forecast interval. It never
+uses current weather/current time as a fallback and never scans a later day.
+
+An hour must have finite condition, air temperature, feels-like temperature, humidity, sustained
+wind, precipitation amount, PoP, and thunderstorm probability. It must also pass the configured
+feels-like temperature, humidity, wind, and precipitation limits and the integration's accepted
+weather-condition filter. Eligible hours are ordered deterministically by:
+
+1. lower thunderstorm probability;
+2. feels-like temperature closer to the midpoint of the configured temperature range;
+3. lower precipitation probability;
+4. lower precipitation amount;
+5. earlier time.
+
+The selected state remains `HH:MM`. Its attributes are `location`, aware `time`, air
+`temperature`, `apparent_temperature`, `relative_humidity`, `wind_speed`, `precipitation`,
+`precipitation_probability`, and `thunderstorm_probability`.
+
+A healthy forecast with no remaining or acceptable hour is available with backend state
+`no_suitable_time` (translated in the frontend) and no selection attributes. Failed, empty,
+timestamp-unusable, or entirely incomplete forecast data makes the entity `unavailable`. Both
+states clear an earlier selection and can recover on the next refresh.
+
+This is a transparent convenience ordering under your configured limits, not a medical, heat-,
+lightning-, or activity-safety score. It does not model direct sun, radiant temperature, clothing,
+health, acclimatization, or activity intensity. Follow official warnings and appropriate safety
+guidance instead of using this sensor as an alert system.
 
 ## Lightning State And Automations
 
@@ -198,11 +267,19 @@ title: Helsinki details
 show_header_toggle: false
 entities:
   - entity: sensor.helsinki_temperature
+  - entity: sensor.helsinki_feels_like
+  - entity: sensor.helsinki_dew_point
+  - entity: sensor.helsinki_atmospheric_pressure
   - entity: sensor.helsinki_humidity
   - entity: sensor.helsinki_wind_speed
   - entity: sensor.helsinki_wind_gust
   - entity: sensor.helsinki_cloud_coverage
+  - entity: sensor.helsinki_low_cloud_cover
+  - entity: sensor.helsinki_medium_cloud_cover
+  - entity: sensor.helsinki_high_cloud_cover
   - entity: sensor.helsinki_rain
+  - entity: sensor.helsinki_precipitation_probability
+  - entity: sensor.helsinki_thunderstorm_probability
   - entity: sensor.helsinki_best_time_of_day
 ```
 
@@ -255,6 +332,9 @@ entities:
   sensor unavailable. Wait for the next refresh to recover automatically.
 - **Sea level is unavailable:** the configured location may be outside FMI sea-level forecast
   coverage, or the optional response may be empty or unavailable.
+- **Best time says “No suitable time today”:** FMI forecast data is healthy, but there is no
+  complete remaining current-day hour that passes your configured limits. Widen the limits if
+  appropriate. `unavailable` instead means the remaining forecast data cannot support a result.
 - **A dashboard example reports an unknown entity:** replace the sample ID with the entity ID shown
   in your registry. Reconfigured and migrated entries deliberately retain their established IDs.
 
@@ -279,7 +359,7 @@ processed transiently in memory for local distance/bearing calculation. They are
 second provider and are not exposed in state, attributes, logs, or diagnostics. See the
 [security and privacy contract](maintenance/COMPATIBILITY_SECURITY.md).
 
-Documentation references verified 2026-08-19:
+Documentation references verified 2026-08-20:
 
 - [HACS custom repositories](https://www.hacs.xyz/docs/faq/custom_repositories/)
 - [HACS repository download and update behavior](https://www.hacs.xyz/docs/use/repositories/dashboard/)

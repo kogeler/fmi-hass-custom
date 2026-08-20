@@ -53,7 +53,7 @@ class _ValidatedLocationSelector(LocationSelector):
 async def validate_user_config(data: dict[str, Any]) -> str:
     """Validate coordinates with the same asynchronous FMI boundary as runtime."""
     try:
-        weather = await fmi.async_weather_by_coordinates(
+        result = await fmi.async_weather_by_coordinates(
             data[CONF_LATITUDE],
             data[CONF_LONGITUDE],
         )
@@ -70,8 +70,9 @@ async def validate_user_config(data: dict[str, Any]) -> str:
         ValueError,
     ) as error:
         raise InvalidFMIResponseError from error
-    if weather is None:
+    if result is None:
         raise CannotConnectError
+    weather = result.weather if isinstance(result, fmi.CurrentWeatherResult) else result
     place = weather.place
     if not isinstance(place, str) or not (place := place.strip()):
         raise InvalidFMIResponseError
@@ -141,6 +142,21 @@ def _place_schema(
         fields[vol.Required(CONF_NAME, default=name)] = str
     fields[vol.Required(const.CONF_PLACE_QUERY, default=place)] = TextSelector()
     return vol.Schema(fields)
+
+
+_OPTION_RANGE_PAIRS = (
+    (const.CONF_MIN_TEMP, const.CONF_MAX_TEMP),
+    (const.CONF_MIN_HUMIDITY, const.CONF_MAX_HUMIDITY),
+    (const.CONF_MIN_WIND_SPEED, const.CONF_MAX_WIND_SPEED),
+    (const.CONF_MIN_PRECIPITATION, const.CONF_MAX_PRECIPITATION),
+)
+
+
+def _has_invalid_option_range(data: Mapping[str, Any]) -> bool:
+    """Return whether any submitted Best-time minimum exceeds its maximum."""
+    return any(
+        float(data[minimum]) > float(data[maximum]) for minimum, maximum in _OPTION_RANGE_PAIRS
+    )
 
 
 class FMIConfigFlowHandler(config_entries.ConfigFlow, domain=const.DOMAIN):
@@ -359,99 +375,102 @@ class FMIOptionsFlowHandler(config_entries.OptionsFlow):
         user_input: dict[str, Any] | None = None,
     ) -> config_entries.ConfigFlowResult:
         """Store user-selected FMI options."""
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(title="FMI Options", data=user_input)
+            if not _has_invalid_option_range(user_input):
+                return self.async_create_entry(title="FMI Options", data=user_input)
+            errors["base"] = "invalid_range"
 
-        options = self.config_entry.options
+        values = user_input if user_input is not None else self.config_entry.options
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
                     vol.Optional(
                         const.CONF_FORECAST_DAYS,
-                        default=options.get(const.CONF_FORECAST_DAYS, const.DAYS_DEFAULT),
+                        default=values.get(const.CONF_FORECAST_DAYS, const.DAYS_DEFAULT),
                     ): vol.In(const.DAYS_RANGE),
                     vol.Optional(
                         CONF_OFFSET,
-                        default=options.get(
+                        default=values.get(
                             CONF_OFFSET,
                             const.FORECAST_OFFSET[0],
                         ),
                     ): vol.In(const.FORECAST_OFFSET),
                     vol.Optional(
                         const.CONF_MIN_HUMIDITY,
-                        default=options.get(
+                        default=values.get(
                             const.CONF_MIN_HUMIDITY,
                             const.HUMIDITY_MIN_DEFAULT,
                         ),
                     ): vol.In(const.HUMIDITY_RANGE),
                     vol.Optional(
                         const.CONF_MAX_HUMIDITY,
-                        default=options.get(
+                        default=values.get(
                             const.CONF_MAX_HUMIDITY,
                             const.HUMIDITY_MAX_DEFAULT,
                         ),
                     ): vol.In(const.HUMIDITY_RANGE),
                     vol.Optional(
                         const.CONF_MIN_TEMP,
-                        default=options.get(const.CONF_MIN_TEMP, const.TEMP_MIN_DEFAULT),
+                        default=values.get(const.CONF_MIN_TEMP, const.TEMP_MIN_DEFAULT),
                     ): vol.In(const.TEMP_RANGE),
                     vol.Optional(
                         const.CONF_MAX_TEMP,
-                        default=options.get(const.CONF_MAX_TEMP, const.TEMP_MAX_DEFAULT),
+                        default=values.get(const.CONF_MAX_TEMP, const.TEMP_MAX_DEFAULT),
                     ): vol.In(const.TEMP_RANGE),
                     vol.Optional(
                         const.CONF_MIN_WIND_SPEED,
-                        default=options.get(
+                        default=values.get(
                             const.CONF_MIN_WIND_SPEED,
                             const.WIND_SPEED_MIN_DEFAULT,
                         ),
                     ): vol.In(const.WIND_SPEED),
                     vol.Optional(
                         const.CONF_MAX_WIND_SPEED,
-                        default=options.get(
+                        default=values.get(
                             const.CONF_MAX_WIND_SPEED,
                             const.WIND_SPEED_MAX_DEFAULT,
                         ),
                     ): vol.In(const.WIND_SPEED),
                     vol.Optional(
                         const.CONF_MIN_PRECIPITATION,
-                        default=options.get(
+                        default=values.get(
                             const.CONF_MIN_PRECIPITATION,
                             const.PRECIPITATION_MIN_DEFAULT,
                         ),
                     ): cv.small_float,
                     vol.Optional(
                         const.CONF_MAX_PRECIPITATION,
-                        default=options.get(
+                        default=values.get(
                             const.CONF_MAX_PRECIPITATION,
                             const.PRECIPITATION_MAX_DEFAULT,
                         ),
                     ): cv.small_float,
                     vol.Optional(
                         const.CONF_DAILY_MODE,
-                        default=options.get(
+                        default=values.get(
                             const.CONF_DAILY_MODE,
                             const.DAILY_MODE_DEFAULT,
                         ),
                     ): cv.boolean,
                     vol.Optional(
                         const.CONF_LIGHTNING,
-                        default=options.get(
+                        default=values.get(
                             const.CONF_LIGHTNING,
                             const.LIGHTNING_DEFAULT,
                         ),
                     ): cv.boolean,
                     vol.Optional(
                         const.CONF_LIGHTNING_DISTANCE,
-                        default=options.get(
+                        default=values.get(
                             const.CONF_LIGHTNING_DISTANCE,
                             const.BOUNDING_BOX_HALF_SIDE_KM,
                         ),
                     ): cv.positive_int,
                     vol.Optional(
                         const.CONF_LIGHTNING_MAX_AGE,
-                        default=options.get(
+                        default=values.get(
                             const.CONF_LIGHTNING_MAX_AGE,
                             const.LIGHTNING_MAX_AGE_DEFAULT_MINUTES,
                         ),
@@ -464,8 +483,9 @@ class FMIOptionsFlowHandler(config_entries.OptionsFlow):
                     ),
                     vol.Optional(
                         const.CONF_OBSERVATION_STATION,
-                        default=options.get(const.CONF_OBSERVATION_STATION, 0),
+                        default=values.get(const.CONF_OBSERVATION_STATION, 0),
                     ): cv.positive_int,
                 }
             ),
+            errors=errors,
         )

@@ -65,10 +65,19 @@ Paths in this table are relative to `docs/maintenance/`.
 Run supported Python and Home Assistant commands through rootless Podman. The host Python is not a
 fallback.
 
+Agents must invoke repository tooling, Python, Home Assistant, validators, dependency operations,
+and containers only through supported `make` targets. Never invoke `podman`, `docker`, a container
+image, or a tool inside an image directly, including for one-off inspection or diagnostics. If the
+required operation has no suitable target, first extend the repository Make tooling with a
+reviewable target that preserves the documented confinement, network, archive-transport, and
+artifact rules, then use that target. Read-only host inspection with tools such as `git`, `rg`, and
+`sed`, and file edits through the supported patch mechanism, remain allowed.
+
 | Task | Command |
 |---|---|
 | Verify rootless Podman | `make doctor` |
 | Build/sync environment | `make dev-build` |
+| Inspect locked FMI/HA contracts | `make reference-contracts` |
 | Regenerate all three hash locks | `make lock` |
 | Check lock reproducibility | `make freeze-check` |
 | Format / check | `make format` / `make format-check` |
@@ -86,6 +95,19 @@ fallback.
 | License inventory | `make licenses` |
 | Build all three Dependency Submission manifests | `make dependency-snapshot` |
 | Prove container confinement | `make confinement-test` |
+
+`make compatibility-stable` and `make compatibility-prerelease` are expensive final moving-target
+gates. Do not run either during iterative implementation, at intermediate plan/session boundaries,
+or merely to reconfirm an unchanged result. First finish code, tests, documentation, and release
+metadata, then pass every other required static, offline, validation, security, dependency,
+confinement, and live gate. Run each moving compatibility target once, last, against that unchanged
+final candidate; record its exact result so later work can reuse the evidence. Repeat one only when
+an earlier run failed and a relevant fix was applied, or when runtime code, tests, dependency
+metadata/locks, compatibility tooling, or the upstream channel changed after that run. Documentation,
+plan, or report-only edits do not invalidate successful compatibility evidence. When a prerelease
+run reports the explicit successful no-newer-prerelease skip, do not rerun it in the same work
+session without evidence that the upstream channel changed. Compatibility-tooling diagnosis and an
+explicit owner request are the only reasons to invoke these targets before final-gate order.
 
 Every pytest path uses pytest-xdist with `PYTEST_WORKERS=auto` by default and
 `--dist=worksteal`, including offline, network-block, live, and moving compatibility runs. Xdist

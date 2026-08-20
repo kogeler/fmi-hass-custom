@@ -4,6 +4,41 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.3.0 - 2026-08-20
+
+### User-facing features
+
+- Added dedicated **Feels like**, **Dew point**, **Atmospheric pressure**, low/medium/high cloud
+  cover, **Precipitation probability**, and **Thunderstorm probability** sensors to the existing
+  location device, with native Home Assistant units, translations, history-friendly numeric
+  states, and independent missing-data recovery.
+- Added apparent temperature to current weather and hourly/daily forecast output, plus FMI hourly
+  PoP to Home Assistant's standard precipitation-probability forecast field. Daily PoP remains
+  omitted because hourly event probabilities cannot be combined without an unavailable dependence
+  model.
+- Made **Best time of day** choose a remaining current-day hour using transparent thunder risk,
+  feels-like comfort, rain chance/amount, and earliest-time priorities under the user's configured
+  limits.
+
+### Changed
+
+- Kept the Best-time entity, registry/unique IDs, customized entity ID, `HH:MM` selected state, and
+  existing attributes/options, while interpreting its stored temperature range as acceptable
+  feels-like temperature instead of air temperature.
+- Replaced the misleading current-time and warmest-hour fallback with a translated
+  `no_suitable_time` result for a healthy day with no matching hour. Missing or unusable forecast
+  data remains `unavailable`, and both outcomes clear stale selection attributes.
+- Added apparent temperature, precipitation probability, and thunderstorm probability to selected
+  Best-time attributes without exposing an opaque comfort score or making a medical/safety claim.
+
+### Fixed
+
+- Kept PoP and thunder-probability values aligned to their aware forecast timestamps and cleared
+  them with their owning current/forecast data, preventing stale values after replacement or
+  failure without adding another FMI request or runtime dependency.
+- Preserved customized and disabled entity-registry records through upgrade/reload while adding
+  the complete sensor set exactly once on the existing location device.
+
 ## 1.2.0 - 2026-08-19
 
 ### User-facing features

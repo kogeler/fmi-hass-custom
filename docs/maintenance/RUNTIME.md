@@ -8,7 +8,7 @@ and runtime side effects. Read it before changing `custom_components/fmi/__init_
 PEP 621 metadata and `requirements-dev.txt`; `hacs.json` independently declares the installation
 floor. Keep historical investigation outside this current contract.
 
-Last verified against current code: 2026-08-19.
+Last verified against current code: 2026-08-20.
 
 ## Entry Ownership And Lifecycle
 
@@ -27,8 +27,9 @@ Last verified against current code: 2026-08-19.
 ## Event-Loop And Network Boundaries
 
 - Coordinate current/forecast work in the synchronous FMI client runs outside the event loop
-  through `asyncio.to_thread`, including forecast XML parsing. Observation helpers use the
-  client's executor-backed async API.
+  through `asyncio.to_thread`, including forecast XML parsing. The same request adds hourly gust,
+  PoP, and thunder probability and returns immutable typed supplements aligned by aware UTC
+  timestamp. Observation helpers use the client's executor-backed async API.
 - Setup/reconfigure place resolution uses the selected client's ten-second request and parser
   semantics inside `asyncio.to_thread`, after the response passes the same entity-disabled 2 MiB
   XML boundary as coordinate forecasts.
@@ -56,6 +57,12 @@ Initial setup succeeds when either the primary current path, including place fal
 configured station produces usable data. Forecast and optional-source failures alone do not force
 setup retry. Every source recovers on a later successful refresh without recreating entities.
 Transition logging should report an outage and recovery once, not on every poll.
+
+Current and future probability supplements have the same lifecycle as their owning
+forecast-backed current/forecast data. Replacement removes timestamps absent from the new result;
+failure, empty data, and primary timeout clear the applicable supplement state. A place or station
+observation carries no forecast probability and never inherits one from an earlier coordinate
+sample.
 
 ## Data, Timeouts, And Request Volume
 

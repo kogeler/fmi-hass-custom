@@ -8,6 +8,7 @@
   "lon": 24.94,
   "defaults": {
     "temperature": {"value": -3.0, "unit": "°C"},
+    "feels_like": {"value": -7.0, "unit": "°C"},
     "dew_point": {"value": -6.0, "unit": "°C"},
     "pressure": {"value": 1012.0, "unit": "hPa"},
     "humidity": {"value": 72.0, "unit": "%"},
@@ -17,6 +18,9 @@
     "wind_gust": {"value": 8.5, "unit": "m/s"},
     "symbol": {"value": 2.0, "unit": ""},
     "cloud_cover": {"value": 45.0, "unit": "%"},
+    "cloud_low_cover": {"value": 25.0, "unit": "%"},
+    "cloud_mid_cover": {"value": 35.0, "unit": "%"},
+    "cloud_high_cover": {"value": 15.0, "unit": "%"},
     "precipitation_amount": {"value": 0.0, "unit": "mm/h"}
   },
   "current": {

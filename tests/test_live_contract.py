@@ -16,7 +16,10 @@ from tests.helpers.live_budget import LiveBudgetExceeded, LiveRequestBudget
 from tests.helpers.live_fmi import (
     LiveContractError,
     validate_daily_precipitation,
+    validate_first_available_local_day_ha_metrics,
+    validate_first_available_local_day_probability_supplements,
     validate_model_forecast,
+    validate_probabilities,
 )
 
 
@@ -58,6 +61,92 @@ def test_daily_precipitation_allows_only_independent_display_rounding(monkeypatc
 
     with pytest.raises(LiveContractError, match="beyond the .* rounding bound"):
         validate_daily_precipitation(hourly, [(midnight, {"precipitation": 0.14})])
+
+
+def test_live_probability_contract_requires_aligned_finite_first_future_day_values() -> None:
+    """Keep live probability checks strict without asserting exact weather."""
+    now = datetime(2026, 8, 20, 10, 30, tzinfo=UTC)
+    first = datetime(2026, 8, 20, 11, tzinfo=UTC)
+    second = datetime(2026, 8, 20, 12, tzinfo=UTC)
+    tomorrow = datetime(2026, 8, 20, 22, tzinfo=UTC)
+    samples = [
+        SimpleNamespace(time=first),
+        SimpleNamespace(time=second),
+        SimpleNamespace(time=tomorrow),
+    ]
+    probabilities = {
+        first: SimpleNamespace(precipitation=0.0, thunderstorm=100.0),
+        second: SimpleNamespace(precipitation=35.0, thunderstorm=4.0),
+    }
+
+    assert (
+        validate_first_available_local_day_probability_supplements(
+            samples,
+            probabilities,
+            "synthetic forecast",
+            now=now,
+        )
+        == 2
+    )
+    assert validate_probabilities(probabilities[first], "synthetic") == (0.0, 100.0)
+
+    late_night = datetime(2026, 8, 20, 20, 30, tzinfo=UTC)
+    next_local_day_probabilities = {tomorrow: SimpleNamespace(precipitation=0.0, thunderstorm=0.0)}
+    assert (
+        validate_first_available_local_day_probability_supplements(
+            [SimpleNamespace(time=tomorrow)],
+            next_local_day_probabilities,
+            "synthetic late-night forecast",
+            now=late_night,
+        )
+        == 1
+    )
+
+    with pytest.raises(LiveContractError, match="has no aligned probabilities"):
+        validate_first_available_local_day_probability_supplements(
+            samples,
+            {first: probabilities[first]},
+            "synthetic forecast",
+            now=now,
+        )
+    with pytest.raises(LiveContractError, match="outside 0..100"):
+        validate_probabilities(
+            SimpleNamespace(precipitation=-1.0, thunderstorm=101.0),
+            "synthetic",
+        )
+
+
+def test_live_ha_metric_contract_requires_apparent_temperature_and_pop() -> None:
+    """Keep presentation checks strict while accepting valid zero probability."""
+    now = datetime(2026, 8, 20, 10, 30, tzinfo=UTC)
+    first = datetime(2026, 8, 20, 11, tzinfo=UTC)
+    valid = [(first, {"apparent_temperature": 18.0, "precipitation_probability": 0})]
+
+    assert validate_first_available_local_day_ha_metrics(valid, "synthetic", now=now) == 1
+
+    late_night = datetime(2026, 8, 20, 20, 30, tzinfo=UTC)
+    next_local_midnight = datetime(2026, 8, 20, 21, tzinfo=UTC)
+    next_local_day = [
+        (
+            next_local_midnight,
+            {"apparent_temperature": 12.0, "precipitation_probability": 0},
+        )
+    ]
+    assert (
+        validate_first_available_local_day_ha_metrics(
+            next_local_day,
+            "synthetic late-night HA forecast",
+            now=late_night,
+        )
+        == 1
+    )
+
+    with pytest.raises(LiveContractError, match="apparent_temperature is not numeric"):
+        validate_first_available_local_day_ha_metrics(
+            [(first, {"precipitation_probability": 10})],
+            "synthetic",
+            now=now,
+        )
 
 
 async def test_live_budget_is_shared_and_hard_bounded(tmp_path: Path) -> None:

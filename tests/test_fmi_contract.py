@@ -8,6 +8,8 @@ from __future__ import annotations
 import inspect
 import threading
 from datetime import UTC, datetime
+from types import MappingProxyType
+from typing import Any, cast
 from unittest.mock import Mock
 from xml.parsers.expat import ExpatError
 
@@ -256,14 +258,145 @@ def test_client_adapter_maps_hourly_maximum_gust_with_finite_precedence(
         models.RequestType.FORECAST,
     )
 
-    assert result.forecasts[0].wind_gust == models.Value(expected, "m/s")
-    assert result.forecasts[0].wind_max == models.Value(hourly_gust, "m/s")
+    assert result.forecast.forecasts[0].wind_gust == models.Value(expected, "m/s")
+    assert result.forecast.forecasts[0].wind_max == models.Value(hourly_gust, "m/s")
+
+
+def test_client_adapter_parses_reordered_probability_fields_and_last_duplicate(
+    monkeypatch,
+) -> None:
+    """Align optional values by field name and retain the last duplicate timestamp."""
+    timestamp = datetime(2026, 5, 20, 12, tzinfo=UTC)
+    weather = weather_from_fixture("forecast_normal.json")
+    assert weather is not None
+    parsed = models.Forecast(
+        "Helsinki",
+        60.17,
+        24.94,
+        [weather.data._replace(time=timestamp)],
+    )
+    monkeypatch.setattr(
+        integration_fmi_client.upstream.forecast_parser,
+        "parse_fmi_response",
+        lambda body, request_type: parsed,
+    )
+    epoch = int(timestamp.timestamp())
+    body = f"""
+        <root xmlns:gml="http://www.opengis.net/gml/3.2"
+              xmlns:gmlcov="http://www.opengis.net/gmlcov/1.0"
+              xmlns:swe="http://www.opengis.net/swe/2.0">
+          <swe:field name="ProbabilityThunderstorm" />
+          <swe:field name="Temperature" />
+          <swe:field name="PoP" />
+          <swe:field name="HourlyMaximumGust" />
+          <gmlcov:positions>
+            60.17 24.94 {epoch}
+            60.17 24.94 {epoch}
+          </gmlcov:positions>
+          <gml:doubleOrNilReasonTupleList>
+            5 -2 20 8
+            7 -1 35 9
+          </gml:doubleOrNilReasonTupleList>
+        </root>
+    """
+
+    result = integration_fmi_client._parse_forecast_response(  # noqa: SLF001
+        body,
+        models.RequestType.FORECAST,
+    )
+
+    assert result.probabilities_by_time[timestamp] == (
+        integration_fmi_client.ForecastProbabilities(35.0, 7.0)
+    )
+    assert result.forecast.forecasts[0].wind_gust == models.Value(9.0, "m/s")
+    with pytest.raises(TypeError):
+        cast(Any, result.probabilities_by_time)[timestamp] = (
+            integration_fmi_client.ForecastProbabilities(0.0, 0.0)
+        )
+
+
+@pytest.mark.parametrize(
+    ("precipitation", "thunderstorm", "expected"),
+    [
+        ("0", "100", (0.0, 100.0)),
+        ("100", "0", (100.0, 0.0)),
+        ("-0.1", "20", (None, 20.0)),
+        ("100.1", "30", (None, 30.0)),
+        ("40", "-1", (40.0, None)),
+        ("50", "101", (50.0, None)),
+        ("NaN", "inf", (None, None)),
+    ],
+)
+def test_client_adapter_validates_probability_range_without_clamping(
+    monkeypatch,
+    precipitation: str,
+    thunderstorm: str,
+    expected: tuple[float | None, float | None],
+) -> None:
+    """Preserve valid boundaries and represent invalid optional values as missing."""
+    timestamp = datetime(2026, 5, 20, 12, tzinfo=UTC)
+    parsed = forecast_from_fixture("forecast_normal.json")._replace(forecasts=[])
+    monkeypatch.setattr(
+        integration_fmi_client.upstream.forecast_parser,
+        "parse_fmi_response",
+        lambda body, request_type: parsed,
+    )
+    body = f"""
+        <root xmlns:gml="http://www.opengis.net/gml/3.2"
+              xmlns:gmlcov="http://www.opengis.net/gmlcov/1.0"
+              xmlns:swe="http://www.opengis.net/swe/2.0">
+          <swe:field name="PoP" />
+          <swe:field name="ProbabilityThunderstorm" />
+          <gmlcov:positions>60.17 24.94 {int(timestamp.timestamp())}</gmlcov:positions>
+          <gml:doubleOrNilReasonTupleList>
+            {precipitation} {thunderstorm}
+          </gml:doubleOrNilReasonTupleList>
+        </root>
+    """
+
+    result = integration_fmi_client._parse_forecast_response(  # noqa: SLF001
+        body,
+        models.RequestType.FORECAST,
+    )
+
+    probabilities = result.probabilities_by_time[timestamp]
+    assert (probabilities.precipitation, probabilities.thunderstorm) == expected
+
+
+def test_client_adapter_skips_unusable_optional_timestamps() -> None:
+    """Malformed optional rows must not turn into timestamp-aligned values."""
+    body = """
+        <root xmlns:gml="http://www.opengis.net/gml/3.2"
+              xmlns:gmlcov="http://www.opengis.net/gmlcov/1.0"
+              xmlns:swe="http://www.opengis.net/swe/2.0">
+          <swe:field name="PoP" />
+          <swe:field name="ProbabilityThunderstorm" />
+          <gmlcov:positions>
+            60.17 24.94 invalid
+            60.17 24.94 1e1000
+            60.17 24.94
+          </gmlcov:positions>
+          <gml:doubleOrNilReasonTupleList>
+            10 20
+            30 40
+            50 60
+          </gml:doubleOrNilReasonTupleList>
+        </root>
+    """
+
+    gusts, probabilities = integration_fmi_client._supplements_by_time(body)  # noqa: SLF001
+
+    assert gusts == {}
+    assert probabilities == {}
 
 
 def test_client_adapter_adds_hourly_gust_without_second_request(monkeypatch) -> None:
     """Change the selected parameter list while retaining one upstream HTTP call."""
     captured: list[dict[str, object]] = []
-    parsed = forecast_from_fixture("forecast_normal.json")
+    parsed = integration_fmi_client.ForecastResult(
+        forecast_from_fixture("forecast_normal.json"),
+        MappingProxyType({}),
+    )
 
     def capture_request(params: dict[str, object]) -> str:
         captured.append(dict(params))
@@ -295,7 +428,9 @@ def test_client_adapter_adds_hourly_gust_without_second_request(monkeypatch) -> 
 
     assert result is parsed
     assert len(captured) == 1
-    assert captured[0]["parameters"] == "Temperature,WindGust,HourlyMaximumGust"
+    assert captured[0]["parameters"] == (
+        "Temperature,WindGust,HourlyMaximumGust,PoP,ProbabilityThunderstorm"
+    )
 
 
 @pytest.mark.parametrize(
@@ -303,11 +438,15 @@ def test_client_adapter_adds_hourly_gust_without_second_request(monkeypatch) -> 
     [
         (
             "Temperature,HourlyMaximumGust",
-            "Temperature,HourlyMaximumGust",
+            "Temperature,HourlyMaximumGust,PoP,ProbabilityThunderstorm",
         ),
         (
             "Temperature",
-            "Temperature,HourlyMaximumGust",
+            "Temperature,HourlyMaximumGust,PoP,ProbabilityThunderstorm",
+        ),
+        (
+            "Temperature,HourlyMaximumGust,PoP,ProbabilityThunderstorm",
+            "Temperature,HourlyMaximumGust,PoP,ProbabilityThunderstorm",
         ),
     ],
 )
@@ -318,7 +457,10 @@ def test_client_adapter_keeps_one_hourly_gust_parameter(
 ) -> None:
     """Avoid duplicate fields and append the supported gust when no legacy field exists."""
     captured: list[dict[str, object]] = []
-    parsed = forecast_from_fixture("forecast_normal.json")
+    parsed = integration_fmi_client.ForecastResult(
+        forecast_from_fixture("forecast_normal.json"),
+        MappingProxyType({}),
+    )
 
     def capture_request(params: dict[str, object]) -> str:
         captured.append(dict(params))
@@ -422,7 +564,10 @@ async def test_client_adapter_preserves_weather_and_forecast_timesteps(monkeypat
     calls: list[tuple[object, ...]] = []
     worker_threads: list[int] = []
     loop_thread = threading.get_ident()
-    parsed = forecast_from_fixture("forecast_normal.json")
+    parsed = integration_fmi_client.ForecastResult(
+        forecast_from_fixture("forecast_normal.json"),
+        MappingProxyType({}),
+    )
 
     def capture_request(*args):
         calls.append(args)
@@ -439,6 +584,8 @@ async def test_client_adapter_preserves_weather_and_forecast_timesteps(monkeypat
     forecast = await integration_fmi_client.async_forecast_by_coordinates(60.17, 24.94, 1, 48)
 
     assert current is not None
+    assert current.weather.data is parsed.forecast.forecasts[-1]
+    assert current.probabilities == integration_fmi_client.ForecastProbabilities(None, None)
     assert forecast is parsed
     assert calls == [
         (models.RequestType.WEATHER, 60.17, 24.94, 10, 4),
@@ -449,7 +596,10 @@ async def test_client_adapter_preserves_weather_and_forecast_timesteps(monkeypat
 
 async def test_client_adapter_returns_none_for_empty_current_forecast(monkeypatch) -> None:
     """Keep the upstream empty-current contract without indexing an absent sample."""
-    empty = models.Forecast("Helsinki", 60.17, 24.94, [])
+    empty = integration_fmi_client.ForecastResult(
+        models.Forecast("Helsinki", 60.17, 24.94, []),
+        MappingProxyType({}),
+    )
     monkeypatch.setattr(integration_fmi_client, "_request_by_coordinates", lambda *args: empty)
 
     assert await integration_fmi_client.async_weather_by_coordinates(60.17, 24.94) is None

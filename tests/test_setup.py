@@ -19,7 +19,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util.json import JsonValueType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.fmi import FMIDataUpdateCoordinator
+from custom_components.fmi import FMIDataUpdateCoordinator, fmi
 from custom_components.fmi.const import DOMAIN
 from custom_components.fmi.weather import FMIWeatherEntity
 
@@ -56,7 +56,12 @@ async def test_mocked_config_entry_loads(
     monkeypatch.setattr(
         FMIDataUpdateCoordinator,
         "_fetch_forecast_weather",
-        AsyncMock(return_value=weather),
+        AsyncMock(
+            return_value=fmi.CurrentWeatherResult(
+                weather,
+                fmi.ForecastProbabilities(None, None),
+            )
+        ),
     )
 
     async def mock_fetch_forecast(self) -> None:

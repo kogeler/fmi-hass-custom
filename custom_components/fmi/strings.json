@@ -65,14 +65,25 @@
       "place": {"name": "Place"},
       "condition": {"name": "Condition"},
       "temperature": {"name": "Temperature"},
+      "feels_like": {"name": "Feels like"},
+      "dew_point": {"name": "Dew point"},
+      "atmospheric_pressure": {"name": "Atmospheric pressure"},
       "wind_speed": {"name": "Wind speed"},
       "wind_direction": {"name": "Wind direction"},
       "wind_gust": {"name": "Wind gust"},
       "humidity": {"name": "Humidity"},
       "cloud_coverage": {"name": "Cloud coverage"},
+      "low_cloud_cover": {"name": "Low cloud cover"},
+      "medium_cloud_cover": {"name": "Medium cloud cover"},
+      "high_cloud_cover": {"name": "High cloud cover"},
       "rain": {"name": "Rain"},
+      "precipitation_probability": {"name": "Precipitation probability"},
+      "thunderstorm_probability": {"name": "Thunderstorm probability"},
       "forecast_time": {"name": "Time"},
-      "best_time_of_day": {"name": "Best time of day"},
+      "best_time_of_day": {
+        "name": "Best time of day",
+        "state": {"no_suitable_time": "No suitable time today"}
+      },
       "lightning_strikes": {
         "name": "Lightning strikes",
         "state": {
@@ -83,16 +94,19 @@
     }
   },
   "options": {
+    "error": {
+      "invalid_range": "A minimum value cannot be greater than its corresponding maximum."
+    },
     "step": {
       "user": {
         "title": "FMI Options",
-        "description": "FMI Configuration Parameters",
+        "description": "Limits are used to determine the remaining Best Time Of The Day. Temperature limits apply to feels-like temperature.",
         "data": {
           "offset": "Forecast Interval",
           "min_relative_humidity": "Min Relative Humidity",
           "max_relative_humidity": "Max Relative Humidity",
-          "min_temperature": "Min Temperature",
-          "max_temperature": "Max Temperature",
+          "min_temperature": "Min Feels-like Temperature",
+          "max_temperature": "Max Feels-like Temperature",
           "min_wind_speed": "Min Wind Speed",
           "max_wind_speed": "Max Wind Speed",
           "min_precipitation": "Min Precipitation",

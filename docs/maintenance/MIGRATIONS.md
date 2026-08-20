@@ -2,7 +2,8 @@
 
 # Config And Registry Migrations
 
-Last verified: 2026-08-19 against Home Assistant 2026.8.1 and the local v0.6.2 tag.
+Last verified: 2026-08-20 against the Home Assistant 2026.8.1 reference, moving stable 2026.8.2,
+and the local v0.6.2 tag.
 
 ## Supported source state
 
@@ -43,6 +44,13 @@ The entity registry does not retain provenance that can reliably distinguish a s
 
 Legacy location devices are reused through their coordinate identifier and updated in place with the current resolved place name. Two entries remain distinct when FMI resolves both to the same place text because their immutable device/entity identifiers differ.
 
+Additive sensor descriptions use the same established unique-ID construction and attach to the
+same location device; they do not create a second migration path. Acceptance tests compare one
+complete expected registry set. They prove historical records retain their registry and unique
+IDs, missing descriptions are added exactly once, a customized Best-time entity ID remains
+literal, and a user-disabled sensor remains disabled across setup and reload. Exact known generated
+defaults may still receive the conservative in-place rename described above.
+
 ## Optional daily weather entity
 
 The legacy daily weather entity is intentionally retained. It is redundant with the main entity's current daily forecast service, but removing or disabling its registry record would break customized dashboards and entity references without a safe replacement mechanism.
@@ -74,6 +82,7 @@ config-entry, entity-registry, device-registry, setup, reload, state, options, a
 It verifies config-only migration, combined setup, repeated migration/reload, future-version
 refusal, custom and ambiguous IDs (including a customized legacy lightning entity), target
 collisions, same-name multi-entry isolation, daily disable/re-enable, and a post-migration
-place-search move with map confirmation.
+place-search move with map confirmation. A current-version snapshot separately verifies the full
+registry set, customized Best-time ID, user-disabled state, and reload idempotency.
 
 The fixture is synthetic, uses rounded public city coordinates, and contains no captured FMI payload or owner location.

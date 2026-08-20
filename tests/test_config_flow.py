@@ -30,6 +30,14 @@ from custom_components.fmi import fmi as fmi_client
 from custom_components.fmi.const import (
     CONF_ENTITY_IDENTITY,
     CONF_LIGHTNING_MAX_AGE,
+    CONF_MAX_HUMIDITY,
+    CONF_MAX_PRECIPITATION,
+    CONF_MAX_TEMP,
+    CONF_MAX_WIND_SPEED,
+    CONF_MIN_HUMIDITY,
+    CONF_MIN_PRECIPITATION,
+    CONF_MIN_TEMP,
+    CONF_MIN_WIND_SPEED,
     CONF_PLACE_QUERY,
     DOMAIN,
     LIGHTNING_MAX_AGE_DEFAULT_MINUTES,
@@ -181,6 +189,69 @@ async def test_options_flow_defaults_and_stores_lightning_max_age(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options[CONF_LIGHTNING_MAX_AGE] == 60
+
+
+@pytest.mark.parametrize(
+    ("minimum", "maximum", "minimum_value", "maximum_value"),
+    [
+        (CONF_MIN_TEMP, CONF_MAX_TEMP, 20, 10),
+        (CONF_MIN_HUMIDITY, CONF_MAX_HUMIDITY, 70, 30),
+        (CONF_MIN_WIND_SPEED, CONF_MAX_WIND_SPEED, 20, 10),
+        (CONF_MIN_PRECIPITATION, CONF_MAX_PRECIPITATION, 1.0, 0.0),
+    ],
+    ids=("temperature", "humidity", "wind", "precipitation"),
+)
+async def test_options_flow_rejects_inverted_best_time_ranges_without_persisting(
+    hass: HomeAssistant,
+    minimum: str,
+    maximum: str,
+    minimum_value: float,
+    maximum_value: float,
+) -> None:
+    """Keep every invalid min/max submission visible but unpersisted."""
+    entry = _entry(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    schema = result["data_schema"]
+    assert schema is not None
+    submitted = schema({})
+    submitted[minimum] = minimum_value
+    submitted[maximum] = maximum_value
+
+    result = await hass.config_entries.options.async_configure(result["flow_id"], submitted)
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_range"}
+    assert dict(entry.options) == {}
+    retry_schema = result["data_schema"]
+    assert retry_schema is not None
+    retry = retry_schema({})
+    assert retry[minimum] == minimum_value
+    assert retry[maximum] == maximum_value
+
+    retry[maximum] = minimum_value
+    result = await hass.config_entries.options.async_configure(result["flow_id"], retry)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[minimum] == minimum_value
+    assert entry.options[maximum] == minimum_value
+
+
+async def test_options_flow_loads_stored_inverted_range_without_mutating_it(
+    hass: HomeAssistant,
+) -> None:
+    """Let a user inspect and correct historical invalid limits explicitly."""
+    entry = _entry(hass)
+    stored = {CONF_MIN_TEMP: 30, CONF_MAX_TEMP: 10}
+    hass.config_entries.async_update_entry(entry, options=stored)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    assert result["type"] is FlowResultType.FORM
+    schema = result["data_schema"]
+    assert schema is not None
+    defaults = schema({})
+    assert defaults[CONF_MIN_TEMP] == 30
+    assert defaults[CONF_MAX_TEMP] == 10
+    assert dict(entry.options) == stored
 
 
 async def test_user_flow_form_uses_home_assistant_location_defaults(

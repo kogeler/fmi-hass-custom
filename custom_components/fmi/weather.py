@@ -13,6 +13,7 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_CLOUD_COVERAGE,
     ATTR_FORECAST_CONDITION,
     ATTR_FORECAST_HUMIDITY,
+    ATTR_FORECAST_NATIVE_APPARENT_TEMP,
     ATTR_FORECAST_NATIVE_DEW_POINT,
     ATTR_FORECAST_NATIVE_PRECIPITATION,
     ATTR_FORECAST_NATIVE_PRESSURE,
@@ -20,6 +21,7 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_NATIVE_TEMP_LOW,
     ATTR_FORECAST_NATIVE_WIND_GUST_SPEED,
     ATTR_FORECAST_NATIVE_WIND_SPEED,
+    ATTR_FORECAST_PRECIPITATION_PROBABILITY,
     ATTR_FORECAST_TIME,
     ATTR_FORECAST_WIND_BEARING,
     Forecast,
@@ -149,6 +151,7 @@ class FMIWeatherEntity(CoordinatorEntity[FMIDataUpdateCoordinator], WeatherEntit
             "mm" if precipitation_unit in {"mm", "mm/h"} else precipitation_unit
         )
         self._attr_native_temperature = self.__get_value(_weather, "temperature")
+        self._attr_native_apparent_temperature = self.__get_value(_weather, "feels_like")
         self._attr_humidity = self.__get_value(_weather, "humidity")
         self._attr_native_precipitation = self.__get_value(_weather, "precipitation_amount")
         self._attr_native_wind_speed = self.__get_value(_weather, "wind_speed")
@@ -195,6 +198,18 @@ class FMIWeatherEntity(CoordinatorEntity[FMIDataUpdateCoordinator], WeatherEntit
         condition = utils.get_weather_symbol(self.__get_value(forecast, "symbol"))
         return condition or None
 
+    @staticmethod
+    def _percentage(value: object) -> float | None:
+        """Return one finite percentage without clamping."""
+        number = utils.finite_float(value)
+        return number if number is not None and 0 <= number <= 100 else None
+
+    def _precipitation_probability(self, forecast: fmi_models.WeatherData) -> int | None:
+        """Return Home Assistant's integer hourly PoP contract."""
+        probabilities = self.coordinator.get_forecast_probabilities(getattr(forecast, "time", None))
+        value = self._percentage(probabilities.precipitation)
+        return int(round(value)) if value is not None else None
+
     def _hourly_forecast(self) -> list[Forecast]:
         """Return normalized FMI samples using Home Assistant's hourly schema."""
         result: list[Forecast] = []
@@ -205,6 +220,10 @@ class FMIWeatherEntity(CoordinatorEntity[FMIDataUpdateCoordinator], WeatherEntit
                     ATTR_FORECAST_TIME: forecast.time.astimezone(UTC).isoformat(),
                     ATTR_FORECAST_CONDITION: self._condition(forecast),
                     ATTR_FORECAST_NATIVE_TEMP: self.__get_value(forecast, "temperature"),
+                    ATTR_FORECAST_NATIVE_APPARENT_TEMP: self.__get_value(forecast, "feels_like"),
+                    ATTR_FORECAST_PRECIPITATION_PROBABILITY: (
+                        self._precipitation_probability(forecast)
+                    ),
                     ATTR_FORECAST_NATIVE_PRECIPITATION: self.__get_value(
                         forecast, "precipitation_amount"
                     ),
@@ -254,6 +273,7 @@ class FMIWeatherEntity(CoordinatorEntity[FMIDataUpdateCoordinator], WeatherEntit
         result: list[Forecast] = []
         for local_date, forecasts in sorted(by_day.items()):
             temperatures = self._values(forecasts, "temperature")
+            apparent_temperatures = self._values(forecasts, "feels_like")
             precipitation = self._values(forecasts, "precipitation_amount")
             wind_speeds = [
                 (speed, forecast)
@@ -274,6 +294,7 @@ class FMIWeatherEntity(CoordinatorEntity[FMIDataUpdateCoordinator], WeatherEntit
                     ATTR_FORECAST_CONDITION: self._daily_condition(forecasts),
                     ATTR_FORECAST_NATIVE_TEMP: max(temperatures, default=None),
                     ATTR_FORECAST_NATIVE_TEMP_LOW: min(temperatures, default=None),
+                    ATTR_FORECAST_NATIVE_APPARENT_TEMP: max(apparent_temperatures, default=None),
                     ATTR_FORECAST_NATIVE_PRECIPITATION: (
                         math.fsum(precipitation) if precipitation else None
                     ),

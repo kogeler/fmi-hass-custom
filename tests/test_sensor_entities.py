@@ -4,7 +4,8 @@
 """Home Assistant regressions for wind gusts and sensor location grouping."""
 
 import math
-from types import SimpleNamespace
+from datetime import UTC
+from types import MappingProxyType, SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock
 
@@ -28,7 +29,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.fmi import FMIDataUpdateCoordinator
 from custom_components.fmi import fmi as fmi_client
-from custom_components.fmi.const import DOMAIN
+from custom_components.fmi.best_time import BestCondition
+from custom_components.fmi.const import BEST_CONDITION_NOT_AVAIL, DOMAIN
 from custom_components.fmi.sensor import (
     LIGHTNING_DESCRIPTION,
     SEA_LEVEL_DESCRIPTION,
@@ -62,9 +64,22 @@ def _entry(
 
 def _patch_sources(monkeypatch, weather) -> dict[str, AsyncMock]:
     forecast = forecast_from_fixture("forecast_normal.json")
+    current_result = fmi_client.CurrentWeatherResult(
+        weather,
+        fmi_client.ForecastProbabilities(0.0, 100.0),
+    )
+    forecast_result = fmi_client.ForecastResult(
+        forecast,
+        MappingProxyType(
+            {
+                sample.time.astimezone(UTC): fmi_client.ForecastProbabilities(25.0, 5.0)
+                for sample in forecast.forecasts
+            }
+        ),
+    )
     mocks = {
-        "weather": AsyncMock(return_value=weather),
-        "forecast": AsyncMock(return_value=forecast),
+        "weather": AsyncMock(return_value=current_result),
+        "forecast": AsyncMock(return_value=forecast_result),
         "place_observation": AsyncMock(return_value=None),
     }
     monkeypatch.setattr(fmi_client, "async_weather_by_coordinates", mocks["weather"])
@@ -135,6 +150,108 @@ async def test_fresh_sensors_use_location_device_context(
     assert device_entry.identifiers == {(DOMAIN, "60.17:24.94")}
 
 
+async def test_forecast_metric_sensors_expose_current_values_and_stable_identity(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Expose all eight additive sensors from cached current coordinator data."""
+    weather = weather_from_fixture("forecast_normal.json")
+    assert weather is not None
+    _patch_sources(monkeypatch, weather)
+    entry = _entry(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    expected = {
+        "feels_like": (-7.0, "°C", "Feels_like"),
+        "dew_point": (-6.0, "°C", "Dew_point"),
+        "atmospheric_pressure": (1012.0, "hPa", "Atmospheric_pressure"),
+        "low_cloud_cover": (25.0, "%", "Low_cloud_cover"),
+        "medium_cloud_cover": (35.0, "%", "Medium_cloud_cover"),
+        "high_cloud_cover": (15.0, "%", "High_cloud_cover"),
+        "precipitation_probability": (0.0, "%", "Precipitation_probability"),
+        "thunderstorm_probability": (100.0, "%", "Thunderstorm_probability"),
+    }
+    registry = er.async_get(hass)
+    for key, (value, unit, unique_suffix) in expected.items():
+        state = hass.states.get(f"sensor.helsinki_{key}")
+        assert state is not None and state.state != STATE_UNAVAILABLE
+        assert float(state.state) == value
+        assert state.attributes["unit_of_measurement"] == unit
+        entity_entry = registry.async_get(state.entity_id)
+        assert entity_entry is not None
+        assert entity_entry.unique_id == f"60.17:24.94_FMI_{unique_suffix}"
+        assert entity_entry.device_id is not None
+
+
+async def test_metric_sensor_missing_values_do_not_disable_independent_fields(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Make only missing client fields unavailable while retaining valid siblings."""
+    weather = weather_from_fixture("missing_values.json")
+    assert weather is not None
+    _patch_sources(monkeypatch, weather)
+    entry = _entry(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    for entity_id in (
+        "sensor.helsinki_feels_like",
+        "sensor.helsinki_low_cloud_cover",
+        "sensor.helsinki_medium_cloud_cover",
+        "sensor.helsinki_high_cloud_cover",
+    ):
+        state = hass.states.get(entity_id)
+        assert state is not None and state.state == STATE_UNAVAILABLE
+    for entity_id in (
+        "sensor.helsinki_dew_point",
+        "sensor.helsinki_atmospheric_pressure",
+        "sensor.helsinki_precipitation_probability",
+        "sensor.helsinki_thunderstorm_probability",
+    ):
+        state = hass.states.get(entity_id)
+        assert state is not None and state.state != STATE_UNAVAILABLE
+
+
+async def test_probability_sensors_clear_and_recover_without_reload(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Replace a missing supplement atomically and recover the same entities."""
+    weather = weather_from_fixture("forecast_normal.json")
+    assert weather is not None
+    mocks = _patch_sources(monkeypatch, weather)
+    valid_result = cast(fmi_client.CurrentWeatherResult, mocks["weather"].return_value)
+    missing_result = fmi_client.CurrentWeatherResult(
+        weather,
+        fmi_client.ForecastProbabilities(None, None),
+    )
+    mocks["weather"].side_effect = [valid_result, missing_result, valid_result]
+    entry = _entry(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data.coordinator
+    probability_id = "sensor.helsinki_precipitation_probability"
+    state = hass.states.get(probability_id)
+    assert state is not None and float(state.state) == 0.0
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    state = hass.states.get(probability_id)
+    temperature = hass.states.get("sensor.helsinki_temperature")
+    assert state is not None and state.state == STATE_UNAVAILABLE
+    assert temperature is not None and temperature.state != STATE_UNAVAILABLE
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    state = hass.states.get(probability_id)
+    assert state is not None and float(state.state) == 0.0
+
+
 @pytest.mark.parametrize(
     ("wind_gust", "wind_max", "expected"),
     [
@@ -189,11 +306,7 @@ def test_coarse_sensor_clears_value_when_forecast_is_empty() -> None:
     assert weather is not None
     coordinator = SimpleNamespace(
         time_step=3,
-        best_time=None,
-        best_temperature=None,
-        best_humidity=None,
-        best_precipitation=None,
-        best_wind_speed=None,
+        best_condition=BestCondition(BEST_CONDITION_NOT_AVAIL),
         get_weather=lambda: weather,
         get_forecasts=lambda: [],
     )
@@ -206,6 +319,36 @@ def test_coarse_sensor_clears_value_when_forecast_is_empty() -> None:
     sensor.update()
 
     assert sensor.native_value is None
+
+
+def test_probability_sensor_uses_configured_interval_sample_timestamp() -> None:
+    """Look up probability for the same forecast sample selected by sensor policy."""
+    weather = weather_from_fixture("forecast_normal.json")
+    forecast = forecast_from_fixture("forecast_normal.json")
+    assert weather is not None
+    selected = forecast.forecasts[3]
+    coordinator = SimpleNamespace(
+        time_step=3,
+        best_condition=BestCondition(BEST_CONDITION_NOT_AVAIL),
+        get_weather=lambda: weather,
+        get_forecasts=lambda: [selected],
+        get_current_probabilities=lambda: fmi_client.ForecastProbabilities(5.0, 1.0),
+        get_forecast_probabilities=lambda timestamp: (
+            fmi_client.ForecastProbabilities(37.0, 4.0)
+            if timestamp == selected.time
+            else fmi_client.ForecastProbabilities(None, None)
+        ),
+    )
+    sensor = cast(Any, object.__new__(FMIBestConditionSensor))
+    sensor.coordinator = coordinator
+    sensor.type = SensorType.PRECIPITATION_PROBABILITY
+    sensor._attr_native_value = None
+    sensor._attr_extra_state_attributes = {}
+    sensor.update_state_func = sensor._FMIBestConditionSensor__update_precipitation_probability
+
+    sensor.update()
+
+    assert sensor.native_value == 37.0
 
 
 async def test_two_locations_create_distinct_devices_and_sensor_ids(
@@ -420,6 +563,25 @@ def test_all_sensor_descriptions_have_current_units_and_types() -> None:
     assert descriptions["humidity"].device_class == "humidity"
     assert descriptions["rain"].device_class == "precipitation_intensity"
     assert descriptions["cloud_coverage"].native_unit_of_measurement == "%"
+    assert descriptions["feels_like"].device_class == "temperature"
+    assert descriptions["feels_like"].native_unit_of_measurement == "°C"
+    assert descriptions["feels_like"].icon == "mdi:thermometer"
+    assert descriptions["dew_point"].device_class == "temperature"
+    assert descriptions["dew_point"].icon == "mdi:thermometer-water"
+    assert descriptions["atmospheric_pressure"].device_class == "atmospheric_pressure"
+    assert descriptions["atmospheric_pressure"].native_unit_of_measurement == "hPa"
+    assert descriptions["atmospheric_pressure"].icon == "mdi:gauge"
+    for key in ("low_cloud_cover", "medium_cloud_cover", "high_cloud_cover"):
+        assert descriptions[key].device_class is None
+        assert descriptions[key].native_unit_of_measurement == "%"
+        assert descriptions[key].state_class == "measurement"
+        assert descriptions[key].icon == "mdi:weather-cloudy"
+    for key in ("precipitation_probability", "thunderstorm_probability"):
+        assert descriptions[key].device_class is None
+        assert descriptions[key].native_unit_of_measurement == "%"
+        assert descriptions[key].state_class == "measurement"
+    assert descriptions["precipitation_probability"].icon == "mdi:weather-rainy"
+    assert descriptions["thunderstorm_probability"].icon == "mdi:weather-lightning"
     assert descriptions["sea_level"].device_class == "distance"
     assert descriptions["sea_level"].native_unit_of_measurement == "cm"
     assert descriptions["place"].device_class is None

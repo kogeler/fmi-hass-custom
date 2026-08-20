@@ -2,7 +2,7 @@
 
 # Live FMI Tests
 
-Live suite last verified: 2026-08-19 against Home Assistant 2026.8.1 and
+Live suite last verified: 2026-08-20 against Home Assistant 2026.8.1 and
 `fmi-weather-client` 1.0.0. FMI WFS documentation/metadata last reviewed: 2026-08-17.
 
 ## Purpose And Selection
@@ -65,13 +65,26 @@ FMI currently publishes limits of 20,000 Download Service requests per day and 6
 
 The dependency probes require a non-empty canonical place, a resolved point inside a broad northern-European bound, non-empty forecast series, aware strictly ordered timestamps, at least one usable core meteorological value, broad physical plausibility for finite values, and an observation no more than 45 minutes old. The resolved point is validated through the same coordinate-weather boundary used by the config flow; no exact external label or coordinates are asserted. The selected client requests a 20-minute observation window at a 10-minute timestep, and the integration refreshes station data every 10 minutes; the 45-minute bound adds service/clock margin without accepting materially stale dashboard data. FMI/client `NaN` missing sentinels are treated as absent; infinity, non-numeric present values, and out-of-range finite values are contract failures.
 
+The Helsinki coordinate-current result requires finite 0–100 PoP and thunder probability. The
+Kilpisjärvi dependency forecast and Helsinki Home Assistant production coordinator require both
+probabilities for every sample on the first available future Europe/Helsinki local forecast date.
+This selects the current date when a future hour remains and the next represented date after the
+last hourly boundary, so the permanent probe is equally strict at every wall-clock time. These
+assertions use the production adapter and existing calls; they add no request and accept valid zero
+probabilities.
+
 The Home Assistant probe additionally requires:
 
 - loaded main and Kumpula observation weather entities;
-- current/observation temperature values matching their live source models within Home Assistant's 0.1-degree display precision;
+- current/observation temperature values matching their live source models within Home Assistant's
+  display precision, and current apparent temperature matching the client-derived feels-like value;
 - expected Home Assistant temperature/pressure units and an available temperature sensor;
+- available, finite, broadly plausible states for feels like, dew point, atmospheric pressure,
+  all three cloud layers, precipitation probability, and thunderstorm probability;
 - non-empty hourly and daily forecast service payloads with aware ordered timestamps;
-- finite, broadly plausible values exposed to dashboards;
+- finite apparent temperature and PoP on every first-available-future-local-day hourly forecast
+  item;
+- finite, broadly plausible values exposed to dashboards, including valid zero probabilities;
 - each daily precipitation value to equal the sum of matching hourly values under the configured
   `Europe/Helsinki` local-day rule, within the exact maximum error introduced when Home Assistant
   independently rounds every hourly value and the daily total to two decimal places;

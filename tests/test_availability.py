@@ -4,7 +4,8 @@
 """Availability and recovery tests for independent FMI data sources."""
 
 import logging
-from types import SimpleNamespace
+from datetime import UTC
+from types import MappingProxyType, SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock
 
@@ -480,6 +481,81 @@ async def test_primary_deadline_timeout_clears_stale_data_and_recovers(
     assert coordinator.get_weather() is weather
     assert coordinator.get_forecasts()
     assert coordinator.source_availability["primary update"] is True
+
+
+async def test_probability_supplements_replace_clear_and_recover_atomically(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Never retain probability values after their owning source is replaced or fails."""
+    weather = weather_from_fixture("forecast_normal.json")
+    forecast = forecast_from_fixture("forecast_normal.json")
+    assert weather is not None
+    first_time = forecast.forecasts[0].time.astimezone(UTC)
+    second_time = forecast.forecasts[1].time.astimezone(UTC)
+    current_probabilities = fmi_client.ForecastProbabilities(25.0, 5.0)
+    current_result = fmi_client.CurrentWeatherResult(weather, current_probabilities)
+    first_result = fmi_client.ForecastResult(
+        forecast,
+        MappingProxyType({first_time: fmi_client.ForecastProbabilities(30.0, 6.0)}),
+    )
+    second_result = fmi_client.ForecastResult(
+        forecast,
+        MappingProxyType({second_time: fmi_client.ForecastProbabilities(40.0, 7.0)}),
+    )
+    source_error = ClientError(400, "Synthetic probability owner failure")
+    mocks = _patch_fmi_sources(
+        monkeypatch,
+        weather=current_result,
+        forecast=first_result,
+    )
+    mocks["forecast"].side_effect = [first_result, second_result, source_error, first_result]
+    _patch_sea_level(monkeypatch)
+    entry = _entry(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data.coordinator
+    assert coordinator.get_weather() is weather
+    assert coordinator.get_current_probabilities() == current_probabilities
+    assert coordinator.get_forecast_probabilities(first_time) == (
+        fmi_client.ForecastProbabilities(30.0, 6.0)
+    )
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.get_forecast_probabilities(first_time) == (
+        fmi_client.ForecastProbabilities(None, None)
+    )
+    assert coordinator.get_forecast_probabilities(second_time) == (
+        fmi_client.ForecastProbabilities(40.0, 7.0)
+    )
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.get_forecasts() == []
+    assert coordinator.get_forecast_probabilities(second_time) == (
+        fmi_client.ForecastProbabilities(None, None)
+    )
+    assert coordinator.get_current_probabilities() == current_probabilities
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.get_forecasts()
+    assert coordinator.get_forecast_probabilities(first_time) == (
+        fmi_client.ForecastProbabilities(30.0, 6.0)
+    )
+
+    mocks["weather"].side_effect = source_error
+    mocks["place_observation"].side_effect = source_error
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert not coordinator.last_update_success
+    assert coordinator.get_weather() is None
+    assert coordinator.get_current_probabilities() == (fmi_client.ForecastProbabilities(None, None))
+    assert coordinator.get_forecast_probabilities(first_time) == (
+        fmi_client.ForecastProbabilities(None, None)
+    )
 
 
 async def test_observation_deadline_timeout_clears_stale_data_and_recovers(

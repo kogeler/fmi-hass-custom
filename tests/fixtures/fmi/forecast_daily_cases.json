@@ -8,6 +8,7 @@
   "lon": 24.94,
   "defaults": {
     "temperature": {"value": 0.0, "unit": "°C"},
+    "feels_like": {"value": -2.0, "unit": "°C"},
     "dew_point": {"value": -2.0, "unit": "°C"},
     "pressure": {"value": 1000.0, "unit": "hPa"},
     "humidity": {"value": 50.0, "unit": "%"},
@@ -17,6 +18,9 @@
     "wind_gust": {"value": 4.0, "unit": "m/s"},
     "symbol": {"value": 1.0, "unit": ""},
     "cloud_cover": {"value": 10.0, "unit": "%"},
+    "cloud_low_cover": {"value": 5.0, "unit": "%"},
+    "cloud_mid_cover": {"value": 10.0, "unit": "%"},
+    "cloud_high_cover": {"value": 15.0, "unit": "%"},
     "precipitation_amount": {"value": 0.0, "unit": "mm/h"}
   },
   "mixed_conditions": [
@@ -24,6 +28,7 @@
       "time": "2026-04-30T21:00:00+00:00",
       "values": {
         "temperature": -5.0,
+        "feels_like": -8.0,
         "dew_point": -7.0,
         "pressure": 1000.0,
         "humidity": 40.0,
@@ -39,6 +44,7 @@
       "time": "2026-04-30T22:00:00+00:00",
       "values": {
         "temperature": -2.0,
+        "feels_like": -5.0,
         "dew_point": -4.0,
         "pressure": 1002.0,
         "humidity": 60.0,
@@ -54,6 +60,7 @@
       "time": "2026-04-30T23:00:00+00:00",
       "values": {
         "temperature": -3.0,
+        "feels_like": -6.0,
         "dew_point": -3.0,
         "pressure": 1004.0,
         "humidity": 80.0,

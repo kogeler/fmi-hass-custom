@@ -6,7 +6,9 @@ This document defines the current support and protection boundaries for maintain
 when the supported Home Assistant line, dependency graph, external services, diagnostics, logging,
 or CI trust model changes. Keep historical audit narrative outside this current contract.
 
-Last verified: 2026-08-19.
+Last verified: 2026-08-20. Moving stable 2026.8.2 passed the complete 448-test suite; no newer
+installable prerelease was available, so the prerelease signal explicitly selected stable and
+skipped.
 
 ## Support Matrix
 
@@ -57,6 +59,9 @@ defined in `RUNTIME.md`.
   place/weather values, external payloads, entry IDs, unique IDs, and legacy coordinate identity.
 - Entity states intentionally expose configured place and weather data to the Home Assistant user;
   that user-facing behavior is distinct from logs and downloadable diagnostics.
+- Best-time state attributes expose only the selected place, aware time, and transparent weather
+  factors. They do not expose configured coordinates, immutable identity, raw forecast data, or an
+  internal rank/score.
 - Integration-owned external FMI XML, including place-resolution responses, is parsed with
   `xmltodict==1.0.4` on Expat 2.7.2 or newer,
   with entity declarations explicitly disabled and a 2 MiB parser-input ceiling. Expat has no

@@ -8,8 +8,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from types import MappingProxyType
 from typing import Any
 
 import fmi_weather_client as upstream
@@ -24,6 +26,37 @@ from .xml_parser import (
 )
 
 FORECAST_GUST_PARAMETER = "HourlyMaximumGust"
+PRECIPITATION_PROBABILITY_PARAMETER = "PoP"
+THUNDERSTORM_PROBABILITY_PARAMETER = "ProbabilityThunderstorm"
+FORECAST_EXTRA_PARAMETERS = (
+    FORECAST_GUST_PARAMETER,
+    PRECIPITATION_PROBABILITY_PARAMETER,
+    THUNDERSTORM_PROBABILITY_PARAMETER,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ForecastProbabilities:
+    """Validated probability values aligned to one forecast timestamp."""
+
+    precipitation: float | None
+    thunderstorm: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class CurrentWeatherResult:
+    """Keep forecast-backed current weather and its probabilities atomic."""
+
+    weather: models.Weather
+    probabilities: ForecastProbabilities
+
+
+@dataclass(frozen=True, slots=True)
+class ForecastResult:
+    """Keep one parsed forecast and its immutable probability map atomic."""
+
+    forecast: models.Forecast
+    probabilities_by_time: Mapping[datetime, ForecastProbabilities]
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,15 +156,36 @@ def _finite_number(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def _hourly_gusts_by_time(body: str) -> dict[datetime, float | None]:
-    """Extract the forecast producer's hourly gust field from a WFS response."""
+def _probability(value: Any) -> float | None:
+    """Return a finite percentage without clamping or inventing zero."""
+    number = _finite_number(value)
+    return number if number is not None and 0 <= number <= 100 else None
+
+
+def _utc_timestamp(value: object) -> datetime | None:
+    """Return an aware UTC datetime when the external timestamp is usable."""
+    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+        return None
+    return value.astimezone(UTC)
+
+
+def _aligned_value(values: list[str], index: int | None) -> str | None:
+    """Return one field-aligned row value when present."""
+    return values[index] if index is not None and index < len(values) else None
+
+
+def _supplements_by_time(
+    body: str,
+) -> tuple[dict[datetime, float | None], dict[datetime, ForecastProbabilities]]:
+    """Extract all integration-owned fields from one bounded WFS document."""
     document = parse_xml_document(body)
     field_names = [
         xml_attribute(field, "name") or "" for field in iter_xml_elements(document, "field")
     ]
-    if FORECAST_GUST_PARAMETER not in field_names:
-        return {}
-    gust_index = field_names.index(FORECAST_GUST_PARAMETER)
+    indexes = {
+        name: field_names.index(name) if name in field_names else None
+        for name in FORECAST_EXTRA_PARAMETERS
+    }
 
     positions = next(
         (
@@ -150,25 +204,47 @@ def _hourly_gusts_by_time(body: str) -> dict[datetime, float | None]:
         "",
     )
     gusts: dict[datetime, float | None] = {}
+    probabilities: dict[datetime, ForecastProbabilities] = {}
     for position_line, value_line in zip(
         positions.splitlines(), value_sets.splitlines(), strict=False
     ):
         position_parts = position_line.split()
         values = value_line.split()
-        if len(position_parts) < 3 or gust_index >= len(values):
+        if len(position_parts) < 3:
             continue
-        timestamp = datetime.fromtimestamp(int(position_parts[2]), UTC)
-        gusts[timestamp] = _finite_number(values[gust_index])
-    return gusts
+        try:
+            epoch_seconds = float(position_parts[2])
+            if not math.isfinite(epoch_seconds):
+                continue
+            timestamp = datetime.fromtimestamp(epoch_seconds, UTC)
+        except OverflowError, OSError, ValueError:
+            continue
+
+        gusts[timestamp] = _finite_number(_aligned_value(values, indexes[FORECAST_GUST_PARAMETER]))
+        probabilities[timestamp] = ForecastProbabilities(
+            precipitation=_probability(
+                _aligned_value(values, indexes[PRECIPITATION_PROBABILITY_PARAMETER])
+            ),
+            thunderstorm=_probability(
+                _aligned_value(values, indexes[THUNDERSTORM_PROBABILITY_PARAMETER])
+            ),
+        )
+    return gusts, probabilities
 
 
-def _parse_forecast_response(body: str, request_type: models.RequestType) -> models.Forecast:
-    """Parse with upstream and normalize forecast gust semantics."""
-    gusts = _hourly_gusts_by_time(body)
+def _hourly_gusts_by_time(body: str) -> dict[datetime, float | None]:
+    """Extract gusts for compatibility with the focused adapter contract tests."""
+    return _supplements_by_time(body)[0]
+
+
+def _parse_forecast_response(body: str, request_type: models.RequestType) -> ForecastResult:
+    """Parse with upstream and normalize all integration-owned supplements."""
+    gusts, probabilities = _supplements_by_time(body)
     forecast = upstream.forecast_parser.parse_fmi_response(body, request_type)
     normalized: list[models.WeatherData] = []
     for sample in forecast.forecasts:
-        hourly_gust = gusts.get(sample.time.astimezone(UTC))
+        timestamp = _utc_timestamp(getattr(sample, "time", None))
+        hourly_gust = gusts.get(timestamp) if timestamp is not None else None
         native_gust = _finite_number(sample.wind_gust.value)
         selected_gust = hourly_gust if hourly_gust is not None else native_gust
         normalized.append(
@@ -177,7 +253,10 @@ def _parse_forecast_response(body: str, request_type: models.RequestType) -> mod
                 wind_max=models.Value(hourly_gust, "m/s"),
             )
         )
-    return forecast._replace(forecasts=normalized)
+    return ForecastResult(
+        forecast=forecast._replace(forecasts=normalized),
+        probabilities_by_time=MappingProxyType(dict(probabilities)),
+    )
 
 
 def _request_by_coordinates(
@@ -186,8 +265,8 @@ def _request_by_coordinates(
     longitude: float,
     timestep_minutes: int,
     forecast_points: int,
-) -> models.Forecast:
-    """Make the selected client's request with the supported forecast gust field."""
+) -> ForecastResult:
+    """Make one selected-client request with all supported supplemental fields."""
     params = upstream.http._create_params(  # pylint: disable=protected-access
         request_type,
         timestep_minutes,
@@ -199,13 +278,19 @@ def _request_by_coordinates(
     if not isinstance(parameters, str):
         raise TypeError("fmi-weather-client returned non-string WFS parameters")
     parameter_names = parameters.split(",")
-    if FORECAST_GUST_PARAMETER not in parameter_names:
-        insert_at = (
-            parameter_names.index("WindGust") + 1
-            if "WindGust" in parameter_names
-            else len(parameter_names)
-        )
-        parameter_names.insert(insert_at, FORECAST_GUST_PARAMETER)
+    insert_at = (
+        parameter_names.index("WindGust") + 1
+        if "WindGust" in parameter_names
+        else len(parameter_names)
+    )
+    changed = False
+    for parameter in FORECAST_EXTRA_PARAMETERS:
+        if parameter in parameter_names:
+            continue
+        parameter_names.insert(insert_at, parameter)
+        insert_at += 1
+        changed = True
+    if changed:
         params["parameters"] = ",".join(parameter_names)
     body = upstream.http._send_request(params)  # pylint: disable=protected-access
     return _parse_forecast_response(body, request_type)
@@ -214,7 +299,7 @@ def _request_by_coordinates(
 async def async_weather_by_coordinates(
     latitude: float,
     longitude: float,
-) -> models.Weather | None:
+) -> CurrentWeatherResult | None:
     """Return forecast-current weather with a valid hourly gust when supplied."""
     forecast = await asyncio.to_thread(
         _request_by_coordinates,
@@ -224,13 +309,23 @@ async def async_weather_by_coordinates(
         10,
         4,
     )
-    if not forecast.forecasts:
+    if not forecast.forecast.forecasts:
         return None
-    return models.Weather(
-        forecast.place,
-        forecast.lat,
-        forecast.lon,
-        forecast.forecasts[-1],
+    sample = forecast.forecast.forecasts[-1]
+    timestamp = _utc_timestamp(sample.time)
+    probabilities = (
+        forecast.probabilities_by_time.get(timestamp, ForecastProbabilities(None, None))
+        if timestamp is not None
+        else ForecastProbabilities(None, None)
+    )
+    return CurrentWeatherResult(
+        weather=models.Weather(
+            forecast.forecast.place,
+            forecast.forecast.lat,
+            forecast.forecast.lon,
+            sample,
+        ),
+        probabilities=probabilities,
     )
 
 
@@ -239,8 +334,8 @@ async def async_forecast_by_coordinates(
     longitude: float,
     timestep_hours: int,
     forecast_points: int,
-) -> models.Forecast:
-    """Return point forecasts with normalized gust values."""
+) -> ForecastResult:
+    """Return point forecasts and timestamp-aligned probability supplements."""
     return await asyncio.to_thread(
         _request_by_coordinates,
         models.RequestType.FORECAST,
