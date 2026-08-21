@@ -1,5 +1,7 @@
 # Copyright (c) 2026 kogeler
 # SPDX-License-Identifier: MIT
+# Contracts: docs/contracts/MIGRATIONS.md, docs/contracts/SENSORS.md,
+# docs/contracts/TIME_AND_MISSING_DATA.md
 
 """Support FMI sensor entities."""
 

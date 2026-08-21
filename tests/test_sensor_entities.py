@@ -4,7 +4,7 @@
 """Home Assistant regressions for wind gusts and sensor location grouping."""
 
 import math
-from datetime import UTC
+from datetime import UTC, datetime
 from types import MappingProxyType, SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock
@@ -27,7 +27,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import slugify
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.fmi import FMIDataUpdateCoordinator
+from custom_components.fmi import FMIDataUpdateCoordinator, FMILightningStruct
 from custom_components.fmi import fmi as fmi_client
 from custom_components.fmi.best_time import BestCondition
 from custom_components.fmi.const import BEST_CONDITION_NOT_AVAIL, DOMAIN
@@ -36,6 +36,7 @@ from custom_components.fmi.sensor import (
     SEA_LEVEL_DESCRIPTION,
     SENSOR_DESCRIPTIONS,
     FMIBestConditionSensor,
+    FMILightningStrikesSensor,
     SensorType,
 )
 from tests.helpers.fmi import forecast_from_fixture, weather_from_fixture
@@ -590,3 +591,28 @@ def test_all_sensor_descriptions_have_current_units_and_types() -> None:
     assert descriptions["forecast_time"].device_class is None
     assert descriptions["best_time_of_day"].device_class is None
     assert descriptions["lightning_strikes"].native_unit_of_measurement is None
+
+
+def test_coincident_lightning_sensor_exposes_here_without_bearing() -> None:
+    """Expose coincident geometry without inventing an arbitrary compass bearing."""
+    sensor = cast(Any, object.__new__(FMILightningStrikesSensor))
+    sensor.coordinator = SimpleNamespace(
+        lightning_data=[
+            FMILightningStruct(
+                time=datetime(2026, 5, 20, 12, 0, tzinfo=UTC),
+                distance=0.0,
+                bearing=None,
+                direction="here",
+                strikes=1,
+                peak_current=-4.0,
+                cloud_cover=30.0,
+                ellipse_major=0.8,
+            )
+        ]
+    )
+
+    sensor.update()
+
+    assert sensor.native_value == "0.0 km · HERE"
+    assert sensor.extra_state_attributes["bearing"] is None
+    assert sensor.extra_state_attributes["direction"] == "here"

@@ -99,20 +99,24 @@
     },
     "step": {
       "user": {
-        "title": "FMI Options",
+        "title": "Finnish Meteorological Institute Options",
         "description": "Limits are used to determine the remaining Best Time Of The Day. Temperature limits apply to feels-like temperature.",
         "data": {
-          "offset": "Forecast Interval",
-          "min_relative_humidity": "Min Relative Humidity",
-          "max_relative_humidity": "Max Relative Humidity",
-          "min_temperature": "Min Feels-like Temperature",
-          "max_temperature": "Max Feels-like Temperature",
-          "min_wind_speed": "Min Wind Speed",
-          "max_wind_speed": "Max Wind Speed",
-          "min_precipitation": "Min Precipitation",
-          "max_precipitation": "Max Precipitation",
-          "daily_mode": "Daily mode",
-          "lightning_max_age_minutes": "Lightning maximum age in minutes"
+          "offset": "Forecast Interval h",
+          "forecast_days": "Num of forecast days",
+          "min_relative_humidity": "Min Relative Humidity %",
+          "max_relative_humidity": "Max Relative Humidity %",
+          "min_temperature": "Min Feels-like Temperature °C",
+          "max_temperature": "Max Feels-like Temperature °C",
+          "min_wind_speed": "Min Wind Speed m/s",
+          "max_wind_speed": "Max Wind Speed m/s",
+          "min_precipitation": "Min Precipitation mm",
+          "max_precipitation": "Max Precipitation mm",
+          "daily_mode": "Activate Daily forecast entity",
+          "lightning_sensor": "Activate Lightning sensor",
+          "lightning_radius": "Lightning sensor radius km",
+          "lightning_max_age_minutes": "Lightning maximum age in minutes",
+          "observation_station_id": "FMI's Observation Station ID"
         }
       }
     }

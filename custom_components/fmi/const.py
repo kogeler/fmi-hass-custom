@@ -1,3 +1,7 @@
+# Contracts: docs/contracts/MIGRATIONS.md, docs/contracts/OPTIONAL_SOURCES.md,
+# docs/contracts/RUNTIME.md, docs/contracts/SENSORS.md,
+# docs/contracts/TIME_AND_MISSING_DATA.md
+
 """Constants for the FMI Weather and Sensor integrations."""
 
 import logging

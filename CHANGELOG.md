@@ -22,6 +22,10 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Consolidated normative integration and repository behavior in a test-traceable contract catalog;
+  audited user and maintainer documentation against the current code, Make surface, and CI graph;
+  and added automated checks for documentation links, command references, translation structure,
+  and the completed-plan archive boundary.
 - Kept the Best-time entity, registry/unique IDs, customized entity ID, `HH:MM` selected state, and
   existing attributes/options, while interpreting its stored temperature range as acceptable
   feels-like temperature instead of air temperature.

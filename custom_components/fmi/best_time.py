@@ -1,5 +1,6 @@
 # Copyright (c) 2026 kogeler
 # SPDX-License-Identifier: MIT
+# Contracts: docs/contracts/TIME_AND_MISSING_DATA.md
 
 """Deterministic selection of the best remaining FMI forecast hour."""
 

@@ -260,3 +260,17 @@ def test_make_failure_exports_and_coverage_reports_are_unambiguous() -> None:
     assert "-s $(ARTIFACTS)/$(COVERAGE_TOTAL)" in makefile
     assert "rm -rf" not in makefile
     assert "rm -rf" not in container
+
+
+def test_image_archives_are_content_addressed_atomic_and_verified() -> None:
+    """Do not reuse, publish, or accept a partial or incorrectly tagged OCI cache."""
+    container = (ROOT / "make/container.mk").read_text(encoding="utf-8")
+    assert (
+        "TOOLBOX_KEY = $(shell cat $(TOOLBOX_CONTEXT) requirements-dev.txt | sha256sum" in container
+    )
+    assert "LOCK_KEY = $(shell cat $(LOCK_CONTEXT) | sha256sum" in container
+    assert "toolbox=%s\\nresolver=%s\\n" in container
+    assert "temporary='$(1).tmp.'$$$$" in container
+    assert "mv -f \"$$temporary\" '$(1)'" in container
+    assert "cached archive did not restore expected image" in container
+    assert "$(PODMAN) image exists '$(2)'" in container

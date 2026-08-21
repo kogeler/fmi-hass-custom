@@ -307,11 +307,24 @@ async def test_public_entity_and_forecast_contracts(
     assert lightning.attributes["distance"] == 12.5
     assert lightning.attributes["bearing"] == 135.0
     assert lightning.attributes["direction"] == "SE"
+    dynamic_lightning_attributes = {
+        "time",
+        "distance",
+        "bearing",
+        "direction",
+        "strikes",
+        "peak_current",
+        "cloud_cover",
+        "ellipse_major",
+    }
+    assert dynamic_lightning_attributes <= set(lightning.attributes)
     assert lightning.attributes["attribution"] == "Weather Data provided by FMI"
     assert "location" not in lightning.attributes
     assert len(lightning.attributes["OBSERVATIONS"]) == 1
-    assert lightning.attributes["OBSERVATIONS"][0]["direction"] == "SW"
-    assert "location" not in lightning.attributes["OBSERVATIONS"][0]
+    retained_observation = lightning.attributes["OBSERVATIONS"][0]
+    assert set(retained_observation) == dynamic_lightning_attributes
+    assert retained_observation["direction"] == "SW"
+    assert "location" not in retained_observation
     assert sea_level is not None and sea_level.state == "12.5"
     assert sea_level.attributes["unit_of_measurement"] == "cm"
     assert len(sea_level.attributes["FORECASTS"]) == 1

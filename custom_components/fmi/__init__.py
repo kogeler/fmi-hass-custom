@@ -1,5 +1,7 @@
 # Copyright (c) 2026 kogeler
 # SPDX-License-Identifier: MIT
+# Contracts: docs/contracts/AVAILABILITY.md, docs/contracts/OPTIONAL_SOURCES.md,
+# docs/contracts/RUNTIME.md
 
 """The FMI (Finnish Meteorological Institute) component."""
 

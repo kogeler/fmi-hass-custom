@@ -55,6 +55,11 @@ def _value(value: object, unit: str = "") -> fmi_models.Value:
     return fmi_models.Value(cast(Any, value), unit)
 
 
+def test_best_time_allowed_fmi_symbols_match_contract() -> None:
+    """Keep the complete eligible-condition gate explicit and reviewable."""
+    assert const.BEST_COND_SYMBOLS == [1, 2, 21, 3, 31, 32, 41, 42, 51, 52, 91, 92]
+
+
 @pytest.mark.parametrize(
     ("sunrise", "sunset"),
     [

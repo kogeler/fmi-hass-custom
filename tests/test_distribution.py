@@ -13,7 +13,15 @@ import sys
 from pathlib import Path
 
 import yaml
+from homeassistant.const import CONF_OFFSET
 from PIL import Image
+
+from custom_components.fmi import const
+from custom_components.fmi.sensor import (
+    LIGHTNING_DESCRIPTION,
+    SEA_LEVEL_DESCRIPTION,
+    SENSOR_DESCRIPTIONS,
+)
 
 ROOT = Path(__file__).parents[1]
 INTEGRATION = ROOT / "custom_components" / "fmi"
@@ -22,6 +30,15 @@ CURRENT_FACING_DOCS = (
     ROOT / "AGENTS.md",
     ROOT / "docs" / "USER_GUIDE.md",
 )
+
+
+def _json_key_tree(value: object) -> object:
+    """Return JSON object/list structure while ignoring translated leaf text."""
+    if isinstance(value, dict):
+        return {key: _json_key_tree(child) for key, child in value.items()}
+    if isinstance(value, list):
+        return [_json_key_tree(child) for child in value]
+    return None
 
 
 def test_hacs_repository_metadata_and_brand() -> None:
@@ -79,6 +96,43 @@ def test_public_support_contract_is_usable_and_privacy_safe() -> None:
     privacy_label = fields["privacy"]["attributes"]["options"][0]["label"]
     for prohibited_data in ("coordinates", "secrets", "tokens", "raw FMI responses"):
         assert prohibited_data in privacy_label
+
+
+def test_shipped_translation_keys_match_runtime_surfaces() -> None:
+    """Keep source strings and both shipped languages complete for current entities/options."""
+    strings = json.loads((INTEGRATION / "strings.json").read_text(encoding="utf-8"))
+    translations = [
+        json.loads((INTEGRATION / "translations" / f"{language}.json").read_text(encoding="utf-8"))
+        for language in ("en", "fi")
+    ]
+    source_tree = _json_key_tree(strings)
+    for translation_tree in map(_json_key_tree, translations):
+        assert translation_tree == source_tree
+    assert strings["entity"] == translations[0]["entity"]
+    assert strings["options"] == translations[0]["options"]
+
+    descriptions = (*SENSOR_DESCRIPTIONS, LIGHTNING_DESCRIPTION, SEA_LEVEL_DESCRIPTION)
+    translation_keys = {description.translation_key for description in descriptions}
+    assert None not in translation_keys
+    assert set(strings["entity"]["sensor"]) == translation_keys
+
+    assert set(strings["options"]["step"]["user"]["data"]) == {
+        CONF_OFFSET,
+        const.CONF_FORECAST_DAYS,
+        const.CONF_MIN_HUMIDITY,
+        const.CONF_MAX_HUMIDITY,
+        const.CONF_MIN_TEMP,
+        const.CONF_MAX_TEMP,
+        const.CONF_MIN_WIND_SPEED,
+        const.CONF_MAX_WIND_SPEED,
+        const.CONF_MIN_PRECIPITATION,
+        const.CONF_MAX_PRECIPITATION,
+        const.CONF_DAILY_MODE,
+        const.CONF_LIGHTNING,
+        const.CONF_LIGHTNING_DISTANCE,
+        const.CONF_LIGHTNING_MAX_AGE,
+        const.CONF_OBSERVATION_STATION,
+    }
 
 
 def test_copied_distribution_imports_from_empty_config(tmp_path: Path) -> None:

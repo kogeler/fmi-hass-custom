@@ -238,6 +238,54 @@ async def test_coarse_legacy_interval_preserves_hourly_forecast_source(
     assert len(coordinator.get_forecasts()) == 17
 
 
+async def test_normal_refresh_request_topology_and_deadlines_are_bounded(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Issue each configured source request once inside the coordinator deadlines."""
+    weather = weather_from_fixture("forecast_normal.json")
+    forecast = forecast_from_fixture("forecast_normal.json")
+    observation = weather_from_fixture("observation.json", "observation")
+    mocks = _patch_fmi_sources(
+        monkeypatch,
+        weather=weather,
+        forecast=forecast,
+        station_observation=observation,
+    )
+    lightning = AsyncMock()
+    sea_level = AsyncMock()
+    monkeypatch.setattr(
+        FMIDataUpdateCoordinator,
+        "_FMIDataUpdateCoordinator__async_update_lightning_strikes",
+        lightning,
+    )
+    monkeypatch.setattr(
+        FMIDataUpdateCoordinator,
+        "_FMIDataUpdateCoordinator__async_update_mareo_data",
+        sea_level,
+    )
+    deadlines: list[int] = []
+    original_timeout = integration.timeout
+
+    def recorded_timeout(seconds: int):
+        deadlines.append(seconds)
+        return original_timeout(seconds)
+
+    monkeypatch.setattr(integration, "timeout", recorded_timeout)
+    entry = _entry(hass, station_id=101004, lightning=True)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    mocks["weather"].assert_awaited_once_with(60.17, 24.94)
+    mocks["forecast"].assert_awaited_once_with(60.17, 24.94, 1, 96)
+    mocks["place_observation"].assert_not_awaited()
+    mocks["station_observation"].assert_awaited_once_with(101004)
+    lightning.assert_awaited_once()
+    sea_level.assert_awaited_once()
+    assert deadlines == [40, 40]
+
+
 async def test_both_current_sources_fail_initial_setup(
     hass: HomeAssistant,
     monkeypatch,

@@ -1,5 +1,7 @@
 # Copyright (c) 2026 kogeler
 # SPDX-License-Identifier: MIT
+# Contracts: docs/contracts/COMPATIBILITY_SECURITY.md, docs/contracts/MIGRATIONS.md,
+# docs/contracts/RECONFIGURATION.md
 
 """Config flow for the Finnish Meteorological Institute integration."""
 

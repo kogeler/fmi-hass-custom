@@ -1,5 +1,6 @@
 # Copyright (c) 2026 kogeler
 # SPDX-License-Identifier: MIT
+# Contracts: docs/contracts/OPTIONAL_SOURCES.md
 
 """Pure local geometry for FMI lightning observations."""
 

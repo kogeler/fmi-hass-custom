@@ -76,10 +76,9 @@ Create and download a Home Assistant backup before an upgrade.
 - **Manual:** replace the complete `custom_components/fmi/` directory with the directory from the
   new release archive, then restart Home Assistant. Do not remove the integration entry first.
 
-Upgrading from the legacy integration line migrates config and registry identity in place.
-Existing unique IDs and customized entity IDs are retained. Some exact legacy generated sensor IDs
-can be renamed to a location-aware default when that target is free; ambiguous, customized, or
-conflicting IDs are left unchanged.
+Upgrading from the legacy integration line migrates config and registry identity in place. Existing
+customized IDs remain usable; the exact compatibility guarantees and conservative rename boundary
+are maintained in the [migration contract](contracts/MIGRATIONS.md).
 
 The lightning direction release intentionally changes the existing lightning sensor value and
 attributes in place. An old address/native-state comparison or template reading `location` must be
@@ -146,19 +145,17 @@ The dedicated numeric sensors can be graphed, recorded, and used directly in aut
 | Low cloud cover | % | Forecast fraction of the sky covered by low cloud. |
 | Medium cloud cover | % | Forecast fraction covered by middle cloud. |
 | High cloud cover | % | Forecast fraction covered by high cloud. |
+| Rain | mm/h | FMI one-hour precipitation value exposed as a precipitation-intensity sensor. Weather entities expose the same one-hour forecast quantity as accumulated `mm`, as required by Home Assistant's weather schema. |
 | Precipitation probability | % | FMI `PoP`: probability of at least 0.1 mm during the preceding forecast hour. It is a chance, not a precipitation amount. |
 | Thunderstorm probability | % | FMI forecast probability of thunder at the point/hour. It does not mean lightning has been observed. |
 
-Cloud layers can overlap vertically, so low, medium, and high percentages must not be added. A
-valid `0%` is a real forecast value; `unavailable` means that field was missing or invalid. A
-missing metric does not disable unrelated sensors or optional sources, and a later valid refresh
-recovers the same entity without reload.
+Cloud layers can overlap vertically, so low, medium, and high percentages must not be added. The
+authoritative value/range/availability rules are `SNS-001` and `SNS-002` in the
+[sensor contract](contracts/SENSORS.md).
 
-The main weather entity exposes apparent temperature for current conditions when finite. A
-configured observation weather entity exposes it only when the selected client supplies a finite
-observation value. Hourly forecasts include apparent temperature and PoP. Daily forecasts include
-the maximum apparent temperature for that local day, but no daily PoP: hourly event probabilities
-cannot be combined correctly without a dependence model that FMI does not provide.
+The main and station weather entities expose only fields supported by their selected source.
+Hourly/daily field and aggregation rules, including why daily PoP is absent, are maintained in the
+[forecast-semantics contract](contracts/FORECAST_SEMANTICS.md).
 
 Thunderstorm probability and the optional lightning sensor answer different questions. The
 probability is a forecast for an hour; the lightning sensor reports recent FMI-observed strike
@@ -166,29 +163,14 @@ groups within the configured radius and age.
 
 ## Best Time Of Day
 
-**Best time of day** selects one complete forecast hour that is not in the past, belongs to the
-current Home Assistant local calendar day, and matches the configured forecast interval. It never
-uses current weather/current time as a fallback and never scans a later day.
-
-An hour must have finite condition, air temperature, feels-like temperature, humidity, sustained
-wind, precipitation amount, PoP, and thunderstorm probability. It must also pass the configured
-feels-like temperature, humidity, wind, and precipitation limits and the integration's accepted
-weather-condition filter. Eligible hours are ordered deterministically by:
-
-1. lower thunderstorm probability;
-2. feels-like temperature closer to the midpoint of the configured temperature range;
-3. lower precipitation probability;
-4. lower precipitation amount;
-5. earlier time.
-
-The selected state remains `HH:MM`. Its attributes are `location`, aware `time`, air
-`temperature`, `apparent_temperature`, `relative_humidity`, `wind_speed`, `precipitation`,
-`precipitation_probability`, and `thunderstorm_probability`.
-
-A healthy forecast with no remaining or acceptable hour is available with backend state
-`no_suitable_time` (translated in the frontend) and no selection attributes. Failed, empty,
-timestamp-unusable, or entirely incomplete forecast data makes the entity `unavailable`. Both
-states clear an earlier selection and can recover on the next refresh.
+**Best time of day** chooses a remaining current-day forecast hour under your configured
+feels-like temperature, humidity, wind, and precipitation limits. It prefers lower thunder/rain
+risk and feels-like comfort without inventing a hidden weighted score. Only the fixed FMI weather
+symbols listed by the contract are eligible; thunderstorm and other excluded conditions are
+rejected before ranking. The exact candidate fields, hard gates, symbol list, tie-break order,
+state/attribute schema, `no_suitable_time` classification, and unavailable behavior are maintained
+in `TIM-003` through `TIM-007` of the
+[time and missing-data contract](contracts/TIME_AND_MISSING_DATA.md).
 
 This is a transparent convenience ordering under your configured limits, not a medical, heat-,
 lightning-, or activity-safety score. It does not model direct sun, radiant temperature, clothing,
@@ -203,7 +185,7 @@ map position during setup; they are not substituted for the entry's point. The c
 is an inclusive circle, and the maximum age controls both the FMI query window and local freshness
 filter.
 
-The current state has three distinct meanings:
+The current state has three user-facing meanings:
 
 - A successful response with no qualifying strike is available with backend state `no_strikes`.
   The frontend displays **No lightning strikes** in English or **Ei salamaniskuja** in Finnish.
@@ -212,12 +194,10 @@ The current state has three distinct meanings:
 - A transport, timeout, unsafe payload, parser, or unusable response is `unavailable`. Old strike
   state and dynamic attributes are cleared; the next valid refresh recovers without a reload.
 
-For a non-empty result, the primary attributes are `time`, numeric kilometer `distance`,
-`direction` (`N`, `NE`, `E`, `SE`, `S`, `SW`, `W`, `NW`, or `here`), numeric degree `bearing`
-(`null` for `here`), `strikes`, `peak_current`, `cloud_cover`, and `ellipse_major`.
-`OBSERVATIONS` contains the same fields for retained secondary groups. No state or row contains an
-address, raw coordinates, or the old `location` field. FMI remains the only lightning network
-provider.
+The exact state/attribute schema, direction sectors, empty/failure behavior, and coordinate boundary
+are maintained in `SNS-006` of the [sensor contract](contracts/SENSORS.md) and `OPT-003` through
+`OPT-006` of the [optional-source contract](contracts/OPTIONAL_SOURCES.md). FMI remains the only
+lightning network provider.
 
 Use attributes for automations instead of parsing the display state. For example:
 
@@ -294,7 +274,6 @@ entity: weather.helsinki_kaisaniemi_observation
 name: Kaisaniemi observation
 show_current: true
 show_forecast: false
-forecast_type: hourly
 ```
 
 ### Optional Lightning And Sea Level
@@ -357,7 +336,7 @@ needed for validation, weather, lightning-area, and sea-level requests. Search t
 it is not stored in the config entry, logs, or diagnostics. FMI lightning strike coordinates are
 processed transiently in memory for local distance/bearing calculation. They are not sent to a
 second provider and are not exposed in state, attributes, logs, or diagnostics. See the
-[security and privacy contract](maintenance/COMPATIBILITY_SECURITY.md).
+[security and privacy contract](contracts/COMPATIBILITY_SECURITY.md).
 
 Documentation references verified 2026-08-20:
 

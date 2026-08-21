@@ -1,5 +1,7 @@
 # Copyright (c) 2026 kogeler
 # SPDX-License-Identifier: MIT
+# Contracts: docs/contracts/COMPATIBILITY_SECURITY.md, docs/contracts/RUNTIME.md,
+# docs/contracts/SENSORS.md
 
 """Narrow compatibility boundary for the selected FMI weather client."""
 

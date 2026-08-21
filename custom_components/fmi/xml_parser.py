@@ -1,5 +1,6 @@
 # Copyright (c) 2026 kogeler
 # SPDX-License-Identifier: MIT
+# Contracts: docs/contracts/COMPATIBILITY_SECURITY.md
 
 """Bounded XML parsing for data received from FMI."""
 

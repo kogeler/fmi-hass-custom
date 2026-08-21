@@ -17,8 +17,9 @@ It is not bundled with Home Assistant Core and does not claim an official Core q
 
 ## Main Limitations
 
-- Data depends on FMI and network availability. Forecast/current data refresh every 30 minutes;
-  configured station observations refresh every 10 minutes.
+- Data depends on FMI and network availability. Polling cadence and source ownership are defined by
+  [`RUN-002`](docs/contracts/RUNTIME.md) and the availability behavior by
+  [the `AVL-*` assertions](docs/contracts/AVAILABILITY.md).
 - The supported product geography is Finland. An FMI place search result outside Finland does not
   expand that boundary, and optional station or sea-level products can have narrower local
   coverage.
@@ -45,21 +46,23 @@ It is not bundled with Home Assistant Core and does not claim an official Core q
 
 ### Maintainers
 
+- [Normative contract catalog and automated traceability](docs/contracts/README.md)
+- [Completed-plan archive and historical evidence](plans/README.md)
 - [Development environment and commands](docs/maintenance/DEVELOPMENT.md)
 - [Dependency ownership and review](docs/maintenance/DEPENDENCIES.md)
 - [CI and release gates](docs/maintenance/CI.md)
 - [Home Assistant release maintenance](docs/maintenance/HA_RELEASE_MAINTENANCE.md)
 - [HACS repository and release model](docs/maintenance/HACS_RELEASES.md)
-- [Runtime architecture and invariants](docs/maintenance/RUNTIME.md)
-- [Source availability](docs/maintenance/AVAILABILITY.md)
-- [Optional lightning and sea-level sources](docs/maintenance/OPTIONAL_SOURCES.md)
-- [Live FMI tests](docs/maintenance/LIVE_TESTS.md)
-- [Forecast semantics](docs/maintenance/FORECAST_SEMANTICS.md)
-- [Time and missing-data policy](docs/maintenance/TIME_AND_MISSING_DATA.md)
-- [Sensor and gust contract](docs/maintenance/SENSORS.md)
-- [Migration guarantees](docs/maintenance/MIGRATIONS.md)
-- [Location reconfiguration and identity](docs/maintenance/RECONFIGURATION.md)
-- [Compatibility, security, and privacy contract](docs/maintenance/COMPATIBILITY_SECURITY.md)
+- [Runtime change guide](docs/maintenance/RUNTIME.md)
+- [Availability change guide](docs/maintenance/AVAILABILITY.md)
+- [Optional-source change guide](docs/maintenance/OPTIONAL_SOURCES.md)
+- [Live-test runbook](docs/maintenance/LIVE_TESTS.md)
+- [Forecast-semantics change guide](docs/maintenance/FORECAST_SEMANTICS.md)
+- [Time and missing-data change guide](docs/maintenance/TIME_AND_MISSING_DATA.md)
+- [Sensor and supplement change guide](docs/maintenance/SENSORS.md)
+- [Migration change guide](docs/maintenance/MIGRATIONS.md)
+- [Reconfiguration change guide](docs/maintenance/RECONFIGURATION.md)
+- [Compatibility, security, and privacy review](docs/maintenance/COMPATIBILITY_SECURITY.md)
 - [License](LICENSE)
 
 ## Maintainer

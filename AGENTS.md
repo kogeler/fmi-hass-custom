@@ -20,13 +20,13 @@ correctness, compatibility, testability, migration, security, privacy, or valida
 - `custom_components/fmi/`: distributed integration, manifest, translations, and brand asset.
 - `tests/`: offline unit/contract/HA integration tests plus explicitly marked live probes.
 - `docs/USER_GUIDE.md`: end-user installation, configuration, and dashboard guidance.
-- `docs/maintenance/`: current technical contracts for future maintenance; never store plan
-  progress, session reports, or before/after summaries here.
-- `plans/P01/`: completed implementation plan (`PLAN.md`), baseline, decisions, verification, and
-  historical handoffs. Use these only when the reason or history of a current contract matters.
-- `plans/P02/`: completed location-selection plan, verified baseline, and execution reports.
-- `plans/P03/`: completed local-lightning and availability plan, verified baseline, and execution
-  reports.
+- `docs/contracts/`: only normative source for current integration/repository behavior; every
+  assertion has a stable ID and links to its automated test evidence.
+- `docs/maintenance/`: rationale, change checklists, runbooks, and external references that link to
+  the normative contracts; never duplicate contract assertions or store session reports here.
+- `plans/README.md`: archive boundary and index for completed P01–P04 plans, dated baselines,
+  decisions, verification, and historical handoffs. Use these only when the reason or history of a
+  current contract matters.
 - `.github/scripts/` and `.github/workflows/`: tested Python CI helpers and GitHub Actions policy.
 - `containers/toolbox/` and `make/container.mk`: content-addressed rootless Podman environment,
   tar-stream transport, confinement policy, and OCI cache operations.
@@ -34,22 +34,19 @@ correctness, compatibility, testability, migration, security, privacy, or valida
   the three root `requirements*.txt` files are generated hash locks.
 - `.version`: only human-maintained release version; the manifest is a synchronized mirror.
 
-## Maintenance Documentation Map
+## Contract Documentation Map
 
-Read the smallest relevant set before changing code, then update the owning document when its
-current contract changes. These files describe what must remain true, not how completed plans were
-executed.
+Read the smallest relevant contract set before changing code. Update the owning assertion and its
+test evidence together when behavior deliberately changes. Contract IDs are permanent; maintenance
+runbooks and implementation modules link to them instead of restating them.
 
 | File | Read or update when working on |
 |---|---|
 | `AVAILABILITY.md` | Setup success, independent source failures, stale-data clearing, recovery, or entity availability |
-| `CI.md` | Workflow triggers, permissions, required checks, PR-body automation, branch protection, or release gates |
-| `COMPATIBILITY_SECURITY.md` | Supported HA/Python matrix, privacy boundaries, accepted vulnerabilities, diagnostics, logging, or workflow trust |
-| `DEPENDENCIES.md` | Requirement-file ownership, selected versions, action/image pins, vulnerability/license policy, or lock changes |
-| `DEVELOPMENT.md` | Podman environment, Make targets, dependency regeneration, xdist policy, formatting, linting, or repository layout |
+| `CI.md` | Workflow triggers, permissions, required checks, PR-body automation, versioning, HACS layout, or release gates |
+| `COMPATIBILITY_SECURITY.md` | HA/Python reference boundaries, privacy, diagnostics, logging, XML safety, or data disclosure |
+| `DEPENDENCIES.md` | Manifest ownership, locks, resolver bootstrap, audit, Dependency Submission, confinement, or xdist policy |
 | `FORECAST_SEMANTICS.md` | Hourly/daily schema, timestamps, local-day grouping, precipitation, aggregation, or condition precedence |
-| `HA_RELEASE_MAINTENANCE.md` | New HA stable releases, reference-lock refreshes, verification, or release/no-release decisions |
-| `HACS_RELEASES.md` | HACS layout/discovery, `.version`, manifest synchronization, changelog rules, tags, releases, or remote settings |
 | `LIVE_TESTS.md` | Public live locations, request budget, network marker isolation, assertions, or failure classification |
 | `MIGRATIONS.md` | Config-entry versioning, registry migration, legacy IDs, collisions, daily entity retention, or upgrade fixtures |
 | `OPTIONAL_SOURCES.md` | Lightning/sea-level HTTP, freshness, bounding boxes, local geometry, optional availability, or coordinate disclosure |
@@ -58,7 +55,9 @@ executed.
 | `SENSORS.md` | Sensor metadata, gust-source adapter, device/entity naming, native units, or conservative ID migration |
 | `TIME_AND_MISSING_DATA.md` | Home Assistant timezone use, sun events, calendar/DST boundaries, timestamps, or malformed FMI values |
 
-Paths in this table are relative to `docs/maintenance/`.
+Paths in this table are relative to `docs/contracts/`. Use the same-named file under
+`docs/maintenance/` for change procedures/rationale; use `DEVELOPMENT.md`, `HACS_RELEASES.md`, and
+`HA_RELEASE_MAINTENANCE.md` there for their specialized runbooks.
 
 ## Commands
 
@@ -86,6 +85,7 @@ artifact rules, then use that target. Read-only host inspection with tools such 
 | Bandit / shell checks | `make bandit` / `make syntax` / `make shellcheck` |
 | Fast offline tests | `make test-fast` |
 | Full offline coverage | `make test-full` |
+| Prepare immutable validator images | `make validator-images` |
 | Home Assistant/hassfest/actionlint validation | `make validate` |
 | Version metadata | `make version-check` |
 | Prove network blocking | `make test-network-block` |
@@ -126,7 +126,7 @@ outdated-package inventory, and marked live probes use explicit purpose-limited 
 Ruff alone uses the hash-locked host `venv-lint/`. Source is streamed into private tmpfs; never
 bind-mount the checkout, Git metadata, a host virtual environment, or a Podman socket. Only tests
 marked `live` may contact FMI, using public test locations and the request budget in
-`docs/maintenance/LIVE_TESTS.md`. Never use owner coordinates or captured private payloads.
+`docs/contracts/LIVE_TESTS.md`. Never use owner coordinates or captured private payloads.
 
 Add coverage proportional to risk. Public behavior, lifecycle, registry migration, source
 availability, and user-visible fixes require Home Assistant-level regressions. Do not weaken an
@@ -135,55 +135,24 @@ passed unless that exact command/run completed successfully.
 
 ## Home Assistant Runtime Rules
 
-- Store per-entry runtime ownership in typed `ConfigEntry.runtime_data`; unload and reload must
-  remove listeners and preserve independent entries.
-- Use coordinators and `CoordinatorEntity` lifecycle APIs. Entity properties read cached memory and
-  do no I/O.
-- Keep forecast/current, configured station observations, lightning, and sea-level failure
-  boundaries independent. Clear invalid stale data and allow later coordinator refreshes to recover.
-- Use Home Assistant's shared async HTTP session and bounded timeouts for integration-owned I/O.
-  Move unavoidable blocking dependency or parser work to the executor; never block the event
-  loop or swallow cancellation.
-- Keep logs and diagnostics free of configured coordinates, raw external responses, and
-  coordinate-derived identity.
-
-Hourly/daily schema, timezone, precipitation, condition, wind, and missing-data rules are
-authoritative in `docs/maintenance/FORECAST_SEMANTICS.md`. Availability, runtime, and
-optional-source contracts are in `AVAILABILITY.md`, `RUNTIME.md`, and `OPTIONAL_SOURCES.md` in the
-same directory.
+Obey the linked `RUN-*`, `AVL-*`, `FCS-*`, `SNS-*`, `TIM-*`, `OPT-*`, and `CSP-*` assertions in
+`docs/contracts/`. Do not add a runtime behavior comment or maintenance rule that restates one of
+those assertions; link its ID instead. Public behavior, lifecycle, and privacy changes require
+Home Assistant-level evidence linked from the owning assertion.
 
 ## Identity And Migration
 
-Config entry version 2 separates immutable `entity_identity` from mutable coordinates and display
-place. Never change existing entity/device unique IDs merely to improve naming. Preserve customized,
-ambiguous suffixed, and collision-affected entity IDs. Rename only an exact known legacy generated
-default when the documented target is free. Reconfigure one entry in place and reject duplicate
-coordinates. Follow `docs/maintenance/MIGRATIONS.md` and `RECONFIGURATION.md`.
+Follow `docs/contracts/MIGRATIONS.md` and `docs/contracts/RECONFIGURATION.md`. Any identity,
+registry, collision, or reconfiguration change must update the owning `MIG-*`/`RCF-*` assertion and
+its Home Assistant test evidence before implementation is considered complete.
 
 ## Dependencies And Releases
 
-Root `pyproject.toml` owns exact integration runtime dependencies and the complete direct `dev`
-set. `tools/lint/pyproject.toml` owns only Ruff. Root `requirements.txt`,
-`requirements-dev.txt`, and `requirements-lint.txt` are generated `pip-compile` outputs with
-SHA-256 hashes and must not be hand-edited; no other requirements manifests or `.in` files are
-maintained. The resolver's exact wheel-only bootstrap is the sole inline self-hosting exception in
-the toolbox Containerfile. `make dependency-snapshot` derives the three GitHub Dependency
-Submission manifests from those locks inside the offline toolbox; only the dedicated trusted
-direct-`master`-push workflow uploads them with job-scoped `contents: write`. Moving compatibility
-inputs are derived unpinned from PEP 621 inside the resolver container and publish only ignored run
-evidence.
-Follow `docs/maintenance/DEVELOPMENT.md` for updates and review both vulnerability and license
-results.
-Support, privacy, and accepted-risk boundaries are in `docs/maintenance/COMPATIBILITY_SECURITY.md`.
-
-Release-bearing PRs to `master` must increment `.version`, synchronize the manifest, and add the
-matching dated changelog section. A Home Assistant reference-only refresh that meets every
-maintenance-only condition in `HA_RELEASE_MAINTENANCE.md` leaves the version unchanged and records
-notable work under `Unreleased`; the owner manually bypasses only the version-increment check.
-Required CI otherwise includes offline coverage, bounded live FMI, validation, dependency risk,
-CodeQL, and current stable compatibility; prerelease compatibility is informational. A successful
-version-incrementing `master` push publishes the tag and GitHub Release only after trusted repeated
-gates. Do not publish manually. See `docs/maintenance/CI.md` and `HACS_RELEASES.md`.
+Follow `docs/contracts/DEPENDENCIES.md`, `docs/contracts/COMPATIBILITY_SECURITY.md`, and
+`docs/contracts/CI.md` for normative dependency, support, privacy, workflow, version, and
+publication requirements. Operational procedures are in `docs/maintenance/DEVELOPMENT.md`,
+`DEPENDENCIES.md`, `CI.md`, `HACS_RELEASES.md`, and `HA_RELEASE_MAINTENANCE.md`. Review both
+vulnerability and license results. Never publish manually.
 
 ## Working Protocol
 
@@ -197,7 +166,7 @@ example through command-line `-c`, environment variables, or repository-local co
 Commit messages and suggested commit messages must describe the completed change without plan,
 session, or step identifiers such as `P03`, `S04`, or `P03-S04`.
 
-For follow-up maintenance, current code, tests, and the owning `docs/maintenance/` contract are the
+For follow-up maintenance, current code, tests, and the owning `docs/contracts/` assertion are the
 sources of truth. Use `plans/*` only to understand historical decisions and verification; do
 not extend it as a tracker for unrelated future work. A new implementation plan
 gets its own plan/handoff namespace. When execution finds a plan error or deliberately departs from
