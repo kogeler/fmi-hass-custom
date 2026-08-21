@@ -16,6 +16,9 @@ All notable changes to this project are documented in this file.
   PoP to Home Assistant's standard precipitation-probability forecast field. Daily PoP remains
   omitted because hourly event probabilities cannot be combined without an unavailable dependence
   model.
+- Added an optional Detailed Weather Forecast dashboard example that exposes more of those FMI
+  values than Home Assistant's fixed standard weather-card layout: current metric chips, expandable
+  cloud-layer details, hourly apparent temperature, and additional hourly/daily forecast details.
 - Made **Best time of day** choose a remaining current-day hour using transparent thunder risk,
   feels-like comfort, rain chance/amount, and earliest-time priorities under the user's configured
   limits.

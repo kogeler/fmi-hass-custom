@@ -214,8 +214,10 @@ closest approach, or provide safety guidance.
 
 ## Dashboard Examples
 
-Replace every example entity ID with the exact ID from your entity registry. The examples use only
-standard Home Assistant cards.
+Replace every example entity ID with the exact ID from your entity registry. The first examples
+use only standard Home Assistant cards. The optional Detailed Weather Forecast example uses an
+independently maintained dashboard card to expose more of the integration's current and forecast
+metrics in one weather view.
 
 ### Current Conditions And Daily Forecast
 
@@ -262,6 +264,123 @@ entities:
   - entity: sensor.helsinki_thunderstorm_probability
   - entity: sensor.helsinki_best_time_of_day
 ```
+
+### More Detailed Weather Card (Optional)
+
+Home Assistant's standard weather card has a fixed presentation and does not render every current
+or forecast field supplied by this integration. The independently maintained
+[Detailed Weather Forecast Card](https://github.com/tobiasb80/detailed-weather-forecast) can add:
+
+- current feels-like temperature, precipitation probability, and thunderstorm probability as
+  always-visible header chips;
+- dew point, pressure, and low/medium/high cloud-cover sensors in expandable current details;
+- apparent temperature below every hourly and daily forecast item;
+- dew point, pressure, and total cloud coverage in the expandable hourly and daily details.
+
+Add the repository URL above under **HACS > Custom repositories** with category **Dashboard**,
+install the card, and refresh the browser. HACS normally registers its dashboard resource. If the
+card type is still unavailable, add `/hacsfiles/detailed-weather-forecast/detailed-weather-forecast.js`
+as a JavaScript module under **Settings > Dashboards > Resources**.
+
+This card is optional and is not distributed or maintained by the FMI integration. Its
+installation, updates, and card-specific support remain with its own project. The following
+configuration uses only generic example IDs:
+
+```yaml
+type: custom:detailed-weather-forecast-card
+entity: weather.helsinki
+name: Helsinki
+
+show_header: true
+show_background: false
+compact_header_chips: false
+hourly_forecast: true
+daily_forecast: true
+
+header_chips:
+  - type: attribute
+    attribute: apparent_temperature
+    name: Feels like
+    icon: mdi:thermometer
+  - type: entity
+    entity: sensor.helsinki_precipitation_probability
+    name: Rain probability
+    icon: mdi:weather-rainy
+  - type: entity
+    entity: sensor.helsinki_thunderstorm_probability
+    name: Thunder
+    icon: mdi:weather-lightning
+
+header_info:
+  - type: attribute
+    attribute: dew_point
+    name: Dew point
+    icon: mdi:thermometer-water
+  - type: attribute
+    attribute: pressure
+    name: Air pressure
+    icon: mdi:gauge
+  - type: entity
+    entity: sensor.helsinki_low_cloud_cover
+    name: Low cloud cover
+    icon: mdi:weather-cloudy
+  - type: entity
+    entity: sensor.helsinki_medium_cloud_cover
+    name: Medium cloud cover
+    icon: mdi:weather-cloudy
+  - type: entity
+    entity: sensor.helsinki_high_cloud_cover
+    name: High cloud cover
+    icon: mdi:weather-cloudy
+
+hourly_extra_attribute:
+  attribute: apparent_temperature
+  color: var(--secondary-text-color)
+
+hourly_info:
+  - attribute: apparent_temperature
+    name: Feels like
+    icon: mdi:thermometer
+  - attribute: dew_point
+    name: Dew point
+    icon: mdi:thermometer-water
+  - attribute: pressure
+    name: Air pressure
+    icon: mdi:gauge
+  - attribute: cloud_coverage
+    name: Cloud cover
+    icon: mdi:weather-cloudy
+
+daily_extra_attribute:
+  attribute: apparent_temperature
+  color: var(--secondary-text-color)
+
+daily_info:
+  - attribute: apparent_temperature
+    name: Maximum feels like
+    icon: mdi:thermometer
+  - attribute: dew_point
+    name: Mean dew point
+    icon: mdi:thermometer-water
+  - attribute: pressure
+    name: Mean air pressure
+    icon: mdi:gauge
+  - attribute: cloud_coverage
+    name: Mean cloud cover
+    icon: mdi:weather-cloudy
+```
+
+The hourly weather forecast already carries apparent temperature, precipitation probability, dew
+point, pressure, and total cloud coverage, so the card can render them for each forecast item. The
+daily apparent-temperature value is the day's maximum; daily pressure, dew point, and total cloud
+coverage are means. Daily precipitation probability is intentionally absent because it cannot be
+derived correctly from the available hourly event probabilities.
+
+Low/medium/high cloud cover and thunderstorm probability are currently separate forecast-backed
+sensor states rather than fields in Home Assistant's hourly forecast schema. The example therefore
+shows them for the sensor's selected current forecast hour, not as a separate value for every
+future hour. Dashboard YAML cannot change that data boundary. Click the header condition to reveal
+`header_info`, and click an hourly or daily item to reveal its configured detail list.
 
 ### Station Observation
 
