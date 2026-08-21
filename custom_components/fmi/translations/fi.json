@@ -65,14 +65,25 @@
             "place": {"name": "Sijainti"},
             "condition": {"name": "Säätila"},
             "temperature": {"name": "Lämpötila"},
+            "feels_like": {"name": "Tuntuu kuin"},
+            "dew_point": {"name": "Kastepiste"},
+            "atmospheric_pressure": {"name": "Ilmanpaine"},
             "wind_speed": {"name": "Tuulen nopeus"},
             "wind_direction": {"name": "Tuulen suunta"},
             "wind_gust": {"name": "Puuska"},
             "humidity": {"name": "Ilmankosteus"},
             "cloud_coverage": {"name": "Pilvisyys"},
+            "low_cloud_cover": {"name": "Alapilvisyys"},
+            "medium_cloud_cover": {"name": "Keskipilvisyys"},
+            "high_cloud_cover": {"name": "Yläpilvisyys"},
             "rain": {"name": "Sade"},
+            "precipitation_probability": {"name": "Sateen todennäköisyys"},
+            "thunderstorm_probability": {"name": "Ukkosen todennäköisyys"},
             "forecast_time": {"name": "Ennusteen aika"},
-            "best_time_of_day": {"name": "Päivän paras aika"},
+            "best_time_of_day": {
+                "name": "Päivän paras aika",
+                "state": {"no_suitable_time": "Ei sopivaa aikaa tänään"}
+            },
             "lightning_strikes": {
                 "name": "Salamaniskut",
                 "state": {
@@ -83,16 +94,19 @@
         }
     },
     "options": {
+        "error": {
+            "invalid_range": "Minimiarvo ei voi olla vastaavaa maksimiarvoa suurempi."
+        },
         "step": {
             "user": {
                 "data": {
                     "max_precipitation": "Maksimi sateenkertymä mm",
                     "max_relative_humidity": "Maksimi suhteellinen kosteus %",
-                    "max_temperature": "Maksimi lämpötila °C",
+                    "max_temperature": "Koetun lämpötilan maksimi °C",
                     "max_wind_speed": "Maksimi tuulennopeus m/s",
                     "min_precipitation": "Minimi sateenkertymä mm",
                     "min_relative_humidity": "Minimi suhteellinen kosteus %",
-                    "min_temperature": "Minimi lämpötila °C",
+                    "min_temperature": "Koetun lämpötilan minimi °C",
                     "min_wind_speed": "Minimi tuulennopeus m/s",
                     "offset": "Sääennusteen aikaväli h",
                     "forecast_days": "Ennustepäivien määrä",
@@ -102,7 +116,7 @@
                     "lightning_max_age_minutes": "Salamaniskun enimmäisikä minuutteina",
                     "observation_station_id": "FMI:n havaintoaseman ID"
                 },
-                "description": "Maksimin ja minimin sisältävät parametrit käytetään määrittämään päivän parhaan ajan",
+                "description": "Raja-arvoja käytetään päivän jäljellä olevan parhaan ajan määrittämiseen. Lämpötilarajat koskevat koettua lämpötilaa.",
                 "title": "Ilmatieteen laitos asetukset"
             }
         }

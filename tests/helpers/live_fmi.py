@@ -9,7 +9,8 @@ import math
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
+from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 from homeassistant.util import dt as dt_util
 
@@ -29,11 +30,16 @@ MODEL_RANGES = {
     "wind_max": (0.0, 150.0),
     "precipitation_amount": (-1.0, 500.0),
     "cloud_cover": (0.0, 100.0),
+    "cloud_low_cover": (0.0, 100.0),
+    "cloud_mid_cover": (0.0, 100.0),
+    "cloud_high_cover": (0.0, 100.0),
+    "feels_like": (-120.0, 80.0),
     "symbol": (0.0, 100.0),
 }
 
 HA_FORECAST_RANGES = {
     "temperature": (-90.0, 60.0),
+    "apparent_temperature": (-120.0, 80.0),
     "templow": (-90.0, 60.0),
     "dew_point": (-100.0, 60.0),
     "pressure": (800.0, 1200.0),
@@ -42,10 +48,12 @@ HA_FORECAST_RANGES = {
     "wind_speed": (0.0, 500.0),
     "wind_gust_speed": (0.0, 600.0),
     "precipitation": (0.0, 500.0),
+    "precipitation_probability": (0.0, 100.0),
     "cloud_coverage": (0.0, 100.0),
 }
 
 HA_FORECAST_PRECIPITATION_HALF_STEP = 0.005
+HELSINKI = ZoneInfo("Europe/Helsinki")
 
 
 def aware_timestamp(value: object, label: str) -> datetime:
@@ -135,6 +143,53 @@ def validate_model_weather(
     return sample
 
 
+def validate_probabilities(probabilities: object, label: str) -> tuple[float, float]:
+    """Require two finite FMI forecast probabilities in their native percentage range."""
+    validated: list[float] = []
+    for field in ("precipitation", "thunderstorm"):
+        raw = getattr(probabilities, field, None)
+        try:
+            number = float(cast(Any, raw))
+        except (TypeError, ValueError) as error:
+            raise LiveContractError(
+                f"{label} {field} probability is not numeric: {raw!r}"
+            ) from error
+        if not math.isfinite(number) or not 0 <= number <= 100:
+            raise LiveContractError(f"{label} {field} probability={raw!r} is outside 0..100")
+        validated.append(number)
+    return validated[0], validated[1]
+
+
+def validate_first_available_local_day_probability_supplements(
+    samples: Sequence[Any],
+    probabilities_by_time: Mapping[datetime, object],
+    label: str,
+    *,
+    now: datetime | None = None,
+) -> int:
+    """Validate probabilities on the first represented future Helsinki-local date."""
+    reference = (now or datetime.now(UTC)).astimezone(UTC)
+    future_samples: list[tuple[int, datetime]] = []
+    for index, sample in enumerate(samples):
+        timestamp = aware_timestamp(getattr(sample, "time", None), f"{label} sample {index}")
+        if timestamp >= reference:
+            future_samples.append((index, timestamp))
+    if not future_samples:
+        raise LiveContractError(f"{label} has no future samples")
+
+    local_date = future_samples[0][1].astimezone(HELSINKI).date()
+    validated = 0
+    for index, timestamp in future_samples:
+        if timestamp.astimezone(HELSINKI).date() != local_date:
+            continue
+        probabilities = probabilities_by_time.get(timestamp)
+        if probabilities is None:
+            raise LiveContractError(f"{label} sample {index} has no aligned probabilities")
+        validate_probabilities(probabilities, f"{label} sample {index}")
+        validated += 1
+    return validated
+
+
 def validate_ha_forecast(
     items: object,
     label: str,
@@ -177,6 +232,40 @@ def validate_ha_forecast(
         if not finite_values:
             raise LiveContractError(f"{label} item {index} has no usable numeric values")
         validated.append((timestamp, item))
+    return validated
+
+
+def validate_first_available_local_day_ha_metrics(
+    hourly: Sequence[tuple[datetime, Mapping[str, Any]]],
+    label: str,
+    *,
+    now: datetime | None = None,
+) -> int:
+    """Require apparent temperature and PoP on the first future Helsinki-local date."""
+    reference = (now or datetime.now(UTC)).astimezone(UTC)
+    future_items = [item for item in hourly if item[0] >= reference]
+    if not future_items:
+        raise LiveContractError(f"{label} has no future items")
+
+    local_date = future_items[0][0].astimezone(HELSINKI).date()
+    validated = 0
+    for index, (timestamp, item) in enumerate(future_items):
+        if timestamp.astimezone(HELSINKI).date() != local_date:
+            continue
+        for field in ("apparent_temperature", "precipitation_probability"):
+            raw = item.get(field)
+            try:
+                number = float(cast(Any, raw))
+            except (TypeError, ValueError) as error:
+                raise LiveContractError(
+                    f"{label} item {index} {field} is not numeric: {raw!r}"
+                ) from error
+            minimum, maximum = HA_FORECAST_RANGES[field]
+            if not math.isfinite(number) or not minimum <= number <= maximum:
+                raise LiveContractError(
+                    f"{label} item {index} {field}={raw!r} is not finite/plausible"
+                )
+        validated += 1
     return validated
 
 

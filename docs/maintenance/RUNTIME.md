@@ -1,109 +1,34 @@
 <!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
 
-# Runtime Architecture And Invariants
+# Runtime Maintenance
 
-This document is the maintenance contract for coordinator ownership, I/O boundaries, availability,
-and runtime side effects. Read it before changing `custom_components/fmi/__init__.py`,
-`fmi_client.py`, or any entity platform. The current reference environment is declared by root
-PEP 621 metadata and `requirements-dev.txt`; `hacs.json` independently declares the installation
-floor. Keep historical investigation outside this current contract.
+Normative entry ownership, polling, I/O, cancellation, and request-volume requirements are owned
+by [the runtime contract](../contracts/RUNTIME.md). Source outcomes are in
+[the availability contract](../contracts/AVAILABILITY.md), and logging/diagnostic/XML boundaries
+are in [the compatibility, security, and privacy contract](../contracts/COMPATIBILITY_SECURITY.md).
 
-Last verified against current code: 2026-08-19.
+Read these contracts before changing `custom_components/fmi/__init__.py`, `fmi_client.py`, or an
+entity platform.
 
-## Entry Ownership And Lifecycle
+## Change Checklist
 
-- Each config entry owns one typed `FMIConfigEntryRuntimeData` value in
-  `ConfigEntry.runtime_data`.
-- The main coordinator refreshes current weather, hourly source forecasts, lightning when enabled,
-  and sea level every 30 minutes. A configured observation station uses its own 10-minute
-  coordinator.
-- `CoordinatorEntity` owns entity listeners. Setup registers one config-entry update listener;
-  unload and failed-unload paths must retain or remove runtime state consistently.
-- Reload, options updates, reconfiguration, and simultaneous entries must not share coordinators,
-  callbacks, identity, or availability state.
-- Entity properties read cached coordinator data only. They must not perform I/O or request a
-  refresh from an update callback.
+1. Map the change to its `RUN-*`, `AVL-*`, or `CSP-*` assertion and existing evidence.
+2. Keep synchronous dependency/parser work behind the existing executor adapters and
+   integration-owned HTTP on Home Assistant's shared session.
+3. Exercise cancellation separately from ordinary exceptions.
+4. Prove setup, unload, failed unload, reload, options update, reconfigure, and simultaneous-entry
+   behavior when ownership/listeners change.
+5. Prove request count and socket blocking when moving an I/O boundary.
+6. Run `make test-full`, `make type-check`, `make test-network-block`, and `make confinement-test`.
+   Use `make live` only for a changed external FMI contract.
 
-## Event-Loop And Network Boundaries
+## Architecture Notes
 
-- Coordinate current/forecast work in the synchronous FMI client runs outside the event loop
-  through `asyncio.to_thread`, including forecast XML parsing. Observation helpers use the
-  client's executor-backed async API.
-- Setup/reconfigure place resolution uses the selected client's ten-second request and parser
-  semantics inside `asyncio.to_thread`, after the response passes the same entity-disabled 2 MiB
-  XML boundary as coordinate forecasts.
-- Integration-owned lightning and sea-level HTTP uses Home Assistant's shared aiohttp session.
-  Their XML parsing runs through `async_add_executor_job`; local lightning geometry remains inside
-  that pure parser job and performs no I/O.
-- Cancellation must propagate. Primary FMI/dependency parsing boundaries catch the documented
-  transport, client/server, parser, and external-shape exceptions. The optional-source wrapper
-  deliberately catches any ordinary `Exception` so an unexpected optional failure cannot disable
-  current weather; cancellation remains outside that catch and propagates.
-- Ordinary tests block sockets. Only the marker-isolated probes described in `LIVE_TESTS.md` may
-  use real network access.
-
-## Source Failure Boundaries
-
-| Source | Success and fallback | Failure behavior |
-|---|---|---|
-| Current weather | Use the forecast-current query; fall back to place observation when current fails | Clear stale current data; setup may still succeed from a configured station |
-| Hourly source forecast | Normalize the complete one-hour series independently of current data | Clear only forecast data; retain usable current or observation state |
-| Configured station | Refresh on its independent coordinator | Clear only station state; never disable working place/current data |
-| Lightning | Optional and enabled through entry options | Clear only lightning state; core weather remains available |
-| Sea level | Best-effort for every configured location | Clear only sea-level state; core weather remains available |
-
-Initial setup succeeds when either the primary current path, including place fallback, or a
-configured station produces usable data. Forecast and optional-source failures alone do not force
-setup retry. Every source recovers on a later successful refresh without recreating entities.
-Transition logging should report an outage and recovery once, not on every poll.
-
-## Data, Timeouts, And Request Volume
-
-- A successful empty lightning collection is valid available data with the `no_strikes` state;
-  `None` means the lightning source failed. Empty or `None` remains failure/no-data for sources
-  without an explicit empty-success contract. Numeric boundaries accept finite values and reject
-  booleans, malformed strings, NaN, and infinities without fabricating zeroes.
-- FMI dependency requests use the client's ten-second HTTP timeout inside the 40-second primary
-  coordinator bound; transient setup place lookup uses the same ten-second request timeout.
-  Integration-owned optional FMI HTTP uses 2-second connect, 3-second read, and 5-second total
-  timeouts plus a 2 MiB response limit.
-- Runtime refreshes add no retry loop. A normal primary refresh makes one current request, one
-  hourly forecast request, and one sea-level request. Place observation is requested only after a
-  current failure. A station adds one request on its independent cadence. Enabled lightning adds
-  exactly one FMI request and no geocoder/provider request.
-- Forecast, optional-source timestamp, and missing-value semantics are defined in
-  `FORECAST_SEMANTICS.md`, `TIME_AND_MISSING_DATA.md`, and `OPTIONAL_SOURCES.md`.
-
-## Logging And Diagnostics
-
-The integration must not configure the process-wide root logger. Logs may contain source names,
-availability transitions, HTTP status classes, and exception class names, but not configured
-coordinates, coordinate-derived identity, raw FMI/XML responses, or arbitrary external exception
-text. Place-search text has the same protection. The FMI dependency logger filter must continue to
-remove query/coordinate-bearing request records and raw parser payloads.
-
-Diagnostics expose only sanitized configuration/options, config version, poll cadence, coordinator
-success, and source availability flags. They must not expose coordinates, place/weather values,
-entry or entity identity, or external payloads. See `COMPATIBILITY_SECURITY.md` for the complete
-privacy boundary.
-
-## Verification Map
-
-- `tests/test_availability.py`: setup, independent source failure, stale clearing, and recovery.
-- `tests/test_lifecycle.py`: setup/unload/reload, listener ownership, multi-entry isolation, and
-  public entity/forecast behavior.
-- `tests/test_runtime_audit.py`: no process-wide logging configuration.
-- `tests/test_compatibility_security.py`: executor boundaries, logging privacy, diagnostics,
-  optional HTTP bounds, and polar bounding boxes.
-- `tests/test_auxiliary_payloads.py`: bounded entity-disabled optional-source XML parsing,
-  timestamps, freshness, and failures.
-- `tests/test_fmi_contract.py`: bounded entity-disabled forecast/place XML parsing and adapter
-  request semantics.
-- `tests/test_xml_parser.py`: Expat version floor, entity rejection, inert external DTD behavior,
-  byte limits, namespaces, and parser result-shape validation.
-
-Run `make test-full`, `make type-check`, and `make test-network-block` after changing these
-contracts. Use `make live` only when the change can affect the external FMI boundary.
+`FMIConfigEntryRuntimeData` is the ownership boundary visible to Home Assistant. The main
+coordinator, configured-station coordinator, and entity platforms stay separate so lifecycle and
+availability tests can observe exact ownership. The FMI client adapter exists to isolate the
+selected synchronous/private dependency surface without spreading compatibility logic through
+entities.
 
 ## References
 

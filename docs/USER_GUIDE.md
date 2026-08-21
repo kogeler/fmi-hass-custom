@@ -76,15 +76,20 @@ Create and download a Home Assistant backup before an upgrade.
 - **Manual:** replace the complete `custom_components/fmi/` directory with the directory from the
   new release archive, then restart Home Assistant. Do not remove the integration entry first.
 
-Upgrading from the legacy integration line migrates config and registry identity in place.
-Existing unique IDs and customized entity IDs are retained. Some exact legacy generated sensor IDs
-can be renamed to a location-aware default when that target is free; ambiguous, customized, or
-conflicting IDs are left unchanged.
+Upgrading from the legacy integration line migrates config and registry identity in place. Existing
+customized IDs remain usable; the exact compatibility guarantees and conservative rename boundary
+are maintained in the [migration contract](contracts/MIGRATIONS.md).
 
 The lightning direction release intentionally changes the existing lightning sensor value and
 attributes in place. An old address/native-state comparison or template reading `location` must be
 updated to use `direction`, `bearing`, or `distance`. The entity-registry record, unique ID,
 customized entity ID, device, config entry, options, and Recorder history remain intact.
+
+The useful forecast-metrics release keeps the existing **Best time of day** entity and its IDs,
+but improves its selection in place. Temperature limits now mean acceptable **feels-like**
+temperature, the current time is no longer a fallback, and a healthy day with no matching hour has
+the translated `no_suitable_time` state. Review automations that assumed this sensor always
+contained an `HH:MM` value or selected the warmest hour.
 
 ## Configure
 
@@ -95,7 +100,7 @@ Institute**, select an entry, and choose **Configure** to change these options:
 
 - forecast days (`0` disables future samples, otherwise up to 10 days);
 - forecast interval used by the **Best time of day** calculation;
-- temperature, humidity, wind, and precipitation limits used by that calculation;
+- feels-like temperature, humidity, wind, and precipitation limits used by that calculation;
 - legacy daily weather entity, which is optional because the main weather entity already supplies
   both hourly and daily forecasts;
 - lightning sensor, search radius, and inclusive maximum age from 1 to 1440 minutes;
@@ -121,10 +126,56 @@ Helsinki entry usually has IDs such as `weather.helsinki` and
 produce different IDs. Always use the IDs shown in your own entity registry.
 
 The main location device normally contains a weather entity and sensors for place, condition,
-temperature, wind speed/direction/gust, humidity, cloud coverage, rain, forecast time, best time
-of day, and sea level. Enabling lightning adds a lightning sensor. A configured station creates a
-separate observation device and weather entity. Enabling legacy daily mode adds another weather
-entity, but it is not needed to request daily forecasts from the main entity.
+temperature, feels like, dew point, atmospheric pressure, wind speed/direction/gust, humidity,
+total/low/medium/high cloud cover, rain, precipitation probability, thunderstorm probability,
+forecast time, best time of day, and sea level. Enabling lightning adds a lightning sensor. A
+configured station creates a separate observation device and weather entity; it does not duplicate
+the main forecast-backed metric sensors. Enabling legacy daily mode adds another weather entity,
+but it is not needed to request daily forecasts from the main entity.
+
+## Useful Weather Metrics
+
+The dedicated numeric sensors can be graphed, recorded, and used directly in automations:
+
+| Sensor | Native unit | Meaning |
+|---|---:|---|
+| Feels like | °C | Apparent temperature calculated by `fmi-weather-client` from FMI temperature, humidity, and wind data. Home Assistant converts it to the configured unit system. |
+| Dew point | °C | Temperature at which air with the forecast moisture content would reach saturation. A value close to air temperature indicates moist air and a greater condensation/fog potential. |
+| Atmospheric pressure | hPa | FMI mean-sea-level pressure, suitable for comparing weather-system pressure between locations; it is not unadjusted station pressure. |
+| Low cloud cover | % | Forecast fraction of the sky covered by low cloud. |
+| Medium cloud cover | % | Forecast fraction covered by middle cloud. |
+| High cloud cover | % | Forecast fraction covered by high cloud. |
+| Rain | mm/h | FMI one-hour precipitation value exposed as a precipitation-intensity sensor. Weather entities expose the same one-hour forecast quantity as accumulated `mm`, as required by Home Assistant's weather schema. |
+| Precipitation probability | % | FMI `PoP`: probability of at least 0.1 mm during the preceding forecast hour. It is a chance, not a precipitation amount. |
+| Thunderstorm probability | % | FMI forecast probability of thunder at the point/hour. It does not mean lightning has been observed. |
+
+Cloud layers can overlap vertically, so low, medium, and high percentages must not be added. The
+authoritative value/range/availability rules are `SNS-001` and `SNS-002` in the
+[sensor contract](contracts/SENSORS.md).
+
+The main and station weather entities expose only fields supported by their selected source.
+Hourly/daily field and aggregation rules, including why daily PoP is absent, are maintained in the
+[forecast-semantics contract](contracts/FORECAST_SEMANTICS.md).
+
+Thunderstorm probability and the optional lightning sensor answer different questions. The
+probability is a forecast for an hour; the lightning sensor reports recent FMI-observed strike
+groups within the configured radius and age.
+
+## Best Time Of Day
+
+**Best time of day** chooses a remaining current-day forecast hour under your configured
+feels-like temperature, humidity, wind, and precipitation limits. It prefers lower thunder/rain
+risk and feels-like comfort without inventing a hidden weighted score. Only the fixed FMI weather
+symbols listed by the contract are eligible; thunderstorm and other excluded conditions are
+rejected before ranking. The exact candidate fields, hard gates, symbol list, tie-break order,
+state/attribute schema, `no_suitable_time` classification, and unavailable behavior are maintained
+in `TIM-003` through `TIM-007` of the
+[time and missing-data contract](contracts/TIME_AND_MISSING_DATA.md).
+
+This is a transparent convenience ordering under your configured limits, not a medical, heat-,
+lightning-, or activity-safety score. It does not model direct sun, radiant temperature, clothing,
+health, acclimatization, or activity intensity. Follow official warnings and appropriate safety
+guidance instead of using this sensor as an alert system.
 
 ## Lightning State And Automations
 
@@ -134,7 +185,7 @@ map position during setup; they are not substituted for the entry's point. The c
 is an inclusive circle, and the maximum age controls both the FMI query window and local freshness
 filter.
 
-The current state has three distinct meanings:
+The current state has three user-facing meanings:
 
 - A successful response with no qualifying strike is available with backend state `no_strikes`.
   The frontend displays **No lightning strikes** in English or **Ei salamaniskuja** in Finnish.
@@ -143,12 +194,10 @@ The current state has three distinct meanings:
 - A transport, timeout, unsafe payload, parser, or unusable response is `unavailable`. Old strike
   state and dynamic attributes are cleared; the next valid refresh recovers without a reload.
 
-For a non-empty result, the primary attributes are `time`, numeric kilometer `distance`,
-`direction` (`N`, `NE`, `E`, `SE`, `S`, `SW`, `W`, `NW`, or `here`), numeric degree `bearing`
-(`null` for `here`), `strikes`, `peak_current`, `cloud_cover`, and `ellipse_major`.
-`OBSERVATIONS` contains the same fields for retained secondary groups. No state or row contains an
-address, raw coordinates, or the old `location` field. FMI remains the only lightning network
-provider.
+The exact state/attribute schema, direction sectors, empty/failure behavior, and coordinate boundary
+are maintained in `SNS-006` of the [sensor contract](contracts/SENSORS.md) and `OPT-003` through
+`OPT-006` of the [optional-source contract](contracts/OPTIONAL_SOURCES.md). FMI remains the only
+lightning network provider.
 
 Use attributes for automations instead of parsing the display state. For example:
 
@@ -165,8 +214,10 @@ closest approach, or provide safety guidance.
 
 ## Dashboard Examples
 
-Replace every example entity ID with the exact ID from your entity registry. The examples use only
-standard Home Assistant cards.
+Replace every example entity ID with the exact ID from your entity registry. The first examples
+use only standard Home Assistant cards. The optional Detailed Weather Forecast example uses an
+independently maintained dashboard card to expose more of the integration's current and forecast
+metrics in one weather view.
 
 ### Current Conditions And Daily Forecast
 
@@ -198,13 +249,138 @@ title: Helsinki details
 show_header_toggle: false
 entities:
   - entity: sensor.helsinki_temperature
+  - entity: sensor.helsinki_feels_like
+  - entity: sensor.helsinki_dew_point
+  - entity: sensor.helsinki_atmospheric_pressure
   - entity: sensor.helsinki_humidity
   - entity: sensor.helsinki_wind_speed
   - entity: sensor.helsinki_wind_gust
   - entity: sensor.helsinki_cloud_coverage
+  - entity: sensor.helsinki_low_cloud_cover
+  - entity: sensor.helsinki_medium_cloud_cover
+  - entity: sensor.helsinki_high_cloud_cover
   - entity: sensor.helsinki_rain
+  - entity: sensor.helsinki_precipitation_probability
+  - entity: sensor.helsinki_thunderstorm_probability
   - entity: sensor.helsinki_best_time_of_day
 ```
+
+### More Detailed Weather Card (Optional)
+
+Home Assistant's standard weather card has a fixed presentation and does not render every current
+or forecast field supplied by this integration. The independently maintained
+[Detailed Weather Forecast Card](https://github.com/tobiasb80/detailed-weather-forecast) can add:
+
+- current feels-like temperature, precipitation probability, and thunderstorm probability as
+  always-visible header chips;
+- dew point, pressure, and low/medium/high cloud-cover sensors in expandable current details;
+- apparent temperature below every hourly and daily forecast item;
+- dew point, pressure, and total cloud coverage in the expandable hourly and daily details.
+
+Add the repository URL above under **HACS > Custom repositories** with category **Dashboard**,
+install the card, and refresh the browser. HACS normally registers its dashboard resource. If the
+card type is still unavailable, add `/hacsfiles/detailed-weather-forecast/detailed-weather-forecast.js`
+as a JavaScript module under **Settings > Dashboards > Resources**.
+
+This card is optional and is not distributed or maintained by the FMI integration. Its
+installation, updates, and card-specific support remain with its own project. The following
+configuration uses only generic example IDs:
+
+```yaml
+type: custom:detailed-weather-forecast-card
+entity: weather.helsinki
+name: Helsinki
+
+show_header: true
+show_background: false
+compact_header_chips: false
+hourly_forecast: true
+daily_forecast: true
+
+header_chips:
+  - type: attribute
+    attribute: apparent_temperature
+    name: Feels like
+    icon: mdi:thermometer
+  - type: entity
+    entity: sensor.helsinki_precipitation_probability
+    name: Rain probability
+    icon: mdi:weather-rainy
+  - type: entity
+    entity: sensor.helsinki_thunderstorm_probability
+    name: Thunder
+    icon: mdi:weather-lightning
+
+header_info:
+  - type: attribute
+    attribute: dew_point
+    name: Dew point
+    icon: mdi:thermometer-water
+  - type: attribute
+    attribute: pressure
+    name: Air pressure
+    icon: mdi:gauge
+  - type: entity
+    entity: sensor.helsinki_low_cloud_cover
+    name: Low cloud cover
+    icon: mdi:weather-cloudy
+  - type: entity
+    entity: sensor.helsinki_medium_cloud_cover
+    name: Medium cloud cover
+    icon: mdi:weather-cloudy
+  - type: entity
+    entity: sensor.helsinki_high_cloud_cover
+    name: High cloud cover
+    icon: mdi:weather-cloudy
+
+hourly_extra_attribute:
+  attribute: apparent_temperature
+  color: var(--secondary-text-color)
+
+hourly_info:
+  - attribute: apparent_temperature
+    name: Feels like
+    icon: mdi:thermometer
+  - attribute: dew_point
+    name: Dew point
+    icon: mdi:thermometer-water
+  - attribute: pressure
+    name: Air pressure
+    icon: mdi:gauge
+  - attribute: cloud_coverage
+    name: Cloud cover
+    icon: mdi:weather-cloudy
+
+daily_extra_attribute:
+  attribute: apparent_temperature
+  color: var(--secondary-text-color)
+
+daily_info:
+  - attribute: apparent_temperature
+    name: Maximum feels like
+    icon: mdi:thermometer
+  - attribute: dew_point
+    name: Mean dew point
+    icon: mdi:thermometer-water
+  - attribute: pressure
+    name: Mean air pressure
+    icon: mdi:gauge
+  - attribute: cloud_coverage
+    name: Mean cloud cover
+    icon: mdi:weather-cloudy
+```
+
+The hourly weather forecast already carries apparent temperature, precipitation probability, dew
+point, pressure, and total cloud coverage, so the card can render them for each forecast item. The
+daily apparent-temperature value is the day's maximum; daily pressure, dew point, and total cloud
+coverage are means. Daily precipitation probability is intentionally absent because it cannot be
+derived correctly from the available hourly event probabilities.
+
+Low/medium/high cloud cover and thunderstorm probability are currently separate forecast-backed
+sensor states rather than fields in Home Assistant's hourly forecast schema. The example therefore
+shows them for the sensor's selected current forecast hour, not as a separate value for every
+future hour. Dashboard YAML cannot change that data boundary. Click the header condition to reveal
+`header_info`, and click an hourly or daily item to reveal its configured detail list.
 
 ### Station Observation
 
@@ -217,7 +393,6 @@ entity: weather.helsinki_kaisaniemi_observation
 name: Kaisaniemi observation
 show_current: true
 show_forecast: false
-forecast_type: hourly
 ```
 
 ### Optional Lightning And Sea Level
@@ -255,6 +430,9 @@ entities:
   sensor unavailable. Wait for the next refresh to recover automatically.
 - **Sea level is unavailable:** the configured location may be outside FMI sea-level forecast
   coverage, or the optional response may be empty or unavailable.
+- **Best time says “No suitable time today”:** FMI forecast data is healthy, but there is no
+  complete remaining current-day hour that passes your configured limits. Widen the limits if
+  appropriate. `unavailable` instead means the remaining forecast data cannot support a result.
 - **A dashboard example reports an unknown entity:** replace the sample ID with the entity ID shown
   in your registry. Reconfigured and migrated entries deliberately retain their established IDs.
 
@@ -277,9 +455,9 @@ needed for validation, weather, lightning-area, and sea-level requests. Search t
 it is not stored in the config entry, logs, or diagnostics. FMI lightning strike coordinates are
 processed transiently in memory for local distance/bearing calculation. They are not sent to a
 second provider and are not exposed in state, attributes, logs, or diagnostics. See the
-[security and privacy contract](maintenance/COMPATIBILITY_SECURITY.md).
+[security and privacy contract](contracts/COMPATIBILITY_SECURITY.md).
 
-Documentation references verified 2026-08-19:
+Documentation references verified 2026-08-20:
 
 - [HACS custom repositories](https://www.hacs.xyz/docs/faq/custom_repositories/)
 - [HACS repository download and update behavior](https://www.hacs.xyz/docs/use/repositories/dashboard/)

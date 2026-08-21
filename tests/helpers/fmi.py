@@ -20,6 +20,7 @@ CONSUMED_WEATHER_DATA_FIELDS = frozenset(
     {
         "time",
         "temperature",
+        "feels_like",
         "dew_point",
         "pressure",
         "humidity",
@@ -29,6 +30,9 @@ CONSUMED_WEATHER_DATA_FIELDS = frozenset(
         "wind_gust",
         "symbol",
         "cloud_cover",
+        "cloud_low_cover",
+        "cloud_mid_cover",
+        "cloud_high_cover",
         "precipitation_amount",
     }
 )

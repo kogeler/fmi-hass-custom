@@ -15,6 +15,7 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_CLOUD_COVERAGE,
     ATTR_FORECAST_CONDITION,
     ATTR_FORECAST_HUMIDITY,
+    ATTR_FORECAST_NATIVE_APPARENT_TEMP,
     ATTR_FORECAST_NATIVE_DEW_POINT,
     ATTR_FORECAST_NATIVE_PRECIPITATION,
     ATTR_FORECAST_NATIVE_PRESSURE,
@@ -22,12 +23,14 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_NATIVE_TEMP_LOW,
     ATTR_FORECAST_NATIVE_WIND_GUST_SPEED,
     ATTR_FORECAST_NATIVE_WIND_SPEED,
+    ATTR_FORECAST_PRECIPITATION_PROBABILITY,
     ATTR_FORECAST_TIME,
     ATTR_FORECAST_WIND_BEARING,
     WeatherEntityFeature,
 )
 from homeassistant.util import dt as dt_util
 
+from custom_components.fmi import fmi as fmi_client
 from custom_components.fmi import utils
 from custom_components.fmi.sensor import FMIBestConditionSensor
 from custom_components.fmi.weather import FMIWeatherEntity
@@ -43,9 +46,10 @@ HELSINKI = ZoneInfo("Europe/Helsinki")
 class StubCoordinator:
     """Minimum coordinator surface consumed by weather entities."""
 
-    def __init__(self, forecast, weather=None) -> None:
+    def __init__(self, forecast, weather=None, probabilities=None) -> None:
         self.forecast = forecast
         self.current = weather
+        self.probabilities = probabilities or {}
         self.last_update_success = True
         self.hass = None
         self.unique_id = "60.17:24.94"
@@ -62,10 +66,16 @@ class StubCoordinator:
     def get_observation(self):
         return self.current
 
+    def get_forecast_probabilities(self, timestamp):
+        return self.probabilities.get(
+            timestamp,
+            fmi_client.ForecastProbabilities(None, None),
+        )
 
-def _entity(forecast, weather=None) -> FMIWeatherEntity:
+
+def _entity(forecast, weather=None, probabilities=None) -> FMIWeatherEntity:
     entity = cast(Any, object.__new__(FMIWeatherEntity))
-    entity.coordinator = StubCoordinator(forecast, weather)
+    entity.coordinator = StubCoordinator(forecast, weather, probabilities)
     return cast(FMIWeatherEntity, entity)
 
 
@@ -150,6 +160,7 @@ def test_current_weather_exposes_real_client_values() -> None:
     entity.update_callback()
 
     assert entity._attr_native_temperature == -4.0
+    assert entity._attr_native_apparent_temperature == -7.0
     assert entity._attr_native_wind_gust_speed == 9.0
     assert entity._attr_native_wind_speed_unit == "m/s"
     assert entity._attr_condition == "partlycloudy"
@@ -166,6 +177,7 @@ def test_missing_current_values_become_none() -> None:
     entity.update_callback()
 
     assert entity._attr_native_temperature is None
+    assert entity._attr_native_apparent_temperature is None
     assert entity._attr_native_wind_gust_speed is None
 
 
@@ -203,6 +215,7 @@ def test_daily_forecast_aggregates_mixed_conditions_wind_and_means(monkeypatch) 
     assert item[ATTR_FORECAST_CONDITION] == "snowy"
     assert item[ATTR_FORECAST_NATIVE_TEMP] == -2.0
     assert item[ATTR_FORECAST_NATIVE_TEMP_LOW] == -5.0
+    assert item[ATTR_FORECAST_NATIVE_APPARENT_TEMP] == -5.0
     assert item[ATTR_FORECAST_NATIVE_PRECIPITATION] == pytest.approx(0.6)
     assert item[ATTR_FORECAST_NATIVE_WIND_SPEED] == 8.0
     assert item[ATTR_FORECAST_NATIVE_WIND_GUST_SPEED] == 12.0
@@ -211,6 +224,7 @@ def test_daily_forecast_aggregates_mixed_conditions_wind_and_means(monkeypatch) 
     assert item[ATTR_FORECAST_NATIVE_PRESSURE] == pytest.approx(1002.0)
     assert item[ATTR_FORECAST_NATIVE_DEW_POINT] == pytest.approx(-14 / 3)
     assert item[ATTR_FORECAST_CLOUD_COVERAGE] == 60
+    assert ATTR_FORECAST_PRECIPITATION_PROBABILITY not in item
 
 
 @pytest.mark.parametrize(
@@ -342,6 +356,8 @@ def test_hourly_forecast_uses_current_home_assistant_keys_and_units(monkeypatch)
         ATTR_FORECAST_TIME,
         ATTR_FORECAST_CONDITION,
         ATTR_FORECAST_NATIVE_TEMP,
+        ATTR_FORECAST_NATIVE_APPARENT_TEMP,
+        ATTR_FORECAST_PRECIPITATION_PROBABILITY,
         ATTR_FORECAST_NATIVE_PRECIPITATION,
         ATTR_FORECAST_NATIVE_WIND_SPEED,
         ATTR_FORECAST_NATIVE_WIND_GUST_SPEED,
@@ -351,6 +367,30 @@ def test_hourly_forecast_uses_current_home_assistant_keys_and_units(monkeypatch)
         ATTR_FORECAST_CLOUD_COVERAGE,
         ATTR_FORECAST_NATIVE_DEW_POINT,
     }
+
+
+def test_hourly_precipitation_probability_validates_and_rounds_half_even(monkeypatch) -> None:
+    """Expose finite PoP through HA's integer contract without inventing missing data."""
+    _set_helsinki_timezone(monkeypatch)
+    forecast = forecast_from_fixture("forecast_daily_cases.json", "mixed_conditions")
+    samples = forecast.forecasts
+    probabilities = {
+        samples[0].time: fmi_client.ForecastProbabilities(12.5, 1.0),
+        samples[1].time: fmi_client.ForecastProbabilities(13.5, 2.0),
+    }
+
+    hourly = _entity(forecast, probabilities=probabilities)._hourly_forecast()
+
+    assert [item[ATTR_FORECAST_NATIVE_APPARENT_TEMP] for item in hourly] == [
+        -8.0,
+        -5.0,
+        -6.0,
+    ]
+    assert [item[ATTR_FORECAST_PRECIPITATION_PROBABILITY] for item in hourly] == [
+        12,
+        14,
+        None,
+    ]
 
 
 def test_sensor_handles_none_value_without_exception() -> None:

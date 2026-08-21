@@ -2,6 +2,11 @@
 
 # Codex Implementation Plan: Stabilize, Test, and Maintain `fmi-hass-custom`
 
+> **Archive notice:** This completed plan is a dated execution record. Use the current
+> [contract catalog](../../docs/contracts/README.md), [maintenance runbooks](../../docs/maintenance/),
+> and [plan archive index](../README.md) instead of treating historical commands or requirements
+> below as current policy.
+
 > **Target repository:** [`kogeler/fmi-hass-custom`](https://github.com/kogeler/fmi-hass-custom)
 > **Intended executor:** OpenAI Codex
 > **Plan baseline date:** 2026-07-31

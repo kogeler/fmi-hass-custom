@@ -38,7 +38,7 @@ HACS_IMAGE := ghcr.io/hacs/action@sha256:ea472b182558d08e50221c550fc5cdbba9e1bc1
 
 include make/container.mk
 
-.PHONY: help lint-venv lock refresh-dependencies freeze-check dev-build format \
+.PHONY: help lint-venv lock refresh-dependencies freeze-check dev-build reference-contracts format \
 	format-check lint type-check bandit syntax shellcheck test-fast test-full \
 	test-network-block coverage-report confinement-test version-check version-sync \
 	validate validate-local validate-actions validate-hassfest validate-hacs live \
@@ -52,6 +52,8 @@ help:
 		'make lock          Regenerate all three hash-verified dependency locks' \
 		'make freeze-check  Recompile locks without upgrades and reject drift' \
 		'make dev-build     Build the content-addressed toolbox image' \
+		'make reference-contracts' \
+		'                   Inspect the locked FMI client and Home Assistant contracts' \
 		'make format        Apply Ruff fixes and formatting on the host' \
 		'make format-check  Check Ruff formatting on the host' \
 		'make lint          Run host Ruff and containerized Pylint' \
@@ -124,6 +126,9 @@ freeze-check: lock-image
 				<(sed "/^[[:space:]]*#/d" /tmp/lint.txt)'
 
 dev-build: toolbox-image
+
+reference-contracts: toolbox-image
+	$(BOX_RUN) python .github/scripts/reference_contracts.py
 
 format: lint-venv
 	@$(RUFF) check --fix $(RUFF_SOURCES)

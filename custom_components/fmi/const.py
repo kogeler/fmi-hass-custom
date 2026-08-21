@@ -1,3 +1,7 @@
+# Contracts: docs/contracts/MIGRATIONS.md, docs/contracts/OPTIONAL_SOURCES.md,
+# docs/contracts/RUNTIME.md, docs/contracts/SENSORS.md,
+# docs/contracts/TIME_AND_MISSING_DATA.md
+
 """Constants for the FMI Weather and Sensor integrations."""
 
 import logging
@@ -67,12 +71,16 @@ ATTR_ELLIPSE_MAJOR = "ellipse_major"
 ATTR_HUMIDITY = "relative_humidity"
 ATTR_WIND_SPEED = "wind_speed"
 ATTR_PRECIPITATION = "precipitation"
+ATTR_APPARENT_TEMPERATURE = "apparent_temperature"
+ATTR_PRECIPITATION_PROBABILITY = "precipitation_probability"
+ATTR_THUNDERSTORM_PROBABILITY = "thunderstorm_probability"
 
 ATTRIBUTION = "Weather Data provided by FMI"
 
 BEST_COND_SYMBOLS = [1, 2, 21, 3, 31, 32, 41, 42, 51, 52, 91, 92]
 BEST_CONDITION_AVAIL = "available"
 BEST_CONDITION_NOT_AVAIL = "not_available"
+BEST_CONDITION_NO_SUITABLE = "no_suitable_time"
 
 # Constants for Lightning strikes
 BOUNDING_BOX_HALF_SIDE_KM = 200

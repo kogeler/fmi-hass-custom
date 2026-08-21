@@ -1,14 +1,17 @@
 # Copyright (c) 2026 kogeler
 # SPDX-License-Identifier: MIT
+# Contracts: docs/contracts/AVAILABILITY.md, docs/contracts/OPTIONAL_SOURCES.md,
+# docs/contracts/RUNTIME.md
 
 """The FMI (Finnish Meteorological Institute) component."""
 
 from __future__ import annotations
 
 from asyncio import gather, timeout
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from types import MappingProxyType
 from typing import Any
 from xml.parsers.expat import ExpatError
 
@@ -27,7 +30,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 from requests.exceptions import RequestException
 
-from . import const, utils
+from . import best_time, const, utils
 from . import fmi_client as fmi
 from .lightning import lightning_geometry
 from .xml_parser import (
@@ -58,6 +61,11 @@ _FMI_SOURCE_ERRORS = (
 )
 
 
+def _empty_probability_map() -> Mapping[datetime, fmi.ForecastProbabilities]:
+    """Return an immutable empty forecast-probability mapping."""
+    return MappingProxyType({})
+
+
 class OptionalSourceError(RuntimeError):
     """Report a classified optional-source transport or payload failure."""
 
@@ -82,6 +90,14 @@ class _LightningState:
     radius: int
     max_age_minutes: int
     data: list[FMILightningStruct] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _ForecastSupplementState:
+    """Keep current and future probability ownership in one runtime value."""
+
+    current: fmi.ForecastProbabilities
+    by_time: Mapping[datetime, fmi.ForecastProbabilities]
 
 
 @dataclass(frozen=True, slots=True)
@@ -324,14 +340,13 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         self.current: fmi_models.Weather | None = None
         # Next day(s) forecasts
         self.forecast: fmi_models.Forecast | None = None
+        self._forecast_supplements = _ForecastSupplementState(
+            current=fmi.ForecastProbabilities(None, None),
+            by_time=_empty_probability_map(),
+        )
 
-        # Best Time Attributes derived based on forecast weather data
-        self.best_time: datetime | None = None
-        self.best_temperature: float | None = None
-        self.best_humidity: float | None = None
-        self.best_wind_speed: float | None = None
-        self.best_precipitation: float | None = None
-        self.best_state: str | None = None
+        # Best Time attributes derived only from complete remaining forecast candidates.
+        self.best_condition = best_time.BestCondition(const.BEST_CONDITION_NOT_AVAIL)
 
         # Mareo
         self.mareo_data: FMIMareoStruct | None = None
@@ -402,6 +417,47 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             return self.current.place
         return None
 
+    def get_current_probabilities(self) -> fmi.ForecastProbabilities:
+        """Return probabilities aligned with the current forecast-backed sample."""
+        return self._forecast_supplements.current
+
+    def get_forecast_probabilities(self, timestamp: object) -> fmi.ForecastProbabilities:
+        """Return probabilities aligned with one aware forecast timestamp."""
+        if (
+            not isinstance(timestamp, datetime)
+            or timestamp.tzinfo is None
+            or timestamp.utcoffset() is None
+        ):
+            return fmi.ForecastProbabilities(None, None)
+        return self._forecast_supplements.by_time.get(
+            timestamp.astimezone(UTC),
+            fmi.ForecastProbabilities(None, None),
+        )
+
+    def _set_current_probabilities(self, value: fmi.ForecastProbabilities) -> None:
+        """Replace current probabilities without changing the forecast owner."""
+        self._forecast_supplements = _ForecastSupplementState(
+            current=value,
+            by_time=self._forecast_supplements.by_time,
+        )
+
+    def _set_forecast_probabilities(
+        self,
+        value: Mapping[datetime, fmi.ForecastProbabilities],
+    ) -> None:
+        """Replace future probabilities without changing the current owner."""
+        self._forecast_supplements = _ForecastSupplementState(
+            current=self._forecast_supplements.current,
+            by_time=value,
+        )
+
+    def _clear_probabilities(self) -> None:
+        """Clear all probability values with one atomic runtime replacement."""
+        self._forecast_supplements = _ForecastSupplementState(
+            current=fmi.ForecastProbabilities(None, None),
+            by_time=_empty_probability_map(),
+        )
+
     def _set_source_availability(self, source: str, available: bool, detail: str = "") -> None:
         """Log only source outage and recovery transitions."""
         previous = self._source_available.get(source)
@@ -423,70 +479,25 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             return type(error).__name__
         return f"HTTP {status_code}"
 
-    @staticmethod
-    def _finite_weather_value(source_data: object, name: str) -> float | None:
-        """Return one finite FMI value from a possibly incomplete model."""
-        wrapped = getattr(source_data, name, None)
-        return utils.finite_float(getattr(wrapped, "value", None))
-
     def __update_best_weather_condition(self) -> None:
-        weather = self.get_weather()
-        if weather is None:
-            return
-
-        weather_data = getattr(weather, "data", None)
-        self.best_state = const.BEST_CONDITION_NOT_AVAIL
-        self.best_time = utils.as_local_aware_datetime(getattr(weather_data, "time", None))
-        self.best_temperature = self._finite_weather_value(weather_data, "temperature")
-        self.best_humidity = self._finite_weather_value(weather_data, "humidity")
-        self.best_wind_speed = self._finite_weather_value(weather_data, "wind_speed")
-        self.best_precipitation = self._finite_weather_value(weather_data, "precipitation_amount")
-
-        current_date = dt_util.now().date()
-        for forecast in self.get_forecasts():
-            local_time = utils.as_local_aware_datetime(getattr(forecast, "time", None))
-            if local_time is None or local_time.date() != current_date:
-                continue
-
-            symbol = self._finite_weather_value(forecast, "symbol")
-            wind_speed = self._finite_weather_value(forecast, "wind_speed")
-
-            if (
-                symbol not in const.BEST_COND_SYMBOLS
-                or wind_speed is None
-                or wind_speed < self.min_wind_speed
-                or wind_speed > self.max_wind_speed
-            ):
-                continue
-
-            temperature = self._finite_weather_value(forecast, "temperature")
-            if (
-                temperature is None
-                or temperature < self.min_temperature
-                or temperature > self.max_temperature
-            ):
-                continue
-
-            humidity = self._finite_weather_value(forecast, "humidity")
-            if humidity is None or humidity < self.min_humidity or humidity > self.max_humidity:
-                continue
-
-            precipitation_amount = self._finite_weather_value(forecast, "precipitation_amount")
-            if (
-                precipitation_amount is None
-                or precipitation_amount < self.min_precip
-                or precipitation_amount > self.max_precip
-            ):
-                continue
-
-            self.best_state = const.BEST_CONDITION_AVAIL
-
-            if self.best_temperature is None or temperature > self.best_temperature:
-                self.best_time = local_time
-                self.best_temperature = temperature
-                self.best_humidity = humidity
-                self.best_wind_speed = wind_speed
-                self.best_precipitation = precipitation_amount
+        """Select the best complete remaining current-local-day forecast hour."""
+        limits = best_time.BestTimeLimits(
+            minimum_temperature=self.min_temperature,
+            maximum_temperature=self.max_temperature,
+            minimum_humidity=self.min_humidity,
+            maximum_humidity=self.max_humidity,
+            minimum_wind_speed=self.min_wind_speed,
+            maximum_wind_speed=self.max_wind_speed,
+            minimum_precipitation=self.min_precip,
+            maximum_precipitation=self.max_precip,
+        )
+        self.best_condition = best_time.select_best_condition(
+            self.get_forecasts(),
+            self.get_forecast_probabilities,
+            dt_util.now(),
+            limits,
+            const.BEST_COND_SYMBOLS,
+        )
 
     @staticmethod
     def __xml_rows(document: XMLDocument, local_name: str) -> list[str]:
@@ -726,12 +737,20 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _fetch_forecast_weather(self):
         """Fetch current weather data based on estimation (forecast)."""
+        result: fmi.CurrentWeatherResult | fmi_models.Weather | None
         try:
-            data = await fmi.async_weather_by_coordinates(self.latitude, self.longitude)
+            result = await fmi.async_weather_by_coordinates(self.latitude, self.longitude)
         except _FMI_SOURCE_ERRORS as error:
             self._set_source_availability("forecast current", False, self._fmi_error_detail(error))
         else:
-            if data is not None:
+            if result is not None:
+                if isinstance(result, fmi.CurrentWeatherResult):
+                    data = result
+                else:
+                    data = fmi.CurrentWeatherResult(
+                        result,
+                        fmi.ForecastProbabilities(None, None),
+                    )
                 self._set_source_availability("forecast current", True)
                 return data
             self._set_source_availability("forecast current", False, "no data returned")
@@ -740,32 +759,47 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         if not place_name:
             return None
         try:
-            data = await fmi.async_observation_by_place(place_name)
+            observation = await fmi.async_observation_by_place(place_name)
         except _FMI_SOURCE_ERRORS as error:
             self._set_source_availability("place observation", False, self._fmi_error_detail(error))
             return None
-        if data is None:
+        if observation is None:
             self._set_source_availability("place observation", False, "no data returned")
             return None
         self._set_source_availability("place observation", True)
-        return data
+        return fmi.CurrentWeatherResult(
+            observation,
+            fmi.ForecastProbabilities(None, None),
+        )
 
     async def _fetch_forecast(self):
         """Fetch current forecast data."""
         self.forecast = None
+        self._set_forecast_probabilities(_empty_probability_map())
         if not self.forecast_points:
             return
+        result: fmi.ForecastResult | fmi_models.Forecast | None
         try:
-            forecast = await fmi.async_forecast_by_coordinates(
+            result = await fmi.async_forecast_by_coordinates(
                 self.latitude, self.longitude, 1, self.forecast_points
             )
         except _FMI_SOURCE_ERRORS as error:
             self._set_source_availability("forecast", False, self._fmi_error_detail(error))
             return
-        if forecast is None or not forecast.forecasts:
+        if result is None:
+            self._set_source_availability("forecast", False, "no data returned")
+            return
+        if isinstance(result, fmi.ForecastResult):
+            forecast = result.forecast
+            probabilities_by_time = result.probabilities_by_time
+        else:
+            forecast = result
+            probabilities_by_time = _empty_probability_map()
+        if not forecast.forecasts:
             self._set_source_availability("forecast", False, "no data returned")
             return
         self.forecast = forecast
+        self._set_forecast_probabilities(probabilities_by_time)
         self._set_source_availability("forecast", True)
 
     async def _async_update_optional_source(
@@ -795,12 +829,15 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         try:
             async with timeout(const.TIMEOUT_FMI_INTEG_IN_SEC):
                 self.logger.debug("FMI: fetch latest forecast data")
-                weather_data = await self._fetch_forecast_weather()
-                if weather_data is None:
+                self._set_current_probabilities(fmi.ForecastProbabilities(None, None))
+                current_result = await self._fetch_forecast_weather()
+                if current_result is None:
                     self.current = None
                     self.forecast = None
+                    self._clear_probabilities()
                     raise UpdateFailed("FMI current conditions are unavailable")
-                self.current = weather_data
+                self.current = current_result.weather
+                self._set_current_probabilities(current_result.probabilities)
 
                 await self._fetch_forecast()
 
@@ -810,6 +847,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         except TimeoutError as error:
             self.current = None
             self.forecast = None
+            self._clear_probabilities()
             self._set_source_availability("primary update", False, "request timed out")
             raise UpdateFailed(error) from error
         except UpdateFailed as error:

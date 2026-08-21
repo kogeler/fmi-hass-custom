@@ -1,116 +1,39 @@
 <!-- Copyright (c) 2026 kogeler. SPDX-License-Identifier: MIT. -->
 
-# Compatibility, Security, And Privacy
+# Compatibility, Security, And Privacy Maintenance
 
-This document defines the current support and protection boundaries for maintainers. Update it
-when the supported Home Assistant line, dependency graph, external services, diagnostics, logging,
-or CI trust model changes. Keep historical audit narrative outside this current contract.
+Normative support, moving-compatibility, logging, diagnostics, XML, disclosure, and fixture
+requirements are owned exclusively by
+[the compatibility, security, and privacy contract](../contracts/COMPATIBILITY_SECURITY.md).
+Dependency/audit rules are in [the dependency contract](../contracts/DEPENDENCIES.md), and workflow
+trust is in [the CI contract](../contracts/CI.md).
 
-Last verified: 2026-08-19.
+## Review Procedure
 
-## Support Matrix
+1. Identify the affected `CSP-*` assertion and review every linked test.
+2. For a support-policy change, update PEP 621 or `hacs.json` only in its owning role and add a
+   reproduced compatibility regression before raising the installation floor.
+3. For logging/diagnostic changes, inspect emitted values and error paths for coordinates, search
+   text, identity, payloads, and arbitrary external exception content.
+4. For XML/parser changes, preserve the input ceiling, Expat floor, entity-disabled behavior, and
+   executor boundary with hostile fixtures.
+5. Review `.github/dependency-audit-exceptions.json` and `TODO.md` rather than copying accepted
+   advisory versions into another document.
+6. Run `make test-full`, `make type-check`, `make bandit`, `make test-network-block`,
+   `make confinement-test`, `make validate`, `make audit`, and `make licenses`. Follow the final-only
+   moving-compatibility protocol in `AGENTS.md` for an actual support/dependency change.
 
-| Environment | Contract |
-|---|---|
-| Home Assistant 2026.8.1 / Python 3.14.2 | Reproducible release reference. The hashed dev lock and complete lifecycle/config/entity/migration suite target this pair; it is not the HACS installation floor. |
-| HACS installation floor | The value in `hacs.json` is retained until a reproduced integration or runtime incompatibility requires raising it. A routine reference-lock refresh is not such evidence. |
-| Latest Home Assistant stable | Required moving compatibility signal. It resolves, freezes, recreates, and tests the current published stable graph without changing the reference lock. A pass is evidence for that run, not a permanent future-version promise. |
-| Latest Home Assistant prerelease | Informational moving signal. No newer installable prerelease is a successful explicit skip; a real beta or helper failure remains visible without blocking the supported release. |
+## Interpretation
 
-Compatibility claims come from functional lifecycle, configuration, entity, migration, and source
-tests. Tests and runtime code must not encode concrete Home Assistant, test-helper, or minimum
-version assertions. Exact reference versions live in root PEP 621 and the generated dev hash lock;
-the independently maintained HACS floor may be raised only for a demonstrated broken contract,
-with regression evidence and documented user impact.
-
-This is a HACS custom integration. It does not claim an official Home Assistant Core quality tier.
-The selected FMI client is not fully async; its synchronous work must remain executor-isolated as
-defined in `RUNTIME.md`.
-
-## Home Assistant Contracts
-
-- Per-entry state lives in typed `ConfigEntry.runtime_data` and must survive lifecycle operations
-  without cross-entry leakage.
-- User, options, and reconfigure flows use current Home Assistant APIs, validate FMI connectivity,
-  reject duplicate locations, and preserve stable identity.
-- Weather entities expose separate hourly and daily async forecast APIs with current feature flags,
-  native units, and aware UTC timestamps.
-- Sensors use current entity descriptions, device/state classes where applicable, translated names,
-  stable unique IDs, and coordinator-driven polling.
-- Existing config and registry state follows `MIGRATIONS.md`; do not trade compatibility for cleaner
-  generated names.
-- Both read-only coordinator platforms keep `PARALLEL_UPDATES = 0`.
-
-## Data And Privacy Boundaries
-
-- FMI necessarily receives either place-search text during the optional setup/reconfigure search
-  path or configured coordinates for final setup validation, current/forecast, lightning-area,
-  and sea-level requests. Search text is transient and is not stored in the config entry, logs, or
-  diagnostics. Responses are processed in memory and are not copied to diagnostics.
-- Lightning strike coordinates remain inside the FMI response/parser boundary. They are used only
-  to calculate local distance, bearing, and direction relative to the owning entry and are not
-  exposed in entity state/attributes or sent to another provider.
-- Logs contain source names, transitions, HTTP status classes, and exception class names only.
-  Configured coordinates, coordinate-derived identity, raw responses, and arbitrary external
-  exception content are prohibited.
-- Diagnostics expose sanitized health/configuration metadata only. They exclude coordinates,
-  place/weather values, external payloads, entry IDs, unique IDs, and legacy coordinate identity.
-- Entity states intentionally expose configured place and weather data to the Home Assistant user;
-  that user-facing behavior is distinct from logs and downloadable diagnostics.
-- Integration-owned external FMI XML, including place-resolution responses, is parsed with
-  `xmltodict==1.0.4` on Expat 2.7.2 or newer,
-  with entity declarations explicitly disabled and a 2 MiB parser-input ceiling. Expat has no
-  external-resource handler in this path, so an external DTD declaration is inert rather than
-  loaded. Optional-source HTTP payloads retain the same 2 MiB streaming limit and parsing remains
-  executor-isolated. The reference Python 3.14.2 runtime uses Expat 2.7.3.
-
-## Accepted Constraints
-
-- Home Assistant 2026.8.1 pins cryptography 48.0.1 with three known advisories. The integration
-  neither imports nor declares it. The owner-approved development/test exception is exact by
-  package, version, and advisory ID; `TODO.md` records the upstream removal trigger.
-- A live FMI/network outage blocks required CI by explicit policy. Re-run once and classify the
-  failure with `LIVE_TESTS.md`; do not weaken assertions or silently make the probe optional.
-
-## Dependency And Workflow Security
-
-- `make audit` passes only when the installed hashed dev graph matches the exact reviewed exception set;
-  new findings and stale exceptions fail. `make audit-raw` remains nonzero while the upstream
-  cryptography pin is vulnerable. `make licenses` is a maintainer-reviewed inventory; an unknown
-  or incompatible license blocks the dependency change.
-- The integration-declared xmltodict/FMI runtime closure has no accepted vulnerability
-  exception.
-- Workflows use read-only permissions by default, full-SHA action references, immutable container
-  digests, and bounded timeouts. CI and PR-body runs cancel superseded executions; release runs use
-  serialized concurrency without cancelling an in-progress publication.
-- All project-aware local/CI commands except Ruff run in rootless Podman with tar-streamed source,
-  no checkout bind, read-only root, private namespaces, no capabilities, NNP, seccomp, scrubbed
-  environment, bounded resources, and offline networking by default. Ruff uses only its separate
-  hashed wheel-only host environment.
-- Reusable CI never receives `contents: write`. Only the direct-master dependency-submission job
-  and the final release publication job receive that permission in separate workflows; CodeQL
-  receives `security-events: write` only to upload results.
-- The metadata-only `pull_request_target` workflow executes trusted default-branch code and treats
-  the source changelog as bounded inert data. Never check out or execute PR-head code with its write
-  token.
-- Every repository-authored CI helper is Python under `.github/scripts/`. GitHub API calls use the
-  SHA-pinned native `actions/github-script`; workflows do not use `curl`, `gh api`, or a custom HTTP
-  client.
-
-## Maintainer Verification
-
-Run `make confinement-test`, `make test-full`, `make type-check`, `make bandit`,
-`make test-network-block`, `make validate`, `make audit`, and `make licenses` after changing
-compatibility, logging, diagnostics, dependency, or workflow boundaries. Run both compatibility
-targets for a support-policy change, and inspect CodeQL/HACS results on the pull request.
+This repository is a maintained HACS custom integration and does not infer an official Home
+Assistant Core quality tier. The exact reference graph is reproducible evidence for development;
+the HACS floor is a separate user-installation decision. A moving compatibility pass is evidence
+for that run, not a permanent promise about future Home Assistant releases.
 
 ## References
 
 - [Home Assistant integration quality guidance](https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/)
 - [Runtime data](https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/runtime-data/)
 - [Diagnostics and coordinate redaction](https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/diagnostics/)
-- [Coordinator and polling guidance](https://developers.home-assistant.io/docs/integration_fetching_data/)
-- [Weather entity API](https://developers.home-assistant.io/docs/core/entity/weather/)
-- [Sensor entity API](https://developers.home-assistant.io/docs/core/entity/sensor/)
 - [Python XML security guidance](https://docs.python.org/3.14/library/xml.html)
-- [`xmltodict` supported security line](https://github.com/martinblech/xmltodict/security)
+- [`xmltodict` security policy](https://github.com/martinblech/xmltodict/security)

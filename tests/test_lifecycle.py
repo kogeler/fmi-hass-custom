@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from types import MappingProxyType
 from typing import Any, cast
 from unittest.mock import AsyncMock
 
@@ -26,6 +27,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import translation
+from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.fmi import (
@@ -37,11 +39,14 @@ from custom_components.fmi import (
 )
 from custom_components.fmi import fmi as fmi_client
 from custom_components.fmi.const import (
+    BEST_CONDITION_NO_SUITABLE,
     BEST_CONDITION_NOT_AVAIL,
     CONF_DAILY_MODE,
     CONF_ENTITY_IDENTITY,
     CONF_FORECAST_DAYS,
     CONF_LIGHTNING,
+    CONF_MAX_TEMP,
+    CONF_MIN_TEMP,
     CONF_OBSERVATION_STATION,
     DOMAIN,
 )
@@ -85,9 +90,30 @@ def _patch_sources(
     observation: models.Weather | None = None,
 ) -> dict[str, AsyncMock]:
     """Install deterministic FMI source mocks and an empty optional source."""
+    weather_result = (
+        fmi_client.CurrentWeatherResult(
+            weather,
+            fmi_client.ForecastProbabilities(0.0, 100.0),
+        )
+        if weather is not None
+        else None
+    )
+    forecast_result = (
+        fmi_client.ForecastResult(
+            forecast,
+            MappingProxyType(
+                {
+                    sample.time.astimezone(UTC): fmi_client.ForecastProbabilities(25.0, 5.0)
+                    for sample in forecast.forecasts
+                }
+            ),
+        )
+        if forecast is not None
+        else None
+    )
     mocks = {
-        "weather": AsyncMock(return_value=weather),
-        "forecast": AsyncMock(return_value=forecast),
+        "weather": AsyncMock(return_value=weather_result),
+        "forecast": AsyncMock(return_value=forecast_result),
         "place_observation": AsyncMock(return_value=None),
         "station_observation": AsyncMock(return_value=observation),
     }
@@ -251,6 +277,7 @@ async def test_public_entity_and_forecast_contracts(
     current = weather_states["Helsinki"]
     assert current.state == "partlycloudy"
     assert current.attributes["temperature"] == -4.0
+    assert current.attributes["apparent_temperature"] == -7.0
     assert current.attributes["temperature_unit"] == "°C"
     assert current.attributes["pressure_unit"] == "hPa"
     observation_state = weather_states["Helsinki Kaisaniemi Observation"]
@@ -265,7 +292,11 @@ async def test_public_entity_and_forecast_contracts(
     assert hourly[0]["datetime"].endswith("+00:00")
     assert daily[0]["datetime"].endswith("+00:00")
     assert hourly[0]["temperature"] == -5.0
+    assert hourly[0]["apparent_temperature"] == -7.0
+    assert hourly[0]["precipitation_probability"] == 25
     assert daily[0]["templow"] == -5.0
+    assert daily[0]["apparent_temperature"] == -7.0
+    assert "precipitation_probability" not in daily[0]
 
     temperature = hass.states.get("sensor.helsinki_temperature")
     lightning = hass.states.get("sensor.helsinki_lightning_strikes")
@@ -276,11 +307,24 @@ async def test_public_entity_and_forecast_contracts(
     assert lightning.attributes["distance"] == 12.5
     assert lightning.attributes["bearing"] == 135.0
     assert lightning.attributes["direction"] == "SE"
+    dynamic_lightning_attributes = {
+        "time",
+        "distance",
+        "bearing",
+        "direction",
+        "strikes",
+        "peak_current",
+        "cloud_cover",
+        "ellipse_major",
+    }
+    assert dynamic_lightning_attributes <= set(lightning.attributes)
     assert lightning.attributes["attribution"] == "Weather Data provided by FMI"
     assert "location" not in lightning.attributes
     assert len(lightning.attributes["OBSERVATIONS"]) == 1
-    assert lightning.attributes["OBSERVATIONS"][0]["direction"] == "SW"
-    assert "location" not in lightning.attributes["OBSERVATIONS"][0]
+    retained_observation = lightning.attributes["OBSERVATIONS"][0]
+    assert set(retained_observation) == dynamic_lightning_attributes
+    assert retained_observation["direction"] == "SW"
+    assert "location" not in retained_observation
     assert sea_level is not None and sea_level.state == "12.5"
     assert sea_level.attributes["unit_of_measurement"] == "cm"
     assert len(sea_level.attributes["FORECASTS"]) == 1
@@ -295,7 +339,107 @@ async def test_public_entity_and_forecast_contracts(
     assert device.manufacturer == "Finnish Meteorological Institute"
 
 
-async def test_lightning_empty_state_translations_load_from_integration(
+async def test_metric_sensors_and_weather_follow_ha_unit_conversion(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Convert native FMI temperature and pressure through public HA surfaces."""
+    hass.config.units = US_CUSTOMARY_SYSTEM
+    weather = weather_from_fixture("forecast_normal.json")
+    forecast = forecast_from_fixture("forecast_normal.json")
+    assert weather is not None
+    _patch_sources(monkeypatch, weather=weather, forecast=forecast)
+    entry = _entry(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    feels_like = hass.states.get("sensor.helsinki_feels_like")
+    pressure = hass.states.get("sensor.helsinki_atmospheric_pressure")
+    weather_state = hass.states.get("weather.helsinki")
+    assert feels_like is not None and float(feels_like.state) == pytest.approx(19.4)
+    assert feels_like.attributes["unit_of_measurement"] == "°F"
+    assert pressure is not None and float(pressure.state) == pytest.approx(29.884, abs=0.001)
+    assert pressure.attributes["unit_of_measurement"] == "inHg"
+    assert weather_state is not None
+    assert weather_state.attributes["apparent_temperature"] == 19
+
+    hourly = await _forecast_service(hass, weather_state.entity_id, "hourly")
+    daily = await _forecast_service(hass, weather_state.entity_id, "daily")
+    assert hourly[0]["apparent_temperature"] == 19
+    assert hourly[0]["precipitation_probability"] == 25
+    assert daily[0]["apparent_temperature"] == 19
+    assert "precipitation_probability" not in daily[0]
+
+
+async def test_partial_metric_failure_preserves_independent_sources_and_recovers(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Keep weather siblings, station, lightning, and sea level across partial data loss."""
+    weather = weather_from_fixture("forecast_normal.json")
+    forecast = forecast_from_fixture("forecast_normal.json")
+    observation = weather_from_fixture("observation.json", "observation")
+    assert weather is not None and observation is not None
+    mocks = _patch_sources(
+        monkeypatch,
+        weather=weather,
+        forecast=forecast,
+        observation=observation,
+    )
+    _patch_optional_success(monkeypatch)
+    valid_current = cast(fmi_client.CurrentWeatherResult, mocks["weather"].return_value)
+    valid_forecast = cast(fmi_client.ForecastResult, mocks["forecast"].return_value)
+    partial_weather = weather._replace(
+        data=weather.data._replace(feels_like=models.Value(None, "°C"))
+    )
+    partial_current = fmi_client.CurrentWeatherResult(
+        partial_weather,
+        fmi_client.ForecastProbabilities(None, None),
+    )
+    partial_forecast = fmi_client.ForecastResult(forecast, MappingProxyType({}))
+    mocks["weather"].side_effect = [valid_current, partial_current, valid_current]
+    mocks["forecast"].side_effect = [valid_forecast, partial_forecast, valid_forecast]
+    entry = _entry(
+        hass,
+        options={CONF_LIGHTNING: True, CONF_OBSERVATION_STATION: 101004},
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data.coordinator
+    feels_like = hass.states.get("sensor.helsinki_feels_like")
+    probability = hass.states.get("sensor.helsinki_precipitation_probability")
+    assert feels_like is not None and feels_like.state != STATE_UNAVAILABLE
+    assert probability is not None and probability.state != STATE_UNAVAILABLE
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    main = hass.states.get("weather.helsinki")
+    station = hass.states.get("weather.helsinki_kaisaniemi_observation")
+    feels_like = hass.states.get("sensor.helsinki_feels_like")
+    probability = hass.states.get("sensor.helsinki_precipitation_probability")
+    dew_point = hass.states.get("sensor.helsinki_dew_point")
+    lightning = hass.states.get("sensor.helsinki_lightning_strikes")
+    sea_level = hass.states.get("sensor.helsinki_sea_level")
+    assert main is not None and main.state != STATE_UNAVAILABLE
+    assert station is not None and station.state != STATE_UNAVAILABLE
+    assert feels_like is not None and feels_like.state == STATE_UNAVAILABLE
+    assert probability is not None and probability.state == STATE_UNAVAILABLE
+    assert dew_point is not None and dew_point.state != STATE_UNAVAILABLE
+    assert lightning is not None and lightning.state != STATE_UNAVAILABLE
+    assert sea_level is not None and sea_level.state != STATE_UNAVAILABLE
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    feels_like = hass.states.get("sensor.helsinki_feels_like")
+    probability = hass.states.get("sensor.helsinki_precipitation_probability")
+    assert feels_like is not None and feels_like.state != STATE_UNAVAILABLE
+    assert probability is not None and probability.state != STATE_UNAVAILABLE
+
+
+async def test_entity_state_and_metric_name_translations_load_from_integration(
     hass: HomeAssistant,
 ) -> None:
     """Expose the finite empty token in both shipped frontend languages."""
@@ -306,6 +450,30 @@ async def test_lightning_empty_state_translations_load_from_integration(
 
     assert english[key] == "No lightning strikes"
     assert finnish[key] == "Ei salamaniskuja"
+    best_time_key = "component.fmi.entity.sensor.best_time_of_day.state.no_suitable_time"
+    assert english[best_time_key] == "No suitable time today"
+    assert finnish[best_time_key] == "Ei sopivaa aikaa tänään"
+
+    sensor_names = {
+        "feels_like": ("Feels like", "Tuntuu kuin"),
+        "dew_point": ("Dew point", "Kastepiste"),
+        "atmospheric_pressure": ("Atmospheric pressure", "Ilmanpaine"),
+        "low_cloud_cover": ("Low cloud cover", "Alapilvisyys"),
+        "medium_cloud_cover": ("Medium cloud cover", "Keskipilvisyys"),
+        "high_cloud_cover": ("High cloud cover", "Yläpilvisyys"),
+        "precipitation_probability": (
+            "Precipitation probability",
+            "Sateen todennäköisyys",
+        ),
+        "thunderstorm_probability": (
+            "Thunderstorm probability",
+            "Ukkosen todennäköisyys",
+        ),
+    }
+    for sensor_key, (english_name, finnish_name) in sensor_names.items():
+        name_key = f"component.fmi.entity.sensor.{sensor_key}.name"
+        assert english[name_key] == english_name
+        assert finnish[name_key] == finnish_name
 
 
 async def test_lightning_empty_failure_and_recovery_transitions(
@@ -661,6 +829,7 @@ async def test_observation_no_data_or_timeout_recovers_through_weather_entity(
     assert observation_state is not None
     assert observation_state.state == "partlycloudy"
     assert observation_state.attributes["temperature"] == 6.5
+    assert observation_state.attributes["apparent_temperature"] == 3.1
 
 
 @pytest.mark.parametrize("forecast_mode", ["disabled", "empty"])
@@ -955,4 +1124,247 @@ async def test_best_condition_rejects_each_out_of_range_forecast(
     await hass.async_block_till_done()
 
     coordinator = entry.runtime_data.coordinator
-    assert coordinator.best_state == BEST_CONDITION_NOT_AVAIL
+    assert coordinator.best_condition.status == BEST_CONDITION_NO_SUITABLE
+    state = hass.states.get("sensor.helsinki_best_time_of_day")
+    assert state is not None and state.state == BEST_CONDITION_NO_SUITABLE
+    for attribute in (
+        "location",
+        "time",
+        "temperature",
+        "relative_humidity",
+        "precipitation",
+        "wind_speed",
+        "apparent_temperature",
+        "precipitation_probability",
+        "thunderstorm_probability",
+    ):
+        assert attribute not in state.attributes
+
+
+async def test_best_time_selected_state_preserves_and_extends_attributes(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Expose the compatible HH:MM state and all transparent selection factors."""
+    weather = weather_from_fixture("forecast_normal.json")
+    source_forecast = forecast_from_fixture("forecast_normal.json")
+    assert weather is not None
+    current_time = datetime(2026, 2, 10, 12, 0, tzinfo=UTC)
+    selected = source_forecast.forecasts[0]._replace(
+        time=current_time.replace(hour=13),
+        temperature=models.Value(18.0, "°C"),
+        feels_like=models.Value(20.0, "°C"),
+        humidity=models.Value(50.0, "%"),
+        wind_speed=models.Value(4.0, "m/s"),
+        precipitation_amount=models.Value(0.1, "mm/h"),
+        symbol=models.Value(1.0, ""),
+    )
+    forecast = source_forecast._replace(forecasts=[selected])
+    mocks = _patch_sources(monkeypatch, weather=weather, forecast=forecast)
+    monkeypatch.setattr("custom_components.fmi.dt_util.now", lambda: current_time)
+    entry = _entry(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = entry.runtime_data.coordinator
+    state = hass.states.get("sensor.helsinki_best_time_of_day")
+    assert coordinator.best_condition.time is not None
+    expected_state = coordinator.best_condition.time.strftime("%H:%M")
+    assert state is not None and state.state == expected_state
+    assert state.attributes["location"] == "Helsinki"
+    assert state.attributes["temperature"] == 18.0
+    assert state.attributes["apparent_temperature"] == 20.0
+    assert state.attributes["relative_humidity"] == 50.0
+    assert state.attributes["wind_speed"] == 4.0
+    assert state.attributes["precipitation"] == 0.1
+    assert state.attributes["precipitation_probability"] == 25.0
+    assert state.attributes["thunderstorm_probability"] == 5.0
+    assert state.attributes["time"] == selected.time
+    assert isinstance(state.attributes["time"], datetime)
+    assert state.attributes["time"].utcoffset() is not None
+    for private_or_internal_attribute in (
+        "latitude",
+        "longitude",
+        "entity_identity",
+        "rank",
+        "score",
+        "raw_forecast",
+    ):
+        assert private_or_internal_attribute not in state.attributes
+
+    complete_forecast = cast(fmi_client.ForecastResult, mocks["forecast"].return_value)
+    incomplete_forecast = fmi_client.ForecastResult(forecast, MappingProxyType({}))
+    mocks["forecast"].side_effect = [incomplete_forecast, complete_forecast]
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    state = hass.states.get("sensor.helsinki_best_time_of_day")
+    assert coordinator.best_condition.status == BEST_CONDITION_NOT_AVAIL
+    assert state is not None and state.state == STATE_UNAVAILABLE
+    assert "time" not in state.attributes
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    state = hass.states.get("sensor.helsinki_best_time_of_day")
+    assert state is not None and state.state == expected_state
+
+
+async def test_best_time_options_reload_reselects_without_replacing_entity(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Apply feels-like limits after reload while retaining registry identity."""
+    weather = weather_from_fixture("forecast_normal.json")
+    source_forecast = forecast_from_fixture("forecast_normal.json")
+    assert weather is not None
+    current_time = datetime(2026, 2, 10, 12, 0, tzinfo=UTC)
+    first = source_forecast.forecasts[0]._replace(
+        time=current_time.replace(hour=13),
+        temperature=models.Value(18.0, "°C"),
+        feels_like=models.Value(18.0, "°C"),
+        humidity=models.Value(50.0, "%"),
+        wind_speed=models.Value(4.0, "m/s"),
+        precipitation_amount=models.Value(0.1, "mm/h"),
+    )
+    second = source_forecast.forecasts[1]._replace(
+        time=current_time.replace(hour=14),
+        temperature=models.Value(25.0, "°C"),
+        feels_like=models.Value(25.0, "°C"),
+        humidity=models.Value(50.0, "%"),
+        wind_speed=models.Value(4.0, "m/s"),
+        precipitation_amount=models.Value(0.1, "mm/h"),
+    )
+    forecast = source_forecast._replace(forecasts=[first, second])
+    _patch_sources(monkeypatch, weather=weather, forecast=forecast)
+    monkeypatch.setattr("custom_components.fmi.dt_util.now", lambda: current_time)
+    entry = _entry(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    registry = er.async_get(hass)
+    before = registry.async_get("sensor.helsinki_best_time_of_day")
+    assert before is not None
+    before_state = hass.states.get(before.entity_id)
+    assert before_state is not None
+    before_time = entry.runtime_data.coordinator.best_condition.time
+    assert before_time is not None
+    assert before_state.state == before_time.strftime("%H:%M")
+    assert entry.runtime_data.coordinator.best_condition.temperature == 18.0
+
+    await _configure_options(
+        hass,
+        entry,
+        **{CONF_MIN_TEMP: 24, CONF_MAX_TEMP: 30},
+    )
+
+    after = registry.async_get("sensor.helsinki_best_time_of_day")
+    assert after is not None
+    assert after.id == before.id
+    assert after.unique_id == before.unique_id
+    after_state = hass.states.get(after.entity_id)
+    assert after_state is not None
+    after_time = entry.runtime_data.coordinator.best_condition.time
+    assert after_time is not None
+    assert after_state.state == after_time.strftime("%H:%M")
+    assert entry.runtime_data.coordinator.best_condition.temperature == 25.0
+
+
+async def test_two_entries_select_best_time_from_their_own_forecasts_and_options(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Keep Best-time data and preferences isolated between simultaneous entries."""
+    weather = weather_from_fixture("forecast_normal.json")
+    source_forecast = forecast_from_fixture("forecast_normal.json")
+    assert weather is not None
+    current_time = datetime(2026, 2, 10, 12, 0, tzinfo=UTC)
+    helsinki_sample = source_forecast.forecasts[0]._replace(
+        time=current_time.replace(hour=13),
+        temperature=models.Value(18.0, "°C"),
+        feels_like=models.Value(18.0, "°C"),
+        humidity=models.Value(50.0, "%"),
+        wind_speed=models.Value(4.0, "m/s"),
+        precipitation_amount=models.Value(0.1, "mm/h"),
+    )
+    tampere_sample = source_forecast.forecasts[1]._replace(
+        time=current_time.replace(hour=14),
+        temperature=models.Value(25.0, "°C"),
+        feels_like=models.Value(25.0, "°C"),
+        humidity=models.Value(50.0, "%"),
+        wind_speed=models.Value(4.0, "m/s"),
+        precipitation_amount=models.Value(0.1, "mm/h"),
+    )
+    locations = {
+        (60.17, 24.94): (
+            weather,
+            source_forecast._replace(forecasts=[helsinki_sample]),
+        ),
+        (61.5, 23.76): (
+            weather._replace(place="Tampere", lat=61.5, lon=23.76),
+            source_forecast._replace(
+                place="Tampere",
+                lat=61.5,
+                lon=23.76,
+                forecasts=[tampere_sample],
+            ),
+        ),
+    }
+
+    async def current(latitude: float, longitude: float):
+        location_weather = locations[(latitude, longitude)][0]
+        return fmi_client.CurrentWeatherResult(
+            location_weather,
+            fmi_client.ForecastProbabilities(20.0, 0.0),
+        )
+
+    async def forecasts(latitude: float, longitude: float, *_):
+        location_forecast = locations[(latitude, longitude)][1]
+        return fmi_client.ForecastResult(
+            location_forecast,
+            MappingProxyType(
+                {
+                    sample.time: fmi_client.ForecastProbabilities(20.0, 0.0)
+                    for sample in location_forecast.forecasts
+                }
+            ),
+        )
+
+    monkeypatch.setattr(fmi_client, "async_weather_by_coordinates", current)
+    monkeypatch.setattr(fmi_client, "async_forecast_by_coordinates", forecasts)
+    monkeypatch.setattr(fmi_client, "async_observation_by_place", AsyncMock(return_value=None))
+
+    async def empty_sea_level(self: FMIDataUpdateCoordinator) -> None:
+        self.mareo_data = None
+
+    monkeypatch.setattr(
+        FMIDataUpdateCoordinator,
+        "_FMIDataUpdateCoordinator__async_update_mareo_data",
+        empty_sea_level,
+    )
+    monkeypatch.setattr("custom_components.fmi.dt_util.now", lambda: current_time)
+    helsinki_entry = _entry(hass, entry_id="best-helsinki")
+    tampere_entry = _entry(
+        hass,
+        title="Synthetic Tampere",
+        latitude=61.5,
+        longitude=23.76,
+        entry_id="best-tampere",
+        options={CONF_MIN_TEMP: 24, CONF_MAX_TEMP: 30},
+    )
+
+    for entry in (helsinki_entry, tampere_entry):
+        if entry.state is ConfigEntryState.NOT_LOADED:
+            assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    helsinki_best = helsinki_entry.runtime_data.coordinator.best_condition
+    tampere_best = tampere_entry.runtime_data.coordinator.best_condition
+    assert helsinki_best.time is not None and tampere_best.time is not None
+    assert helsinki_best.temperature == 18.0
+    assert tampere_best.temperature == 25.0
+    assert helsinki_best.time != tampere_best.time
+    helsinki_state = hass.states.get("sensor.helsinki_best_time_of_day")
+    tampere_state = hass.states.get("sensor.tampere_best_time_of_day")
+    assert helsinki_state is not None and tampere_state is not None
+    assert helsinki_state.state != tampere_state.state

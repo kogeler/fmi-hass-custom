@@ -11,7 +11,13 @@ from unittest.mock import AsyncMock
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import CONF_LATITUDE, CONF_LOCATION, CONF_LONGITUDE, STATE_UNAVAILABLE
+from homeassistant.const import (
+    CONF_LATITUDE,
+    CONF_LOCATION,
+    CONF_LONGITUDE,
+    CONF_NAME,
+    STATE_UNAVAILABLE,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr
@@ -36,6 +42,30 @@ class LegacySnapshot:
     entries: dict[str, MockConfigEntry]
     devices: dict[str, dr.DeviceEntry]
     entities: dict[str, er.RegistryEntry]
+
+
+_SENSOR_IDENTITY_NAMES = (
+    "Place",
+    "Condition",
+    "Temperature",
+    "Feels like",
+    "Dew point",
+    "Atmospheric pressure",
+    "Wind Speed",
+    "Wind Direction",
+    "Wind Gust",
+    "Humidity",
+    "Cloud Coverage",
+    "Low cloud cover",
+    "Medium cloud cover",
+    "High cloud cover",
+    "Rain",
+    "Precipitation probability",
+    "Thunderstorm probability",
+    "Time",
+    "Best Time Of Day",
+    "Sea Level",
+)
 
 
 def _legacy_sensor_unique_id(identity: str, client_name: str, sensor_name: str) -> str:
@@ -339,10 +369,32 @@ async def test_combined_setup_preserves_registry_history_and_is_idempotent(
         for entity in registry.entities.values()
         if entity.config_entry_id in entry_ids
     }
-    assert set(migrated_entities) == set(original_registry_ids.values())
-    assert {entity.unique_id for entity in migrated_entities.values()} == set(
-        original_unique_ids.values()
+    expected_registry_unique_ids: set[str] = set()
+    for key, entry in snapshot.entries.items():
+        identity = entry.data[CONF_ENTITY_IDENTITY]
+        expected_registry_unique_ids.update(
+            _legacy_sensor_unique_id(
+                identity,
+                entry.data[CONF_NAME],
+                sensor_name,
+            )
+            for sensor_name in _SENSOR_IDENTITY_NAMES
+        )
+        if entry.options.get("lightning_sensor", False):
+            expected_registry_unique_ids.add(
+                _legacy_sensor_unique_id(
+                    identity,
+                    entry.data[CONF_NAME],
+                    "Lightning Strikes",
+                )
+            )
+        expected_registry_unique_ids.add(identity)
+        if snapshot.entities.get(f"{key}_daily") is not None:
+            expected_registry_unique_ids.add(f"{identity}_daily")
+    assert {entity.unique_id for entity in migrated_entities.values()} == (
+        expected_registry_unique_ids
     )
+    assert set(original_registry_ids.values()) <= set(migrated_entities)
 
     for key, registry_id in original_registry_ids.items():
         entity = migrated_entities[registry_id]
@@ -367,6 +419,112 @@ async def test_combined_setup_preserves_registry_history_and_is_idempotent(
     await hass.async_block_till_done()
 
     assert _registry_records(hass, snapshot) == after_first_setup
+
+
+async def test_current_registry_customization_and_disabled_state_survive_reload(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """Preserve one complete current registry contract across repeated setup."""
+    _patch_sources(monkeypatch)
+    identity = "current-registry-identity"
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Helsinki",
+        unique_id="fmi:current-registry",
+        data={
+            CONF_NAME: "FMI",
+            CONF_LATITUDE: 60.17,
+            CONF_LONGITUDE: 24.94,
+            CONF_ENTITY_IDENTITY: identity,
+        },
+        version=2,
+        minor_version=1,
+    )
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    best = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        _legacy_sensor_unique_id(identity, "FMI", "Best Time Of Day"),
+        suggested_object_id="best_time_of_day",
+        config_entry=entry,
+        original_name="Best Time Of Day",
+    )
+    best = registry.async_update_entity(
+        best.entity_id,
+        new_entity_id="sensor.preferred_outdoor_time",
+    )
+    feels_like = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        _legacy_sensor_unique_id(identity, "FMI", "Feels like"),
+        suggested_object_id="feels_like",
+        config_entry=entry,
+        original_name="Feels like",
+    )
+    feels_like = registry.async_update_entity(
+        feels_like.entity_id,
+        disabled_by=er.RegistryEntryDisabler.USER,
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    expected_unique_ids = {
+        _legacy_sensor_unique_id(identity, "FMI", sensor_name)
+        for sensor_name in _SENSOR_IDENTITY_NAMES
+    } | {identity}
+    entries = er.async_entries_for_config_entry(registry, entry.entry_id)
+    assert {registry_entry.unique_id for registry_entry in entries} == expected_unique_ids
+    customized = registry.async_get("sensor.preferred_outdoor_time")
+    disabled_entity_id = registry.async_get_entity_id(
+        "sensor",
+        DOMAIN,
+        feels_like.unique_id,
+    )
+    assert disabled_entity_id is not None
+    disabled = registry.async_get(disabled_entity_id)
+    assert customized is not None
+    assert customized.id == best.id
+    assert customized.unique_id == best.unique_id
+    assert disabled is not None and disabled.id == feels_like.id
+    assert disabled.disabled_by is er.RegistryEntryDisabler.USER
+    assert hass.states.get(disabled.entity_id) is None
+    before_reload = tuple(
+        sorted(
+            (
+                registry_entry.id,
+                registry_entry.entity_id,
+                registry_entry.unique_id,
+                registry_entry.disabled_by,
+                registry_entry.device_id,
+            )
+            for registry_entry in entries
+        )
+    )
+
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    reloaded_entries = er.async_entries_for_config_entry(registry, entry.entry_id)
+    assert (
+        tuple(
+            sorted(
+                (
+                    registry_entry.id,
+                    registry_entry.entity_id,
+                    registry_entry.unique_id,
+                    registry_entry.disabled_by,
+                    registry_entry.device_id,
+                )
+                for registry_entry in reloaded_entries
+            )
+        )
+        == before_reload
+    )
+    assert registry.async_get("sensor.preferred_outdoor_time") is not None
+    assert hass.states.get(disabled.entity_id) is None
 
 
 async def test_ambiguous_suffix_is_preserved_for_same_place_multi_entry_history(

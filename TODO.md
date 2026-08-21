@@ -5,7 +5,7 @@
 ## Resolve vulnerable Home Assistant-pinned cryptography
 
 - Status: `BLOCKED_UPSTREAM`; temporary risk accepted by the repository owner on 2026-08-08 and
-  rechecked on 2026-08-16.
+  rechecked on 2026-08-21.
 - Home Assistant 2026.8.1 requires `cryptography==48.0.1` exactly. The raw audit reports
   `PYSEC-2026-3552`, `PYSEC-2026-3553`, and `PYSEC-2026-3554`; fixing the complete set requires
   cryptography 50.0.0.
@@ -25,7 +25,7 @@ require `make audit-raw`, `make audit`, the full offline suite, and `make valida
 removing this item. The raw audit intentionally remains nonzero while the upstream pin is
 vulnerable; the policy audit passes only for the exact accepted finding set.
 
-Evidence rechecked 2026-08-16: [PKCS#7 advisory](https://osv.dev/vulnerability/PYSEC-2026-3552),
+Evidence rechecked 2026-08-21: [PKCS#7 advisory](https://osv.dev/vulnerability/PYSEC-2026-3552),
 [certificate path-building advisory](https://osv.dev/vulnerability/PYSEC-2026-3553),
 [name-constraints advisory](https://osv.dev/vulnerability/PYSEC-2026-3554), Home Assistant 2026.8.1
 package metadata, and the open [Home Assistant cryptography 50.0.0 update](https://github.com/home-assistant/core/pull/178496).

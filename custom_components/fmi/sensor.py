@@ -1,5 +1,7 @@
 # Copyright (c) 2026 kogeler
 # SPDX-License-Identifier: MIT
+# Contracts: docs/contracts/MIGRATIONS.md, docs/contracts/SENSORS.md,
+# docs/contracts/TIME_AND_MISSING_DATA.md
 
 """Support FMI sensor entities."""
 
@@ -39,12 +41,20 @@ class SensorType(enum.IntEnum):
     PLACE = enum.auto()
     WEATHER = enum.auto()
     TEMPERATURE = enum.auto()
+    FEELS_LIKE = enum.auto()
+    DEW_POINT = enum.auto()
+    ATMOSPHERIC_PRESSURE = enum.auto()
     WIND_SPEED = enum.auto()
     WIND_DIR = enum.auto()
     WIND_GUST = enum.auto()
     HUMIDITY = enum.auto()
     CLOUDS = enum.auto()
+    LOW_CLOUD_COVER = enum.auto()
+    MEDIUM_CLOUD_COVER = enum.auto()
+    HIGH_CLOUD_COVER = enum.auto()
     RAIN = enum.auto()
+    PRECIPITATION_PROBABILITY = enum.auto()
+    THUNDERSTORM_PROBABILITY = enum.auto()
     TIME_FORECAST = enum.auto()
     TIME = enum.auto()
     LIGHTNING = enum.auto()
@@ -86,6 +96,39 @@ SENSOR_DESCRIPTIONS = (
         state_class=SensorStateClass.MEASUREMENT,
         sensor_type=SensorType.TEMPERATURE,
         legacy_name="Temperature",
+    ),
+    FMISensorEntityDescription(
+        key="feels_like",
+        translation_key="feels_like",
+        name="Feels like",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=ha_const.UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:thermometer",
+        sensor_type=SensorType.FEELS_LIKE,
+        legacy_name="Feels like",
+    ),
+    FMISensorEntityDescription(
+        key="dew_point",
+        translation_key="dew_point",
+        name="Dew point",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=ha_const.UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:thermometer-water",
+        sensor_type=SensorType.DEW_POINT,
+        legacy_name="Dew point",
+    ),
+    FMISensorEntityDescription(
+        key="atmospheric_pressure",
+        translation_key="atmospheric_pressure",
+        name="Atmospheric pressure",
+        device_class=SensorDeviceClass.ATMOSPHERIC_PRESSURE,
+        native_unit_of_measurement=ha_const.UnitOfPressure.HPA,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:gauge",
+        sensor_type=SensorType.ATMOSPHERIC_PRESSURE,
+        legacy_name="Atmospheric pressure",
     ),
     FMISensorEntityDescription(
         key="wind_speed",
@@ -139,6 +182,36 @@ SENSOR_DESCRIPTIONS = (
         legacy_name="Cloud Coverage",
     ),
     FMISensorEntityDescription(
+        key="low_cloud_cover",
+        translation_key="low_cloud_cover",
+        name="Low cloud cover",
+        native_unit_of_measurement=ha_const.PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:weather-cloudy",
+        sensor_type=SensorType.LOW_CLOUD_COVER,
+        legacy_name="Low cloud cover",
+    ),
+    FMISensorEntityDescription(
+        key="medium_cloud_cover",
+        translation_key="medium_cloud_cover",
+        name="Medium cloud cover",
+        native_unit_of_measurement=ha_const.PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:weather-cloudy",
+        sensor_type=SensorType.MEDIUM_CLOUD_COVER,
+        legacy_name="Medium cloud cover",
+    ),
+    FMISensorEntityDescription(
+        key="high_cloud_cover",
+        translation_key="high_cloud_cover",
+        name="High cloud cover",
+        native_unit_of_measurement=ha_const.PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:weather-cloudy",
+        sensor_type=SensorType.HIGH_CLOUD_COVER,
+        legacy_name="High cloud cover",
+    ),
+    FMISensorEntityDescription(
         key="rain",
         translation_key="rain",
         name="Rain",
@@ -148,6 +221,26 @@ SENSOR_DESCRIPTIONS = (
         icon="mdi:weather-pouring",
         sensor_type=SensorType.RAIN,
         legacy_name="Rain",
+    ),
+    FMISensorEntityDescription(
+        key="precipitation_probability",
+        translation_key="precipitation_probability",
+        name="Precipitation probability",
+        native_unit_of_measurement=ha_const.PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:weather-rainy",
+        sensor_type=SensorType.PRECIPITATION_PROBABILITY,
+        legacy_name="Precipitation probability",
+    ),
+    FMISensorEntityDescription(
+        key="thunderstorm_probability",
+        translation_key="thunderstorm_probability",
+        name="Thunderstorm probability",
+        native_unit_of_measurement=ha_const.PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:weather-lightning",
+        sensor_type=SensorType.THUNDERSTORM_PROBABILITY,
+        legacy_name="Thunderstorm probability",
     ),
     FMISensorEntityDescription(
         key="forecast_time",
@@ -320,12 +413,20 @@ class FMIBestConditionSensor(_BaseSensorClass):
         self.update_state_func: Callable[[fmi_models.WeatherData], None] = {
             SensorType.WEATHER: self.__update_weather,
             SensorType.TEMPERATURE: self.__update_temperature,
+            SensorType.FEELS_LIKE: self.__update_feels_like,
+            SensorType.DEW_POINT: self.__update_dew_point,
+            SensorType.ATMOSPHERIC_PRESSURE: self.__update_atmospheric_pressure,
             SensorType.WIND_SPEED: self.__update_wind_speed,
             SensorType.WIND_DIR: self.__update_wind_direction,
             SensorType.WIND_GUST: self.__update_wind_gust,
             SensorType.HUMIDITY: self.__update_humidity,
             SensorType.CLOUDS: self.__update_clouds,
+            SensorType.LOW_CLOUD_COVER: self.__update_low_cloud_cover,
+            SensorType.MEDIUM_CLOUD_COVER: self.__update_medium_cloud_cover,
+            SensorType.HIGH_CLOUD_COVER: self.__update_high_cloud_cover,
             SensorType.RAIN: self.__update_rain,
+            SensorType.PRECIPITATION_PROBABILITY: self.__update_precipitation_probability,
+            SensorType.THUNDERSTORM_PROBABILITY: self.__update_thunderstorm_probability,
             SensorType.TIME_FORECAST: self.__update_forecast_time,
             SensorType.TIME: self.__update_time,
         }.get(description.sensor_type, self.__update_dummy)
@@ -374,6 +475,26 @@ class FMIBestConditionSensor(_BaseSensorClass):
     def __convert_float(self, source_data: fmi_models.WeatherData, *names: str) -> None:
         self._attr_native_value = self._finite_value(source_data, *names)
 
+    def __convert_percentage(self, source_data: fmi_models.WeatherData, name: str) -> None:
+        value = self._finite_value(source_data, name)
+        self._attr_native_value = value if value is not None and 0 <= value <= 100 else None
+
+    def __probabilities(
+        self, source_data: fmi_models.WeatherData
+    ) -> tuple[float | None, float | None]:
+        weather = self.coordinator.get_weather()
+        probabilities = (
+            self.coordinator.get_current_probabilities()
+            if weather is not None and source_data is weather.data
+            else self.coordinator.get_forecast_probabilities(getattr(source_data, "time", None))
+        )
+        precipitation = utils.finite_float(probabilities.precipitation)
+        thunderstorm = utils.finite_float(probabilities.thunderstorm)
+        return (
+            precipitation if precipitation is not None and 0 <= precipitation <= 100 else None,
+            thunderstorm if thunderstorm is not None and 0 <= thunderstorm <= 100 else None,
+        )
+
     def __update_dummy(self, source_data: fmi_models.WeatherData) -> None:
         _ = source_data
         self._attr_native_value = None
@@ -388,6 +509,15 @@ class FMIBestConditionSensor(_BaseSensorClass):
 
     def __update_temperature(self, source_data: fmi_models.WeatherData) -> None:
         self.__convert_float(source_data, "temperature")
+
+    def __update_feels_like(self, source_data: fmi_models.WeatherData) -> None:
+        self.__convert_float(source_data, "feels_like")
+
+    def __update_dew_point(self, source_data: fmi_models.WeatherData) -> None:
+        self.__convert_float(source_data, "dew_point")
+
+    def __update_atmospheric_pressure(self, source_data: fmi_models.WeatherData) -> None:
+        self.__convert_float(source_data, "pressure")
 
     def __update_wind_speed(self, source_data: fmi_models.WeatherData) -> None:
         self.__convert_float(source_data, "wind_speed")
@@ -406,16 +536,33 @@ class FMIBestConditionSensor(_BaseSensorClass):
     def __update_clouds(self, source_data: fmi_models.WeatherData) -> None:
         self.__convert_float(source_data, "cloud_cover")
 
+    def __update_low_cloud_cover(self, source_data: fmi_models.WeatherData) -> None:
+        self.__convert_percentage(source_data, "cloud_low_cover")
+
+    def __update_medium_cloud_cover(self, source_data: fmi_models.WeatherData) -> None:
+        self.__convert_percentage(source_data, "cloud_mid_cover")
+
+    def __update_high_cloud_cover(self, source_data: fmi_models.WeatherData) -> None:
+        self.__convert_percentage(source_data, "cloud_high_cover")
+
     def __update_rain(self, source_data: fmi_models.WeatherData) -> None:
         self.__convert_float(source_data, "precipitation_amount")
 
+    def __update_precipitation_probability(self, source_data: fmi_models.WeatherData) -> None:
+        self._attr_native_value = self.__probabilities(source_data)[0]
+
+    def __update_thunderstorm_probability(self, source_data: fmi_models.WeatherData) -> None:
+        self._attr_native_value = self.__probabilities(source_data)[1]
+
     def __update_time(self, source_data: fmi_models.WeatherData) -> None:
         _ = source_data
-        self._attr_native_value = (
-            self.coordinator.best_time.strftime("%H:%M")
-            if self.coordinator.best_time is not None
-            else None
-        )
+        best = self.coordinator.best_condition
+        if best.status == const.BEST_CONDITION_NO_SUITABLE:
+            self._attr_native_value = const.BEST_CONDITION_NO_SUITABLE
+        elif best.status == const.BEST_CONDITION_AVAIL and best.time is not None:
+            self._attr_native_value = best.time.strftime("%H:%M")
+        else:
+            self._attr_native_value = None
 
     def update(self) -> None:
         """Update the weather sensor state."""
@@ -425,14 +572,26 @@ class FMIBestConditionSensor(_BaseSensorClass):
             self._attr_extra_state_attributes = {}
             return
 
-        self._attr_extra_state_attributes = {
-            ha_const.ATTR_LOCATION: weather.place,
-            ha_const.ATTR_TIME: self.coordinator.best_time,
-            ha_const.ATTR_TEMPERATURE: self.coordinator.best_temperature,
-            const.ATTR_HUMIDITY: self.coordinator.best_humidity,
-            const.ATTR_PRECIPITATION: self.coordinator.best_precipitation,
-            const.ATTR_WIND_SPEED: self.coordinator.best_wind_speed,
-        }
+        best = self.coordinator.best_condition
+        if self.type == SensorType.TIME and best.status != const.BEST_CONDITION_AVAIL:
+            self._attr_extra_state_attributes = {}
+        else:
+            self._attr_extra_state_attributes = {
+                ha_const.ATTR_LOCATION: weather.place,
+                ha_const.ATTR_TIME: best.time,
+                ha_const.ATTR_TEMPERATURE: best.temperature,
+                const.ATTR_HUMIDITY: best.humidity,
+                const.ATTR_PRECIPITATION: best.precipitation,
+                const.ATTR_WIND_SPEED: best.wind_speed,
+            }
+            if self.type == SensorType.TIME:
+                self._attr_extra_state_attributes.update(
+                    {
+                        const.ATTR_APPARENT_TEMPERATURE: best.apparent_temperature,
+                        const.ATTR_PRECIPITATION_PROBABILITY: (best.precipitation_probability),
+                        const.ATTR_THUNDERSTORM_PROBABILITY: best.thunderstorm_probability,
+                    }
+                )
         if self.type == SensorType.PLACE:
             self._attr_native_value = weather.place
             return

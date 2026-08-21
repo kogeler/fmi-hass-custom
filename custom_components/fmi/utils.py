@@ -1,3 +1,6 @@
+# Contracts: docs/contracts/OPTIONAL_SOURCES.md,
+# docs/contracts/TIME_AND_MISSING_DATA.md
+
 """Common utilities for the FMI Weather and Sensor integrations."""
 
 import math

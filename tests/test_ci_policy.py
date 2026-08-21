@@ -37,8 +37,22 @@ def test_workflow_set_is_minimal_event_driven_and_fully_pinned() -> None:
         assert "\n  schedule:" not in content
         assert "runs-on: ubuntu-24.04" not in content
         assert len(ACTION_REFERENCE.findall(content)) == len(external_uses)
+        assert content.count("uses: actions/checkout@") == content.count(
+            "persist-credentials: false"
+        )
+        for image in re.findall(r"^\s*image:\s*(\S+)$", content, re.MULTILINE):
+            assert re.fullmatch(r"\S+@sha256:[0-9a-f]{64}", image)
         assert "curl " not in content
         assert "gh api" not in content
+
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    validator_images = re.findall(
+        r"^[A-Z][A-Z0-9_]*_IMAGE\s*:=\s*(\S+)$",
+        makefile,
+        re.MULTILINE,
+    )
+    assert len(validator_images) == 3
+    assert all(re.fullmatch(r"\S+@sha256:[0-9a-f]{64}", image) for image in validator_images)
 
 
 def test_ci_uses_make_rootless_podman_and_independent_image_caches() -> None:
@@ -62,10 +76,20 @@ def test_ci_uses_make_rootless_podman_and_independent_image_caches() -> None:
     assert "pip install" not in ci
     assert "container:" not in ci
 
+    cache_paths = re.findall(
+        r"^\s+path: (\.artifacts/images/(?:toolbox|resolver)\.tar)$",
+        ci,
+        re.MULTILINE,
+    )
+    assert len(cache_paths) == ci.count("uses: actions/cache@")
     for image in ("toolbox", "resolver"):
         assert f"steps.images.outputs.{image}" in ci
         assert f".artifacts/images/{image}.tar" in ci
         assert "${{ runner.arch }}" in ci
+        assert (
+            f"key: podman-${{{{ runner.os }}}}-${{{{ runner.arch }}}}-{image}-"
+            f"${{{{ steps.images.outputs.{image} }}}}"
+        ) in ci
     assert "make image-load-toolbox" in ci
     assert "make image-load-resolver" in ci
     assert "make image-save-toolbox" in ci
