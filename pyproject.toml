@@ -15,7 +15,7 @@ dependencies = [
 # Home Assistant selection is not the minimum release declared by HACS.
 dev = [
   "bandit[toml]==1.9.4",
-  "homeassistant==2026.8.1",
+  "homeassistant==2026.9.0",
   "mypy==2.3.0",
   "packaging==26.3",
   "pip-audit==2.10.1",
@@ -24,7 +24,7 @@ dev = [
   "pytest==9.0.3",
   "pytest-asyncio==1.4.0",
   "pytest-cov==7.1.0",
-  "pytest-homeassistant-custom-component==0.13.355",
+  "pytest-homeassistant-custom-component==0.13.363",
   "pytest-socket==0.8.0",
   "pytest-xdist==3.8.0",
 ]

@@ -334,7 +334,7 @@ async def test_public_entity_and_forecast_contracts(
     assert temperature_entry is not None and temperature_entry.device_id is not None
     assert temperature_entry.config_entry_id == entry.entry_id
     device = dr.async_get(hass).async_get(temperature_entry.device_id)
-    assert device is not None
+    assert isinstance(device, dr.DeviceEntry)
     assert device.name == "Helsinki"
     assert device.manufacturer == "Finnish Meteorological Institute"
 

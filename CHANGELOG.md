@@ -4,6 +4,17 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+### Maintenance
+
+- Refreshed the maintainer reference environment to Home Assistant 2026.9.0 and its matching test
+  helper without changing the integration version, runtime requirements, or HACS installation floor.
+- Rechecked the Home Assistant-pinned `cryptography==48.0.1`; the same three exact upstream-blocked
+  advisories remain accepted for the development/test graph, with no new audit findings.
+- Updated CodeQL Action to 4.37.9 and verified every other workflow action already uses its current
+  immutable release commit.
+
 ## 1.3.0 - 2026-08-20
 
 ### User-facing features

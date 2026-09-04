@@ -8,7 +8,7 @@
         "PYSEC-2026-3553",
         "PYSEC-2026-3554"
       ],
-      "reason": "Temporary Home Assistant 2026.8.1 exact pin tracked in TODO.md"
+      "reason": "Temporary Home Assistant 2026.9.0 exact pin tracked in TODO.md"
     }
   ]
 }
