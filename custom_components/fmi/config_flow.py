@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 from xml.parsers.expat import ExpatError
 
-import voluptuous as vol
 from fmi_weather_client.errors import ClientError, ServerError
 from homeassistant import config_entries
 from homeassistant.const import CONF_LATITUDE, CONF_LOCATION, CONF_LONGITUDE, CONF_NAME, CONF_OFFSET
@@ -24,6 +23,12 @@ from requests.exceptions import RequestException
 
 from . import const
 from . import fmi_client as fmi
+
+if TYPE_CHECKING:
+    # Home Assistant 2026.10+ aliases voluptuous to these probatio objects at import.
+    import probatio as vol
+else:
+    import voluptuous as vol
 
 
 class CannotConnectError(Exception):

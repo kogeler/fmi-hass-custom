@@ -173,7 +173,9 @@ gets its own plan/handoff namespace. When execution finds a plan error or delibe
 the plan, correct the plan immediately before continuing the affected work; do not defer that
 correction to a report or final review.
 Record only notable release-level or unreleased HA-reference maintenance changes in
-`CHANGELOG.md`. New human-authored files use `Copyright (c) 2026 kogeler` and
+`CHANGELOG.md`, classified by effect on an installed integration as defined in
+`docs/maintenance/HACS_RELEASES.md`; keep runtime-affecting changes without a visible UI or feature
+change under `Runtime operation`. New human-authored files use `Copyright (c) 2026 kogeler` and
 `SPDX-License-Identifier: MIT` where comments are supported.
 
 Work is done only when the requested behavior is implemented and documented, relevant offline and

@@ -7,9 +7,11 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
+from packaging.requirements import Requirement
 
 ROOT = Path(__file__).parents[1]
 SCRIPT = ROOT / ".github" / "scripts" / "compatibility.py"
@@ -63,22 +65,13 @@ def test_recreated_prerelease_must_still_match_the_channel(
 
 def test_moving_inputs_are_derived_from_project_metadata(tmp_path: Path) -> None:
     """Use only direct project names and deliberately discard reference pins."""
-    project = tmp_path / "pyproject.toml"
-    project.write_text(
-        """
-[project]
-dependencies = ["fmi-weather-client==1.0.0", "xmltodict==1.0.4"]
-[project.optional-dependencies]
-dev = ["homeassistant==2026.8.1", "pytest-homeassistant-custom-component==0.13.355"]
-""".strip(),
-        encoding="utf-8",
-    )
+    project = ROOT / "pyproject.toml"
+    runtime = tomllib.loads(project.read_text(encoding="utf-8"))["project"]["dependencies"]
 
     homeassistant, direct = COMPATIBILITY._moving_inputs(project, tmp_path / "inputs")
 
     assert homeassistant.read_text(encoding="utf-8") == "homeassistant\n"
     assert direct.read_text(encoding="utf-8").splitlines() == [
-        "fmi-weather-client",
-        "xmltodict",
+        *(Requirement(item).name for item in runtime),
         "pytest-homeassistant-custom-component",
     ]

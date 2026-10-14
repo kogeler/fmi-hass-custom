@@ -11,3 +11,4 @@ __pycache__/
 /tmp
 .artifacts/
 venv-lint/
+.claude/

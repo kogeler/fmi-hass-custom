@@ -38,6 +38,8 @@ Some Home Assistant transitive packages may publish source archives only. Their 
 built wheels are reviewed as part of the generated dev graph; removing a transitive package from
 the lock would falsify the reference environment. The resolver bootstrap is intentionally small
 because it cannot depend on the lock it generates; `DEP-003` is its complete normative boundary.
+Its pip and pip-tools pins are deliberately held back for an upstream hashing defect; follow the
+`TODO(pip-tools-json-hashes)` item in [`TODO.md`](../../TODO.md) before upgrading either one.
 
 ## References
 

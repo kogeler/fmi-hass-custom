@@ -15,12 +15,20 @@ RUN useradd --create-home --uid 1000 --shell /bin/bash box
 
 # The resolver cannot bootstrap from a lock it generates. This complete small
 # wheel-only tree is therefore pinned explicitly, matching the reference model.
+#
+# TODO(pip-tools-json-hashes): pip and pip-tools are deliberately held back.
+# pip-tools 7.6.1+ requests https://pypi.org/<name>/json (404) instead of
+# https://pypi.org/pypi/<name>/json, silently loses PyPI digests, and downloads
+# every release file to hash it (about 5 GiB and 5 minutes for the dev lock).
+# pip-tools 7.6.0 is the last correct release and cannot run on pip 26.2+.
+# Do not upgrade either pin until TODO.md "Restore current pip and pip-tools in
+# the resolver bootstrap" confirms an upstream fix.
 FROM base AS lock
 
 RUN python -m pip install --quiet --only-binary=:all: \
-        pip==26.2.1 \
+        pip==26.1.2 \
         setuptools==84.0.0 \
-        pip-tools==7.6.1 \
+        pip-tools==7.6.0 \
         build==1.5.0 \
         click==8.4.2 \
         packaging==26.3 \
