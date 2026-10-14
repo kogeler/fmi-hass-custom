@@ -38,8 +38,9 @@ moving-channel rules are in
 Treat a reference refresh as maintenance-only when distributed integration/user-facing files, the
 HACS installation floor, and manifest runtime requirements are unchanged. Leave `.version` and its
 manifest mirror unchanged, put notable maintenance notes under `Unreleased`, and require all normal
-gates. The owner may bypass only the CI version-increment check for this explicitly reviewed path;
-the existing published Release remains a read-only workflow no-op.
+gates. For this explicitly reviewed path the owner may bypass the required `meta` check only when
+`Version increment` is the sole blocking job it reports; the existing published Release remains a
+read-only workflow no-op.
 
 A new integration release is required when distributed/user-facing integration files, the HACS
 floor, or an integration-owned runtime requirement changes. Move accumulated notes into a matching

@@ -398,3 +398,35 @@ jobs:
             base_version="$UNPUBLISHED_BASE_VERSION"
           fi
           make version-check VERSION_ARGS="--base-version $base_version"
+
+  # The single required status check; see CIR-010 in docs/contracts/CI.md.
+  meta:
+    name: meta
+    needs:
+      - quality
+      - live-fmi
+      - hassfest
+      - hacs-validation
+      - dependency-review
+      - codeql
+      - compatibility-stable
+      - compatibility-prerelease
+      - version
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every blocking job
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
+          blocking="$(jq -r '
+            to_entries[]
+            | select(.key != "compatibility-prerelease")
+            | select(.value.result != "success" and .value.result != "skipped")
+            | .key' <<< "$NEEDS")"
+          if [[ -n "$blocking" ]]; then
+            printf 'Blocking jobs did not succeed:\n%s\n' "$blocking" >&2
+            exit 1
+          fi

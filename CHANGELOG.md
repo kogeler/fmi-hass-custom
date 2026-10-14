@@ -40,6 +40,9 @@ All notable changes to this project are documented in this file.
   tracked in `TODO.md`.
 - Updated the CI's GitHub Actions, validator and base container images, and resolver bootstrap
   packages to their latest releases.
+- Added a fixed-name `meta` CI job that waits for every other CI job and fails if any blocking job
+  fails. Branch protection now requires only this check, so renamed or added jobs no longer drift
+  from the required status checks, and the informational prerelease check no longer blocks merges.
 
 ## 1.3.0 - 2026-08-20
 
