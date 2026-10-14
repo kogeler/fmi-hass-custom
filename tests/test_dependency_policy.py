@@ -9,8 +9,10 @@ import json
 import re
 import tomllib
 from pathlib import Path
+from typing import Any
 
-from packaging.requirements import Requirement
+import homeassistant
+from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
 
 ROOT = Path(__file__).parents[1]
@@ -38,42 +40,82 @@ def _exact(requirement: str) -> tuple[str, str]:
     return canonicalize_name(parsed.name), specifiers[0].version
 
 
+def _project(path: Path) -> dict[str, Any]:
+    project: dict[str, Any] = tomllib.loads(path.read_text(encoding="utf-8"))["project"]
+    return project
+
+
 def test_pep621_owns_every_direct_python_dependency() -> None:
     """Runtime, development, and host Ruff inputs have one explicit owner each."""
-    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-    lint_project = tomllib.loads((ROOT / "tools/lint/pyproject.toml").read_text(encoding="utf-8"))[
-        "project"
-    ]
+    project = _project(ROOT / "pyproject.toml")
+    lint_project = _project(ROOT / "tools/lint/pyproject.toml")
     manifest = json.loads(
         (ROOT / "custom_components/fmi/manifest.json").read_text(encoding="utf-8")
     )
 
     runtime = dict(_exact(item) for item in project["dependencies"])
-    manifest_runtime = dict(_exact(item) for item in manifest["requirements"])
-    assert runtime == manifest_runtime
-    assert runtime == {
-        "fmi-weather-client": "1.0.0",
-        "xmltodict": "1.0.4",
+    manifest_names = {
+        canonicalize_name(Requirement(item).name) for item in manifest["requirements"]
     }
+    assert manifest_names == set(runtime)
+    assert set(runtime) == {"fmi-weather-client", "xmltodict"}
 
     development = dict(_exact(item) for item in project["optional-dependencies"]["dev"])
     assert set(project["optional-dependencies"]) == {"dev"}
-    assert development == {
-        "bandit": "1.9.4",
-        "homeassistant": "2026.9.0",
-        "mypy": "2.3.0",
-        "packaging": "26.3",
-        "pip-audit": "2.10.1",
-        "pip-licenses": "5.5.5",
-        "pylint": "4.0.6",
-        "pytest": "9.0.3",
-        "pytest-asyncio": "1.4.0",
-        "pytest-cov": "7.1.0",
-        "pytest-homeassistant-custom-component": "0.13.363",
-        "pytest-socket": "0.8.0",
-        "pytest-xdist": "3.8.0",
+    assert set(development) == {
+        "bandit",
+        "homeassistant",
+        "mypy",
+        "packaging",
+        "pip-audit",
+        "pip-licenses",
+        "pylint",
+        "pytest",
+        "pytest-asyncio",
+        "pytest-cov",
+        "pytest-homeassistant-custom-component",
+        "pytest-socket",
+        "pytest-xdist",
     }
-    assert lint_project["dependencies"] == ["ruff==0.16.1"]
+    lint = dict(_exact(item) for item in lint_project["dependencies"])
+    assert set(lint) == {"ruff"}
+
+
+def _core_integration_pins() -> dict[str, set[str]]:
+    """Return exact versions that integrations bundled with reference Home Assistant require."""
+    pins: dict[str, set[str]] = {}
+    for path in (Path(homeassistant.__file__).parent / "components").glob("*/manifest.json"):
+        for item in json.loads(path.read_text(encoding="utf-8")).get("requirements", []):
+            try:
+                requirement = Requirement(item)
+            except InvalidRequirement:
+                continue
+            versions = {spec.version for spec in requirement.specifier if spec.operator == "=="}
+            pins.setdefault(canonicalize_name(requirement.name), set()).update(versions)
+    return pins
+
+
+def test_manifest_requirements_follow_home_assistant_core_pins() -> None:
+    """Share core packages as minimums and test them at the reference Home Assistant version."""
+    runtime = dict(_exact(item) for item in _project(ROOT / "pyproject.toml")["dependencies"])
+    manifest = json.loads(
+        (ROOT / "custom_components/fmi/manifest.json").read_text(encoding="utf-8")
+    )
+    core = _core_integration_pins()
+
+    for item in manifest["requirements"]:
+        declared = Requirement(item)
+        name = canonicalize_name(declared.name)
+        specifiers = list(declared.specifier)
+        assert declared.url is None and declared.marker is None and not declared.extras, item
+        assert len(specifiers) == 1, item
+        if name in core:
+            assert core[name] == {runtime[name]}, f"{name}: pin the reference core version"
+            assert specifiers[0].operator == ">=", item
+            assert declared.specifier.contains(runtime[name]), item
+        else:
+            assert specifiers[0].operator == "==", item
+            assert specifiers[0].version == runtime[name], item
 
 
 def test_exactly_three_generated_hash_locks_are_split_by_audience() -> None:
@@ -94,7 +136,8 @@ def test_exactly_three_generated_hash_locks_are_split_by_audience() -> None:
     assert all(development[name] == version for name, version in runtime.items())
     assert "ruff" not in development
     assert "pip-tools" not in development
-    assert lint == {"ruff": "0.16.1"}
+    lint_project = _project(ROOT / "tools/lint/pyproject.toml")
+    assert lint == dict(_exact(item) for item in lint_project["dependencies"])
 
     for path in lock_paths:
         content = path.read_text(encoding="utf-8")
@@ -112,17 +155,20 @@ def test_resolver_bootstrap_is_the_only_inline_install_set() -> None:
     )[0]
     assert "--only-binary=:all:" in lock_stage
     assert "--require-hashes" not in lock_stage
-    for requirement in (
-        "pip==26.2.1",
-        "setuptools==84.0.0",
-        "pip-tools==7.6.1",
-        "build==1.5.0",
-        "click==8.4.2",
-        "packaging==26.3",
-        "pyproject-hooks==1.2.0",
-        "wheel==0.48.0",
-    ):
-        assert requirement in lock_stage
+    _, install = lock_stage.split("pip install", maxsplit=1)
+    assert "pip install" not in install
+    arguments = install.split("\n\n", maxsplit=1)[0].replace("\\\n", " ").split()
+    bootstrap = dict(_exact(item) for item in arguments if not item.startswith("-"))
+    assert set(bootstrap) == {
+        "build",
+        "click",
+        "packaging",
+        "pip",
+        "pip-tools",
+        "pyproject-hooks",
+        "setuptools",
+        "wheel",
+    }
 
     dev_stage = containerfile.split("FROM base AS dev", maxsplit=1)[1]
     assert "--require-hashes" in dev_stage

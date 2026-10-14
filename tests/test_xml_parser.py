@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pytest
@@ -92,9 +93,14 @@ def test_unexpected_parser_result_is_classified(monkeypatch: pytest.MonkeyPatch)
 
 def test_unsupported_expat_runtime_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     """Enforce the minimum version documented by current CPython XML guidance."""
-    monkeypatch.setattr(xml_parser.expat, "version_info", (2, 7, 1))
+    minimum = xml_parser.MINIMUM_EXPAT_VERSION
+    unsupported = (*minimum[:-1], minimum[-1] - 1)
+    monkeypatch.setattr(xml_parser.expat, "version_info", unsupported)
+    installed, required = (".".join(map(str, version)) for version in (unsupported, minimum))
 
-    with pytest.raises(XMLPayloadError, match=r"Expat 2\.7\.1.*2\.7\.2"):
+    with pytest.raises(
+        XMLPayloadError, match=rf"Expat {re.escape(installed)}.*{re.escape(required)}"
+    ):
         ensure_safe_expat()
 
 

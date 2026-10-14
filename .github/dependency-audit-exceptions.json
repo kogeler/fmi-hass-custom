@@ -1,14 +1,3 @@
 {
-  "exceptions": [
-    {
-      "package": "cryptography",
-      "version": "48.0.1",
-      "vulnerabilities": [
-        "PYSEC-2026-3552",
-        "PYSEC-2026-3553",
-        "PYSEC-2026-3554"
-      ],
-      "reason": "Temporary Home Assistant 2026.9.0 exact pin tracked in TODO.md"
-    }
-  ]
+  "exceptions": []
 }

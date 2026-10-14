@@ -117,3 +117,14 @@ validator images MUST NOT enter those writable caches.
 - [`test_ci_uses_make_rootless_podman_and_independent_image_caches`](../../tests/test_ci_policy.py) — `tests/test_ci_policy.py::test_ci_uses_make_rootless_podman_and_independent_image_caches`
 - [`test_image_archives_are_content_addressed_atomic_and_verified`](../../tests/test_dependency_policy.py) — `tests/test_dependency_policy.py::test_image_archives_are_content_addressed_atomic_and_verified`
 - [`test_workflow_set_is_minimal_event_driven_and_fully_pinned`](../../tests/test_ci_policy.py) — `tests/test_ci_policy.py::test_workflow_set_is_minimal_event_driven_and_fully_pinned`
+
+### `CIR-010` — One fixed-name job aggregates every required CI result
+
+**Contract:** CI MUST contain one job named `meta` that needs every other CI job and always runs.
+It MUST fail unless every needed job succeeded or was skipped, except that the informational
+prerelease compatibility result MUST NOT block it. Branch protection MUST require only this check
+so that it does not depend on individual job labels.
+
+**Evidence:**
+
+- [`test_meta_job_is_the_single_aggregate_required_check`](../../tests/test_ci_policy.py) — `tests/test_ci_policy.py::test_meta_job_is_the_single_aggregate_required_check`

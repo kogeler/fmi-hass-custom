@@ -7,12 +7,16 @@
 ### `DEP-001` — PEP 621 owns every direct Python dependency
 
 **Contract:** Root `pyproject.toml` MUST own exact integration runtime dependencies and the complete
-direct dev set; `tools/lint/pyproject.toml` MUST own Ruff alone. Manifest requirements MUST exactly
-mirror root runtime dependencies. No other direct Python dependency manifest MAY be maintained.
+direct dev set; `tools/lint/pyproject.toml` MUST own Ruff alone. Manifest requirements MUST name
+exactly the root runtime dependencies and mirror their exact pins, except a package that
+integrations bundled with the reference Home Assistant also pin: its root pin MUST equal that
+reference core version, and the manifest MUST declare it only as a minimum (`>=`) that the root pin
+satisfies. No other direct Python dependency manifest MAY be maintained.
 
 **Evidence:**
 
 - [`test_pep621_owns_every_direct_python_dependency`](../../tests/test_dependency_policy.py) — `tests/test_dependency_policy.py::test_pep621_owns_every_direct_python_dependency`
+- [`test_manifest_requirements_follow_home_assistant_core_pins`](../../tests/test_dependency_policy.py) — `tests/test_dependency_policy.py::test_manifest_requirements_follow_home_assistant_core_pins`
 
 ### `DEP-002` — Exactly three generated hash locks exist
 

@@ -8,6 +8,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 ACTION_REFERENCE = re.compile(
@@ -146,6 +148,28 @@ def test_ci_preserves_hacs_security_and_compatibility_gates() -> None:
     assert "github.event.repository.fork" not in ci
     assert "Audit the frozen fork environment" in ci
     assert "run: make audit" in ci
+
+
+def test_meta_job_is_the_single_aggregate_required_check() -> None:
+    """One fixed-name job waits for every CI job and fails unless each blocking job passed."""
+    jobs = yaml.safe_load(_workflow("ci.yml"))["jobs"]
+    meta = jobs["meta"]
+    assert meta["name"] == "meta"
+    assert meta["if"] == "always()"
+    assert set(meta["needs"]) == set(jobs) - {"meta"}
+    assert "permissions" not in meta
+    assert "uses" not in meta
+
+    (step,) = meta["steps"]
+    assert step["env"] == {"NEEDS": "${{ toJSON(needs) }}"}
+    script = step["run"]
+    assert script.count("select(.key != ") == 1
+    assert 'select(.key != "compatibility-prerelease")' in script
+    assert '.value.result != "success" and .value.result != "skipped"' in script
+    assert "exit 1" in script
+
+    informational = {name for name, job in jobs.items() if job.get("continue-on-error")}
+    assert informational == {"compatibility-prerelease"}
 
 
 def test_ci_write_permissions_are_confined_to_codeql() -> None:

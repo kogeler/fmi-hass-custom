@@ -4,16 +4,45 @@
 
 All notable changes to this project are documented in this file.
 
-## Unreleased
+## 1.3.1 - 2026-10-14
 
-### Maintenance
+### Runtime operation
 
-- Refreshed the maintainer reference environment to Home Assistant 2026.9.0 and its matching test
-  helper without changing the integration version, runtime requirements, or HACS installation floor.
-- Rechecked the Home Assistant-pinned `cryptography==48.0.1`; the same three exact upstream-blocked
-  advisories remain accepted for the development/test graph, with no new audit findings.
-- Updated CodeQL Action to 4.37.9 and verified every other workflow action already uses its current
-  immutable release commit.
+- Verified the integration on Home Assistant 2026.10, which replaces voluptuous with
+  probatio-based validation. On 2026.10 and newer, setup, reconfiguration, and options forms are
+  validated by probatio; weather, forecasts, sensors, and optional sources run unchanged. No runtime
+  code change was required, older supported releases keep using voluptuous, and the minimum
+  supported Home Assistant release is unchanged.
+- Declared `xmltodict`, which Home Assistant's own integrations also pin, as a minimum requirement
+  instead of an exact pin. Home Assistant now decides the installed version, so a future Home
+  Assistant update of that library cannot conflict with the integration's requirement and stop it
+  from loading. Every supported Home Assistant release still installs the same version as before.
+
+### Security
+
+- Removed the temporary cryptography vulnerability exception after Home Assistant selected a fixed
+  cryptography release. This affected only the development and test environment; the integration
+  does not use cryptography. The raw dependency audit now reports no known vulnerabilities.
+
+### Development and maintenance
+
+- Updated the reproducible development and test reference to the latest stable Home Assistant with
+  its matching test helper and current type-checking and linting tools, and fully regenerated the
+  hash locks.
+- Typed config-flow schemas against the probatio validation objects that Home Assistant now
+  substitutes for voluptuous. This is a static-typing change only; the runtime still imports
+  voluptuous as required by older supported Home Assistant releases.
+- Removed copied dependency version literals from repository tests; the owning project manifests
+  and resolver bootstrap remain the only version sources.
+- Held the lock resolver at the last pip-tools/pip pair that reads PyPI-published digests. Newer
+  pip-tools releases silently downloaded every distribution file of the development graph to hash
+  it, so a lock or freeze check took about six minutes instead of under one. The upstream fix is
+  tracked in `TODO.md`.
+- Updated the CI's GitHub Actions, validator and base container images, and resolver bootstrap
+  packages to their latest releases.
+- Added a fixed-name `meta` CI job that waits for every other CI job and fails if any blocking job
+  fails. Branch protection now requires only this check, so renamed or added jobs no longer drift
+  from the required status checks, and the informational prerelease check no longer blocks merges.
 
 ## 1.3.0 - 2026-08-20
 

@@ -25,15 +25,15 @@ For a release PR and its `master` push:
 
 ## Recommended `master` Protection
 
-After a workflow has rendered its real check names, require the quality, live FMI, hassfest, HACS,
-dependency review, both CodeQL languages, latest stable compatibility, and version-increment jobs.
-Do not require informational prerelease compatibility, direct-master dependency submission, or the
-PR-body metadata job. Keep pull requests, resolved conversations, blocked force pushes/deletions,
-and read-only default Actions token enabled.
+Require only the `meta` check from the GitHub Actions app, as defined by `CIR-010`. Renaming,
+adding, or removing other CI jobs then needs no ruleset change; add a new job to the `needs` list of
+`meta` instead. Do not require direct-master dependency submission or the PR-body metadata job.
+Keep pull requests, resolved conversations, blocked force pushes/deletions, signed commits, and the
+read-only default Actions token enabled.
 
-Exact check labels are remote state and can be selected only after a real GitHub run. Local
-actionlint and policy tests prove repository intent but cannot claim branch protection or remote
-HACS/API state.
+A required check is satisfied only after a real GitHub run reports it, so switch a ruleset to a new
+check name only after that name has reported on the target pull request. Local actionlint and policy
+tests prove repository intent but cannot claim branch protection or remote HACS/API state.
 
 ## Change Checklist
 
