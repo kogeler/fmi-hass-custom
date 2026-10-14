@@ -14,8 +14,9 @@ documentation.
 ## Dependency Change Procedure
 
 1. Change only the owning PEP 621 project manifest; synchronize integration runtime requirements
-   into `custom_components/fmi/manifest.json` when applicable. Decide any HACS-floor and release
-   metadata change before final verification.
+   into `custom_components/fmi/manifest.json` when applicable, following `DEP-001` for packages
+   that Home Assistant core also pins. Decide any HACS-floor and release metadata change before
+   final verification.
 2. Run `make refresh-dependencies` or `make lock` and review every changed direct/transitive pin,
    hash, source distribution, and audience.
 3. Run `make dev-build` and `make freeze-check`; the image build includes `pip check`.
@@ -40,6 +41,16 @@ the lock would falsify the reference environment. The resolver bootstrap is inte
 because it cannot depend on the lock it generates; `DEP-003` is its complete normative boundary.
 Its pip and pip-tools pins are deliberately held back for an upstream hashing defect; follow the
 `TODO(pip-tools-json-hashes)` item in [`TODO.md`](../../TODO.md) before upgrading either one.
+
+## Packages Shared With Home Assistant Core
+
+Home Assistant decides the installed version of a package that its bundled integrations also pin,
+and hassfest rejects an exact custom-integration pin for such a package. An exact manifest pin
+would conflict as soon as Home Assistant moved its own pin, so `DEP-001` keeps the manifest at a
+minimum while the root pin and locks test the reference core version. When a reference refresh
+changes that core version, the dependency-policy test fails until the root pin follows it. Raise
+the manifest minimum only deliberately, never above the version pinned by the Home Assistant
+release in `hacs.json`, because users on that release would otherwise get the same conflict.
 
 ## References
 

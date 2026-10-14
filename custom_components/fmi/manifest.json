@@ -11,7 +11,7 @@
   "issue_tracker": "https://github.com/kogeler/fmi-hass-custom/issues",
   "requirements": [
     "fmi-weather-client==1.0.0",
-    "xmltodict==1.0.4"
+    "xmltodict>=1.0.4"
   ],
   "version": "1.3.1"
 }

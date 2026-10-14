@@ -32,9 +32,9 @@ DEPENDENCY_SNAPSHOT := dependency-snapshot.json
 RUFF_OUTPUT_FORMAT ?=
 RUFF_OUTPUT := $(if $(RUFF_OUTPUT_FORMAT),--output-format=$(RUFF_OUTPUT_FORMAT))
 
-HASSFEST_IMAGE := ghcr.io/home-assistant/hassfest@sha256:a77f1cf7cfc21ad626ebaae52ecb6131a45ab20223f8c2c0750bfca487aa4f05
+HASSFEST_IMAGE := ghcr.io/home-assistant/hassfest@sha256:4b1adfb1e0a37710af0390708eb8000230b80b2193ccffbeed0a901fa9765181
 ACTIONLINT_IMAGE := docker.io/rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
-HACS_IMAGE := ghcr.io/hacs/action@sha256:ea472b182558d08e50221c550fc5cdbba9e1bc1efba53f92bc4fed38e7bc56b9
+HACS_IMAGE := ghcr.io/hacs/action@sha256:dc92fdad2f6ffbe74bffb7269d781ea8e064f52d9bb486cdf3925d74e7ab6ebf
 
 include make/container.mk
 

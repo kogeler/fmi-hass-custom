@@ -11,7 +11,8 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from packaging.requirements import Requirement
+import homeassistant
+from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
 
 ROOT = Path(__file__).parents[1]
@@ -53,8 +54,10 @@ def test_pep621_owns_every_direct_python_dependency() -> None:
     )
 
     runtime = dict(_exact(item) for item in project["dependencies"])
-    manifest_runtime = dict(_exact(item) for item in manifest["requirements"])
-    assert runtime == manifest_runtime
+    manifest_names = {
+        canonicalize_name(Requirement(item).name) for item in manifest["requirements"]
+    }
+    assert manifest_names == set(runtime)
     assert set(runtime) == {"fmi-weather-client", "xmltodict"}
 
     development = dict(_exact(item) for item in project["optional-dependencies"]["dev"])
@@ -76,6 +79,43 @@ def test_pep621_owns_every_direct_python_dependency() -> None:
     }
     lint = dict(_exact(item) for item in lint_project["dependencies"])
     assert set(lint) == {"ruff"}
+
+
+def _core_integration_pins() -> dict[str, set[str]]:
+    """Return exact versions that integrations bundled with reference Home Assistant require."""
+    pins: dict[str, set[str]] = {}
+    for path in (Path(homeassistant.__file__).parent / "components").glob("*/manifest.json"):
+        for item in json.loads(path.read_text(encoding="utf-8")).get("requirements", []):
+            try:
+                requirement = Requirement(item)
+            except InvalidRequirement:
+                continue
+            versions = {spec.version for spec in requirement.specifier if spec.operator == "=="}
+            pins.setdefault(canonicalize_name(requirement.name), set()).update(versions)
+    return pins
+
+
+def test_manifest_requirements_follow_home_assistant_core_pins() -> None:
+    """Share core packages as minimums and test them at the reference Home Assistant version."""
+    runtime = dict(_exact(item) for item in _project(ROOT / "pyproject.toml")["dependencies"])
+    manifest = json.loads(
+        (ROOT / "custom_components/fmi/manifest.json").read_text(encoding="utf-8")
+    )
+    core = _core_integration_pins()
+
+    for item in manifest["requirements"]:
+        declared = Requirement(item)
+        name = canonicalize_name(declared.name)
+        specifiers = list(declared.specifier)
+        assert declared.url is None and declared.marker is None and not declared.extras, item
+        assert len(specifiers) == 1, item
+        if name in core:
+            assert core[name] == {runtime[name]}, f"{name}: pin the reference core version"
+            assert specifiers[0].operator == ">=", item
+            assert declared.specifier.contains(runtime[name]), item
+        else:
+            assert specifiers[0].operator == "==", item
+            assert specifiers[0].version == runtime[name], item
 
 
 def test_exactly_three_generated_hash_locks_are_split_by_audience() -> None:

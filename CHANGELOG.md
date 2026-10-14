@@ -13,6 +13,10 @@ All notable changes to this project are documented in this file.
   validated by probatio; weather, forecasts, sensors, and optional sources run unchanged. No runtime
   code change was required, older supported releases keep using voluptuous, and the minimum
   supported Home Assistant release is unchanged.
+- Declared `xmltodict`, which Home Assistant's own integrations also pin, as a minimum requirement
+  instead of an exact pin. Home Assistant now decides the installed version, so a future Home
+  Assistant update of that library cannot conflict with the integration's requirement and stop it
+  from loading. Every supported Home Assistant release still installs the same version as before.
 
 ### Security
 
@@ -22,9 +26,10 @@ All notable changes to this project are documented in this file.
 
 ### Development and maintenance
 
-- Updated the reproducible development and test reference to Home Assistant 2026.10.1 with its
-  matching test helper, current mypy and Pylint releases, and fully regenerated hash locks.
-- Typed config-flow schemas against the probatio validation objects that Home Assistant 2026.10
+- Updated the reproducible development and test reference to the latest stable Home Assistant with
+  its matching test helper and current type-checking and linting tools, and fully regenerated the
+  hash locks.
+- Typed config-flow schemas against the probatio validation objects that Home Assistant now
   substitutes for voluptuous. This is a static-typing change only; the runtime still imports
   voluptuous as required by older supported Home Assistant releases.
 - Removed copied dependency version literals from repository tests; the owning project manifests
@@ -33,8 +38,8 @@ All notable changes to this project are documented in this file.
   pip-tools releases silently downloaded every distribution file of the development graph to hash
   it, so a lock or freeze check took about six minutes instead of under one. The upstream fix is
   tracked in `TODO.md`.
-- Updated CodeQL Action to 4.37.9 and verified every other workflow action already uses its current
-  immutable release commit.
+- Updated the CI's GitHub Actions, validator and base container images, and resolver bootstrap
+  packages to their latest releases.
 
 ## 1.3.0 - 2026-08-20
 
