@@ -455,8 +455,9 @@ entities:
   in your registry. Reconfigured and migrated entries deliberately retain their established IDs.
 
 When reporting a problem, attach sanitized Home Assistant diagnostics and relevant integration log
-lines. Diagnostics redact configured coordinates and legacy coordinate-derived identity. Do not
-publish precise home coordinates or raw external responses.
+lines. Diagnostics redact configured coordinates, the entry's display name, the observation
+station ID, and legacy coordinate-derived identity. Do not publish precise home coordinates or raw
+external responses.
 
 ## Remove
 

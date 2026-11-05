@@ -25,10 +25,14 @@ All notable changes to this project are documented in this file.
 ### Runtime operation
 
 - Verified the integration on Home Assistant 2026.11, which builds HACS in as the Marketplace. No
-  runtime code change was required, and the minimum supported Home Assistant release is unchanged.
+  runtime behavior change was required, and the minimum supported Home Assistant release is
+  unchanged.
 
 ### Security
 
+- Diagnostics downloads now also redact the entry's display name and the configured observation
+  station ID, because either can reveal the approximate configured location. Coordinates and
+  coordinate-derived identity were already redacted.
 - Updated certifi, filelock, and Pillow in the hash locks to releases that fix newly published
   vulnerabilities; Pillow follows the Home Assistant 2026.11 reference. This affects only the
   development and test environment; the integration does not declare these packages, and Home
@@ -44,6 +48,10 @@ All notable changes to this project are documented in this file.
 - Updated the CI's GitHub Actions, the hassfest and HACS validator images, the Python base image,
   and resolver bootstrap packages to their latest releases. The HACS validation now runs the
   current check set, including the license and integration-category checks.
+- Declared the weather entity's device with Home Assistant's `DeviceInfo` type, which newer Home
+  Assistant type checking requires. The device and its identifiers are unchanged.
+- Removed the archive of completed implementation plans from the repository. The contracts under
+  `docs/contracts/` remain the documentation of current behavior.
 
 ## 1.3.1 - 2026-10-14
 

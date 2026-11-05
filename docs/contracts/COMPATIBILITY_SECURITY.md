@@ -52,7 +52,8 @@ idempotent.
 
 **Contract:** Downloadable diagnostics MUST expose only sanitized configuration/options, config
 version, polling cadence, coordinator success, and source availability. They MUST NOT expose exact
-coordinates, place/weather values, entry/entity/legacy identity, or external payloads; exported
+coordinates, the configured display name, the observation station ID, place/weather values,
+entry/entity/legacy identity, or external payloads; exported
 availability mappings MUST NOT mutate coordinator state.
 
 **Evidence:**

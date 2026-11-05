@@ -9,12 +9,18 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE
+from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME
 from homeassistant.core import HomeAssistant
 
 from . import FMIConfigEntry, FMIDataUpdateCoordinator, const
 
-TO_REDACT = {CONF_LATITUDE, CONF_LONGITUDE, const.CONF_ENTITY_IDENTITY}
+TO_REDACT = {
+    CONF_LATITUDE,
+    CONF_LONGITUDE,
+    CONF_NAME,
+    const.CONF_ENTITY_IDENTITY,
+    const.CONF_OBSERVATION_STATION,
+}
 
 
 def _coordinator_diagnostics(coordinator: FMIDataUpdateCoordinator) -> dict[str, Any]:
@@ -37,7 +43,7 @@ async def async_get_config_entry_diagnostics(
     return {
         "entry": {
             "data": async_redact_data(entry.data, TO_REDACT),
-            "options": dict(entry.options),
+            "options": async_redact_data(dict(entry.options), TO_REDACT),
             "version": entry.version,
             "minor_version": entry.minor_version,
         },

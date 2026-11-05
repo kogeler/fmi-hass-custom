@@ -59,7 +59,6 @@ which is maintained separately from this integration.
 ### Maintainers
 
 - [Normative contract catalog and automated traceability](docs/contracts/README.md)
-- [Completed-plan archive and historical evidence](plans/README.md)
 - [Development environment and commands](docs/maintenance/DEVELOPMENT.md)
 - [Dependency ownership and review](docs/maintenance/DEPENDENCIES.md)
 - [CI and release gates](docs/maintenance/CI.md)

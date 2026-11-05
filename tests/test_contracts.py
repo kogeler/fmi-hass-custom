@@ -18,7 +18,6 @@ CONTRACTS = ROOT / "docs" / "contracts"
 CURRENT_DOCUMENTATION = (
     *ROOT.glob("*.md"),
     *(ROOT / "docs").rglob("*.md"),
-    ROOT / "plans" / "README.md",
     ROOT / "tests" / "fixtures" / "fmi" / "README.md",
 )
 
@@ -187,17 +186,6 @@ def test_current_documentation_links_and_make_targets_resolve() -> None:
 
         for match in MAKE_REFERENCE.finditer(content):
             assert match.group("target") in make_targets, (path, match.group("target"))
-
-
-def test_completed_plans_are_explicitly_archived() -> None:
-    """Prevent dated execution records from masquerading as current documentation."""
-    archive_index = (ROOT / "plans" / "README.md").read_text(encoding="utf-8")
-    for plan in sorted((ROOT / "plans").glob("P*/PLAN.md")):
-        plan_name = plan.parent.name
-        content = plan.read_text(encoding="utf-8")
-        assert "**Archive notice:**" in content[:1500], plan
-        assert "../../docs/contracts/README.md" in content[:1500], plan
-        assert f"]({plan_name}/PLAN.md)" in archive_index, plan_name
 
 
 def test_implementation_and_maintenance_docs_link_to_contract_owners() -> None:
