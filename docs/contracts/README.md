@@ -4,9 +4,8 @@
 
 This directory is the only normative specification for current, testable repository and
 integration behavior. Implementation modules and maintenance runbooks link here instead of
-restating these requirements. `AGENTS.md` separately governs agent execution, historical decisions
-and completed-plan evidence remain under `plans/`, and user instructions remain in
-`docs/USER_GUIDE.md`.
+restating these requirements. `AGENTS.md` separately governs agent execution, and user
+instructions remain in `docs/USER_GUIDE.md`.
 
 The key words `MUST`, `MUST NOT`, `SHOULD`, `SHOULD NOT`, and `MAY` are interpreted as described
 in [BCP 14](https://www.rfc-editor.org/info/bcp14) when they appear in uppercase. Every normative

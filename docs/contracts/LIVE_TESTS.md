@@ -8,11 +8,14 @@
 
 **Contract:** Only tests marked `live` MAY access FMI. Ordinary pytest entry points MUST deselect
 live tests and block sockets; the live Make target MUST run in its explicit online contour while
-retaining the Home Assistant test guard outside the narrow live fixture.
+retaining the Home Assistant test guard outside the narrow live fixture. Every pytest entry point,
+including the live target that clears the project `addopts`, MUST disable the `respx` plugin so
+that Home Assistant aliases `httpx` before it is imported.
 
 **Evidence:**
 
 - [`test_every_pytest_entry_point_uses_automatic_xdist_workers`](../../tests/test_dependency_policy.py) — `tests/test_dependency_policy.py::test_every_pytest_entry_point_uses_automatic_xdist_workers`
+- [`test_pytest_entry_points_that_clear_addopts_still_disable_respx`](../../tests/test_dependency_policy.py) — `tests/test_dependency_policy.py::test_pytest_entry_points_that_clear_addopts_still_disable_respx`
 - [`test_dependency_place_resolution_contract`](../../tests/test_live_fmi.py) — `tests/test_live_fmi.py::test_dependency_place_resolution_contract`
 - [`test_home_assistant_live_entity_and_forecast_contract`](../../tests/test_live_fmi.py) — `tests/test_live_fmi.py::test_home_assistant_live_entity_and_forecast_contract`
 

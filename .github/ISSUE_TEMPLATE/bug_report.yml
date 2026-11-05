@@ -9,7 +9,7 @@ assignees: []
 body:
   - type: markdown
     attributes:
-      value: |
+      value: >
         Thanks for helping improve the integration. Search existing issues first and use the
         latest published release when possible. Do not include precise home coordinates, secrets,
         access tokens, or raw FMI responses.
@@ -18,7 +18,7 @@ body:
     id: integration_version
     attributes:
       label: Integration release
-      description: The installed FMI release shown by HACS or manifest.json.
+      description: The installed FMI release shown by the Marketplace, HACS, or manifest.json.
       placeholder: Copy the installed release exactly
     validations:
       required: true

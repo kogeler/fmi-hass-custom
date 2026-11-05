@@ -17,7 +17,7 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
 HOME_ASSISTANT = "homeassistant"
-TEST_HELPER = "pytest-homeassistant-custom-component"
+TEST_HELPER = "pytest-homeassistant"
 
 
 class CompatibilityError(RuntimeError):
@@ -130,37 +130,39 @@ def _moving_inputs(project: Path, root: Path) -> tuple[Path, Path]:
     project_inputs = root / "requirements-project.txt"
     homeassistant.write_text(f"{HOME_ASSISTANT}\n", encoding="utf-8")
     direct_names = [requirement.name for requirement in runtime_requirements]
-    direct_names.append(TEST_HELPER)
     project_inputs.write_text("".join(f"{name}\n" for name in direct_names), encoding="utf-8")
     return homeassistant, project_inputs
 
 
-def _check_dependencies(python: str, channel: str) -> None:
-    """Reject dependency errors except a known moving beta/helper HA constraint."""
+def _selected_pins(root: Path, version: str) -> Path:
+    """Pin Home Assistant and the test helper that is released with the same version."""
+    pins = root / "requirements-homeassistant-selected.txt"
+    pins.write_text(f"{HOME_ASSISTANT}=={version}\n{TEST_HELPER}=={version}\n", encoding="utf-8")
+    return pins
+
+
+def _assert_matching_helper(python: str, version: str) -> None:
+    """Require the test helper built for exactly the Home Assistant version under test."""
+    helper_version = _distribution_version(python, TEST_HELPER)
+    if helper_version != version:
+        raise CompatibilityError(
+            f"{TEST_HELPER} {helper_version} does not match Home Assistant {version}"
+        )
+
+
+def _check_dependencies(python: str) -> None:
+    """Reject any inconsistent dependency metadata in the recreated environment."""
     result = _run(
         [python, "-m", "pip", "check"],
         capture_output=True,
         check=False,
     )
-    if result.returncode == 0:
-        print(result.stdout, end="")
-        return
-
-    lines = [line for line in result.stdout.splitlines() if line.strip()]
-    allowed_prefix = f"{TEST_HELPER} "
-    unexpected = [
-        line
-        for line in lines
-        if channel != "prerelease"
-        or not line.startswith(allowed_prefix)
-        or " has requirement homeassistant" not in line
-    ]
-    if unexpected or not lines:
+    if result.returncode != 0:
+        lines = [line for line in result.stdout.splitlines() if line.strip()]
         raise CompatibilityError(
-            "dependency metadata is inconsistent: " + "; ".join(unexpected or lines)
+            "dependency metadata is inconsistent: " + "; ".join(lines or ["pip check failed"])
         )
-    print("Informational prerelease harness mismatch:")
-    print("\n".join(lines))
+    print(result.stdout, end="")
 
 
 def _resolve(
@@ -183,28 +185,22 @@ def _resolve(
         venv.EnvBuilder(with_pip=True).create(resolver)
         resolver_python = _python(resolver)
 
-        if channel == "stable":
-            _install(resolver_python, "--upgrade", "-r", str(homeassistant))
-            selected = _distribution_version(resolver_python, HOME_ASSISTANT)
-            constraint = root / "requirements-homeassistant-selected.txt"
-            constraint.write_text(f"{HOME_ASSISTANT}=={selected}\n", encoding="utf-8")
-            _install(
-                resolver_python,
-                "--upgrade",
-                "-c",
-                str(constraint),
-                "-r",
-                str(direct),
-            )
-        else:
-            _install(resolver_python, "--upgrade", "-r", str(direct))
-            _install(resolver_python, "--upgrade", "--pre", "-r", str(homeassistant))
-
+        channel_options = ["--pre"] if channel == "prerelease" else []
+        _install(resolver_python, "--upgrade", *channel_options, "-r", str(homeassistant))
         resolved_version = _assert_channel(
             resolver_python,
             channel,
             allow_unavailable=channel == "prerelease",
         )
+        _install(
+            resolver_python,
+            "--upgrade",
+            "-r",
+            str(direct),
+            "-r",
+            str(_selected_pins(root, resolved_version)),
+        )
+        _assert_matching_helper(resolver_python, resolved_version)
         _freeze(resolver_python, output)
 
         venv.EnvBuilder(with_pip=True).create(runner)
@@ -215,10 +211,10 @@ def _resolve(
             raise CompatibilityError(
                 f"recreated Home Assistant {recreated_version} does not match {resolved_version}"
             )
-        _check_dependencies(runner_python, channel)
-        helper_version = _distribution_version(runner_python, TEST_HELPER)
+        _check_dependencies(runner_python)
+        _assert_matching_helper(runner_python, recreated_version)
         print(
-            f"Testing Home Assistant {recreated_version} with {TEST_HELPER} {helper_version}",
+            f"Testing Home Assistant {recreated_version} with {TEST_HELPER} {recreated_version}",
             flush=True,
         )
         _run(

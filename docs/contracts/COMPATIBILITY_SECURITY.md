@@ -21,13 +21,17 @@ incompatibility and regression evidence.
 
 **Contract:** CI MUST resolve, freeze, recreate, check, and test latest stable Home Assistant as a
 blocking job. A genuinely newer prerelease MAY be informational; absence of one MUST be an explicit
-successful skip, while a recreated prerelease MUST still match its requested channel.
+successful skip, while a recreated prerelease MUST still match its requested channel. Each moving
+environment MUST test with the `pytest-homeassistant` release whose version equals the selected Home
+Assistant version.
 
 **Evidence:**
 
 - [`test_ci_preserves_hacs_security_and_compatibility_gates`](../../tests/test_ci_policy.py) — `tests/test_ci_policy.py::test_ci_preserves_hacs_security_and_compatibility_gates`
 - [`test_missing_prerelease_is_an_informational_skip`](../../tests/test_compatibility_helper.py) — `tests/test_compatibility_helper.py::test_missing_prerelease_is_an_informational_skip`
 - [`test_recreated_prerelease_must_still_match_the_channel`](../../tests/test_compatibility_helper.py) — `tests/test_compatibility_helper.py::test_recreated_prerelease_must_still_match_the_channel`
+- [`test_test_helper_is_pinned_to_the_selected_home_assistant`](../../tests/test_compatibility_helper.py) — `tests/test_compatibility_helper.py::test_test_helper_is_pinned_to_the_selected_home_assistant`
+- [`test_mismatched_test_helper_is_fatal`](../../tests/test_compatibility_helper.py) — `tests/test_compatibility_helper.py::test_mismatched_test_helper_is_fatal`
 
 ### `CSP-003` — Logs exclude private external data
 
@@ -48,7 +52,8 @@ idempotent.
 
 **Contract:** Downloadable diagnostics MUST expose only sanitized configuration/options, config
 version, polling cadence, coordinator success, and source availability. They MUST NOT expose exact
-coordinates, place/weather values, entry/entity/legacy identity, or external payloads; exported
+coordinates, the configured display name, the observation station ID, place/weather values,
+entry/entity/legacy identity, or external payloads; exported
 availability mappings MUST NOT mutate coordinator state.
 
 **Evidence:**

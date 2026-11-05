@@ -18,7 +18,7 @@ from homeassistant import config_entries
 from homeassistant.components.diagnostics import REDACTED
 from homeassistant.const import CONF_LATITUDE, CONF_LOCATION, CONF_LONGITUDE, CONF_NAME
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.fmi import FMIDataUpdateCoordinator, const, fmi_client, utils
 
@@ -204,6 +204,8 @@ async def test_diagnostics_redact_location_and_stable_identity(
     assert result["entry"]["data"][CONF_LATITUDE] == REDACTED
     assert result["entry"]["data"][CONF_LONGITUDE] == REDACTED
     assert result["entry"]["data"][const.CONF_ENTITY_IDENTITY] == REDACTED
+    assert result["entry"]["data"][CONF_NAME] == REDACTED
+    assert result["entry"]["options"][const.CONF_OBSERVATION_STATION] == REDACTED
     assert const.CONF_PLACE_QUERY not in result["entry"]["data"]
     assert result["coordinators"]["primary"] == {
         "last_update_success": True,
@@ -213,6 +215,7 @@ async def test_diagnostics_redact_location_and_stable_identity(
     serialized = repr(result)
     assert "60.123456" not in serialized
     assert "24.654321" not in serialized
+    assert "101004" not in serialized
 
 
 def test_source_availability_snapshot_cannot_mutate_coordinator_state() -> None:

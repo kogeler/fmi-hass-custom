@@ -24,9 +24,6 @@ correctness, compatibility, testability, migration, security, privacy, or valida
   assertion has a stable ID and links to its automated test evidence.
 - `docs/maintenance/`: rationale, change checklists, runbooks, and external references that link to
   the normative contracts; never duplicate contract assertions or store session reports here.
-- `plans/README.md`: archive boundary and index for completed P01–P04 plans, dated baselines,
-  decisions, verification, and historical handoffs. Use these only when the reason or history of a
-  current contract matters.
 - `.github/scripts/` and `.github/workflows/`: tested Python CI helpers and GitHub Actions policy.
 - `containers/toolbox/` and `make/container.mk`: content-addressed rootless Podman environment,
   tar-stream transport, confinement policy, and OCI cache operations.
@@ -167,11 +164,9 @@ Commit messages and suggested commit messages must describe the completed change
 session, or step identifiers such as `P03`, `S04`, or `P03-S04`.
 
 For follow-up maintenance, current code, tests, and the owning `docs/contracts/` assertion are the
-sources of truth. Use `plans/*` only to understand historical decisions and verification; do
-not extend it as a tracker for unrelated future work. A new implementation plan
-gets its own plan/handoff namespace. When execution finds a plan error or deliberately departs from
-the plan, correct the plan immediately before continuing the affected work; do not defer that
-correction to a report or final review.
+sources of truth. Implementation plans are never committed or linked from tracked files. When
+execution finds a plan error or deliberately departs from the plan, correct the plan immediately
+before continuing the affected work; do not defer that correction to a report or final review.
 Record only notable release-level or unreleased HA-reference maintenance changes in
 `CHANGELOG.md`, classified by effect on an installed integration as defined in
 `docs/maintenance/HACS_RELEASES.md`; keep runtime-affecting changes without a visible UI or feature

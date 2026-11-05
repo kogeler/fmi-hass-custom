@@ -73,7 +73,7 @@ def test_pep621_owns_every_direct_python_dependency() -> None:
         "pytest",
         "pytest-asyncio",
         "pytest-cov",
-        "pytest-homeassistant-custom-component",
+        "pytest-homeassistant",
         "pytest-socket",
         "pytest-xdist",
     }
@@ -224,6 +224,21 @@ def test_every_pytest_entry_point_uses_automatic_xdist_workers() -> None:
     assert '"--dist=worksteal"' in compatibility
     assert "-n 0" not in repository_text
     assert "PYTEST_WORKERS ?= 0" not in repository_text
+
+
+def test_pytest_entry_points_that_clear_addopts_still_disable_respx() -> None:
+    """Home Assistant must alias httpx before respx can import it, whatever the plugin order."""
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    addopts = project["tool"]["pytest"]["ini_options"]["addopts"]
+    assert any(
+        first == "-p" and second == "no:respx"
+        for first, second in zip(addopts, addopts[1:], strict=False)
+    )
+
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    cleared = [line for line in makefile.splitlines() if "-o addopts=" in line]
+    assert cleared
+    assert all("-p no:respx" in line for line in cleared)
 
 
 def test_make_target_surface_has_no_legacy_or_duplicate_execution_path() -> None:

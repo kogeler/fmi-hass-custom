@@ -70,6 +70,32 @@ def test_uses_first_unreleased_section_and_preserves_manual_text(tmp_path: Path)
     )
 
 
+def test_joins_wrapped_changelog_lines_for_github(tmp_path: Path) -> None:
+    """GitHub keeps single newlines in PR bodies, so wrapped entries become single lines."""
+    result, output = _run(
+        tmp_path,
+        changelog=(
+            "# Changelog\n\n"
+            "## Unreleased\n\n### Added\n\n"
+            "- First entry that\n  continues here.\n"
+            "- Second entry.\n\n"
+            "A paragraph that\nwraps.\n\n"
+            "```text\nkept\nas is\n```\n"
+        ),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert output.read_text(encoding="utf-8") == (
+        f"{START_MARKER}\n"
+        "## Unreleased\n\n### Added\n\n"
+        "- First entry that continues here.\n"
+        "- Second entry.\n\n"
+        "A paragraph that wraps.\n\n"
+        "```text\nkept\nas is\n```\n"
+        f"{END_MARKER}\n"
+    )
+
+
 def test_uses_first_versioned_section_when_no_unreleased_section(tmp_path: Path) -> None:
     """A release branch exposes its current dated version section verbatim."""
     result, output = _run(

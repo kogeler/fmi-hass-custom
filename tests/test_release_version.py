@@ -154,6 +154,26 @@ def test_release_notes_use_only_matching_section_and_full_link(tmp_path: Path) -
     )
 
 
+def test_release_notes_join_wrapped_changelog_lines(tmp_path: Path) -> None:
+    """GitHub keeps single newlines in release bodies, so wrapped entries become single lines."""
+    _write_repository(
+        tmp_path,
+        changelog=(
+            "# Changelog\n\n"
+            "## 1.0.0 - 2026-08-01\n\n### Fixed\n\n"
+            "- A fix that\n  wraps.\n- Another fix.\n"
+        ),
+    )
+    output = tmp_path / "release-notes.md"
+
+    result = _run(tmp_path, "notes", "--output", str(output))
+
+    assert result.returncode == 0, result.stderr
+    assert output.read_text(encoding="utf-8").startswith(
+        "### Fixed\n\n- A fix that wraps.\n- Another fix.\n\n"
+    )
+
+
 def test_repository_metadata_is_release_ready() -> None:
     """The committed repository metadata satisfies the same CI contract."""
     result = _run(ROOT, "check")

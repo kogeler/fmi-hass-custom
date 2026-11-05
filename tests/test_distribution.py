@@ -45,10 +45,13 @@ def test_hacs_repository_metadata_and_brand() -> None:
     """Validate version-independent HACS metadata and the distributed brand."""
     hacs = json.loads((ROOT / "hacs.json").read_text(encoding="utf-8"))
 
-    assert hacs["name"] == "FMI"
+    assert hacs["name"] == "FMI Weather"
     assert hacs["country"] == "FI"
     assert hacs["hide_default_branch"] is True
     assert hacs["render_readme"] is True
+
+    manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["categories"] == ["weather_alerts.forecasts"]
 
     icon_path = INTEGRATION / "brand" / "icon.png"
     with Image.open(icon_path) as icon:

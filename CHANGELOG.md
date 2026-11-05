@@ -4,6 +4,58 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.3.2 - 2026-11-05
+
+### User-facing features
+
+- Renamed the repository's display name in HACS and the Home Assistant Marketplace from **FMI** to
+  **FMI Weather**, so it is easier to recognize next to other FMI repositories. Only the listed
+  name changes: the `fmi` domain, config entries, devices, entity IDs, and the integration name
+  under **Settings > Devices & services** stay the same, and no action is needed.
+- Updated the installation, switching, upgrade, removal, and dashboard-card guidance for the
+  Marketplace that replaces HACS in Home Assistant 2026.11, with a My Home Assistant link that opens
+  the Marketplace or HACS, whichever the installed release provides. The minimum supported Home
+  Assistant release is unchanged.
+- Added screenshots of the location's sensors and of its forecast in the optional Detailed Weather
+  Forecast Card to the README, which the Marketplace shows before installation.
+- Declared the **Weather & alerts > Forecasts** integration category in the manifest, so the
+  Marketplace can list the integration under that category. Older Home Assistant releases ignore
+  the key.
+
+### Runtime operation
+
+- Verified the integration on Home Assistant 2026.11, which builds HACS in as the Marketplace. No
+  runtime behavior change was required, and the minimum supported Home Assistant release is
+  unchanged.
+
+### Security
+
+- Diagnostics downloads now also redact the entry's display name and the configured observation
+  station ID, because either can reveal the approximate configured location. Coordinates and
+  coordinate-derived identity were already redacted.
+- Updated certifi, filelock, and Pillow in the hash locks to releases that fix newly published
+  vulnerabilities; Pillow follows the Home Assistant 2026.11 reference. This affects only the
+  development and test environment; the integration does not declare these packages, and Home
+  Assistant provides its own.
+
+### Development and maintenance
+
+- Updated the reproducible development and test reference to Home Assistant 2026.11 and regenerated
+  the hash locks.
+- Replaced the discontinued community test helper with the `pytest-homeassistant` package that Home
+  Assistant now publishes with each release. Moving compatibility checks install the helper with
+  exactly the same version as the Home Assistant release under test.
+- Updated the CI's GitHub Actions, the hassfest and HACS validator images, the Python base image,
+  and resolver bootstrap packages to their latest releases. The HACS validation now runs the
+  current check set, including the license and integration-category checks.
+- Declared the weather entity's device with Home Assistant's `DeviceInfo` type, which newer Home
+  Assistant type checking requires. The device and its identifiers are unchanged.
+- Pull-request descriptions and GitHub release notes generated from this changelog now join its
+  wrapped lines, because GitHub showed every wrap as a line break there. The bug-report form's
+  introduction is folded the same way and names the Marketplace as a place to read the version.
+- Removed the archive of completed implementation plans from the repository. The contracts under
+  `docs/contracts/` remain the documentation of current behavior.
+
 ## 1.3.1 - 2026-10-14
 
 ### Runtime operation

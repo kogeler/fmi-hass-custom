@@ -7,26 +7,40 @@ This guide applies to the
 Check that page before installation or upgrade for the current version, release notes, and source
 archives. The minimum Home Assistant version is declared in `hacs.json` within that release.
 Current stable and prerelease compatibility checks detect upcoming changes, but do not promise
-support for every future release. The integration needs internet access to FMI. HACS is recommended
-but not required. The supported product geography is Finland; optional observation and sea-level
+support for every future release. The integration needs internet access to FMI. The Home Assistant
+Marketplace or HACS, whichever your Home Assistant release provides, is recommended but not
+required. The supported product geography is Finland; optional observation and sea-level
 datasets can cover only part of that area. A place-search result outside Finland does not establish
 support for that location.
 
-## Install With HACS
+## Install With The Marketplace Or HACS
 
-1. Install and configure [HACS](https://www.hacs.xyz/docs/use/) for your Home Assistant system.
-2. Open HACS, use the top-right menu, and select **Custom repositories**.
-3. Enter `https://github.com/kogeler/fmi-hass-custom`, select **Integration**, and add it.
-4. Open the FMI repository in HACS, select **Download**, and choose the newest published version.
-   Confirm it against the [latest GitHub Release](https://github.com/kogeler/fmi-hass-custom/releases/latest).
-5. Restart Home Assistant.
-6. Open **Settings > Devices & services > Add integration**, search for **Finnish Meteorological
+Starting with Home Assistant 2026.11, HACS is built into Home Assistant as the **Marketplace** under
+**Settings > Marketplace**, and the HACS custom integration can no longer be installed. Older Home
+Assistant releases keep using HACS. Both read the same repository and its published releases. This
+only changes the installation tool; the minimum supported Home Assistant version is still the one
+declared in `hacs.json`.
+
+1. Add this repository as a custom repository of type **Integration**:
+   - Open
+     [this My Home Assistant link](https://my.home-assistant.io/redirect/hacs_repository/?owner=kogeler&repository=fmi-hass-custom&category=integration).
+     It opens the Marketplace on Home Assistant 2026.11 and newer, and HACS on older releases, and
+     offers to add the repository.
+   - Alternatively, on older releases with HACS installed, open HACS, use the top-right menu, select
+     **Custom repositories**, enter `https://github.com/kogeler/fmi-hass-custom`, and select
+     **Integration**.
+2. Open the **FMI Weather** repository, select **Download**, and choose the newest published
+   version. Confirm it against the
+   [latest GitHub Release](https://github.com/kogeler/fmi-hass-custom/releases/latest).
+3. Restart Home Assistant when asked. HACS always requires a restart; the Marketplace creates a
+   repair with a restart button when one is needed.
+4. Open **Settings > Devices & services > Add integration**, search for **Finnish Meteorological
    Institute**, and choose a location method:
    - **Choose on map** starts at Home Assistant's configured Home location. Accept the marker or
      move it to another forecast point.
    - **Search by place name** sends a city or place name to FMI, then shows FMI's result on the map.
      Confirm that point or adjust the marker before saving.
-7. Enter the display name requested on the selected path. FMI validates the final map point before
+5. Enter the display name requested on the selected path. FMI validates the final map point before
    Home Assistant creates the entry.
 
 Repeat the last step to configure another location. The same coordinates cannot be used by two
@@ -38,16 +52,17 @@ Create and download a Home Assistant backup before changing the repository sourc
 the FMI entry under **Settings > Devices & services**: that entry owns the existing configuration,
 devices, and entity-registry records.
 
-If the previous FMI source was added to HACS as a custom repository:
+If the previous FMI source was added to HACS or the Marketplace as a custom repository:
 
-1. Open HACS, use the top-right menu, and select **Custom repositories**.
-2. Remove the previous FMI repository URL from that list.
-3. Add `https://github.com/kogeler/fmi-hass-custom` with type **Integration**.
-4. Open the FMI repository in HACS and select **Download** or **Redownload** for the newest
+1. Remove the previous FMI repository from HACS (top-right menu, **Custom repositories**) or from
+   **Settings > Marketplace**. The Marketplace refuses a second repository that installs the same
+   `fmi` domain.
+2. Add `https://github.com/kogeler/fmi-hass-custom` with type **Integration** as described above.
+3. Open the **FMI Weather** repository and select **Download** or **Redownload** for the newest
    published release.
-5. Restart Home Assistant.
+4. Restart Home Assistant.
 
-This changes the repository from which HACS installs `custom_components/fmi/`; it does not create a
+This changes the repository from which HACS or the Marketplace installs `custom_components/fmi/`; it does not create a
 new Home Assistant integration. The fork retains the `fmi` domain and migrates existing config and
 registry state in place, including customized entity IDs. If HACS removes the old downloaded files
 during the switch, complete the fork download before restarting Home Assistant.
@@ -71,8 +86,8 @@ Home Assistant installs the exact runtime requirements declared by the integrati
 
 Create and download a Home Assistant backup before an upgrade.
 
-- **HACS:** install the offered FMI update from **Settings > Updates** or use **Redownload** on the
-  HACS repository, then restart Home Assistant.
+- **Marketplace or HACS:** install the offered FMI update from **Settings > Updates**, or use
+  **Redownload** on the repository, then restart Home Assistant.
 - **Manual:** replace the complete `custom_components/fmi/` directory with the directory from the
   new release archive, then restart Home Assistant. Do not remove the integration entry first.
 
@@ -277,10 +292,13 @@ or forecast field supplied by this integration. The independently maintained
 - apparent temperature below every hourly and daily forecast item;
 - dew point, pressure, and total cloud coverage in the expandable hourly and daily details.
 
-Add the repository URL above under **HACS > Custom repositories** with category **Dashboard**,
-install the card, and refresh the browser. HACS normally registers its dashboard resource. If the
-card type is still unavailable, add `/hacsfiles/detailed-weather-forecast/detailed-weather-forecast.js`
-as a JavaScript module under **Settings > Dashboards > Resources**.
+Add the repository URL above as a custom repository with category **Dashboard** in the Marketplace
+or HACS, install the card, and refresh the browser. Both normally register its dashboard resource.
+If the card type is still unavailable, add
+`/local/community/detailed-weather-forecast/detailed-weather-forecast.js` (Marketplace) or
+`/hacsfiles/detailed-weather-forecast/detailed-weather-forecast.js` (HACS; this path also keeps
+working after the Marketplace takes over) as a JavaScript module under
+**Settings > Dashboards > Resources**.
 
 This card is optional and is not distributed or maintained by the FMI integration. Its
 installation, updates, and card-specific support remain with its own project. The following
@@ -437,15 +455,16 @@ entities:
   in your registry. Reconfigured and migrated entries deliberately retain their established IDs.
 
 When reporting a problem, attach sanitized Home Assistant diagnostics and relevant integration log
-lines. Diagnostics redact configured coordinates and legacy coordinate-derived identity. Do not
-publish precise home coordinates or raw external responses.
+lines. Diagnostics redact configured coordinates, the entry's display name, the observation
+station ID, and legacy coordinate-derived identity. Do not publish precise home coordinates or raw
+external responses.
 
 ## Remove
 
 1. Open **Settings > Devices & services > Finnish Meteorological Institute**.
 2. Open the entry menu and select **Delete**. This removes its devices and entities from Home
    Assistant.
-3. Remove the repository from HACS, or delete `custom_components/fmi/` for a manual installation.
+3. Remove the repository from the Marketplace or HACS, or delete `custom_components/fmi/` for a manual installation.
 4. Restart Home Assistant.
 
 ## External Services And Privacy
@@ -457,8 +476,9 @@ processed transiently in memory for local distance/bearing calculation. They are
 second provider and are not exposed in state, attributes, logs, or diagnostics. See the
 [security and privacy contract](contracts/COMPATIBILITY_SECURITY.md).
 
-Documentation references verified 2026-08-20:
+Documentation references verified 2026-11-03:
 
+- [Home Assistant Marketplace and HACS](https://www.hacs.xyz/docs/marketplace/)
 - [HACS custom repositories](https://www.hacs.xyz/docs/faq/custom_repositories/)
 - [HACS repository download and update behavior](https://www.hacs.xyz/docs/use/repositories/dashboard/)
 - [Home Assistant weather forecast card](https://www.home-assistant.io/dashboards/weather-forecast/)

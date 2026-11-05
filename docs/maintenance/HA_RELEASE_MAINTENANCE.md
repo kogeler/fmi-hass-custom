@@ -12,8 +12,9 @@ moving-channel rules are in
 
 1. Inspect `git status`, `.version`, `hacs.json`, root PEP 621 metadata, manifest requirements,
    audit exceptions, and relevant `TODO.md` items. Keep unrelated work out of the refresh.
-2. Confirm the new stable Home Assistant and matching test-helper releases from authoritative
-   metadata. Update only their direct PEP 621 selections. If Python requirements changed, review the
+2. Confirm the new stable Home Assistant release and the `pytest-homeassistant` test helper that
+   Home Assistant publishes with the same version from authoritative metadata. Update only their
+   direct PEP 621 selections, always to the same version. If Python requirements changed, review the
    immutable Python image separately. Do not copy versions into runtime code, tests, or `hacs.json`.
 3. Run `make lock`, review every changed pin/hash, then run `make dev-build` and
    `make freeze-check`.

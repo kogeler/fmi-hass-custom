@@ -2,6 +2,29 @@
 
 # Maintenance TODO
 
+## Submit the integration to the default catalog
+
+- Status: `IN_PROGRESS`; updated 2026-11-05.
+- Remaining work:
+  1. Publish the release through the normal workflow and confirm that its `HACS validation` log
+     reports every current check passed without `ignore` or warnings, and that `Hassfest` passed.
+  2. The owner installs that release as a custom repository through **Settings > Marketplace**, both
+     as a fresh install and as an upgrade taken over from HACS, and runs the release smoke checks:
+     setup by map and by place, reload, forecasts and sensors, optional sources, reconfiguration
+     with preserved entity IDs, and diagnostics privacy. The catalog pull request waits for this
+     result.
+  3. Recheck that `fmi` is not a Core domain in `https://next.home-assistant.io/integrations.json`,
+     that the repository is not already listed or removed in
+     [`hacs/default`](https://github.com/hacs/default), and that no other catalog repository uses
+     the `fmi` domain.
+  4. Prepare the `hacs/default` pull request from a personal fork: one alphabetically sorted
+     `"kogeler/fmi-hass-custom"` entry in `integration`, and the template completed with links to
+     that release and to its successful `HACS validation` and `Hassfest` jobs. Only the owner submits
+     it; do not request reviews.
+  5. After the merge and the next catalog data update, verify that the repository can be found and
+     installed from the Marketplace, then make catalog search the primary installation path in
+     `docs/USER_GUIDE.md` and remove this item.
+
 ## Restore current pip and pip-tools in the resolver bootstrap
 
 - Status: `BLOCKED_UPSTREAM`; workaround applied by the repository owner's decision on 2026-10-14.
