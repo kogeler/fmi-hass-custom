@@ -43,13 +43,16 @@ release publication MAY receive `contents: write` only in their dedicated jobs.
 
 **Contract:** `pr-body.yml` MUST be the sole `pull_request_target` workflow. It MUST execute trusted
 default-branch code, treat bounded head `CHANGELOG.md` content as inert data, recheck update races,
-and MUST NOT check out/execute head code or receive repository-content write permission.
+and MUST NOT check out/execute head code or receive repository-content write permission. The
+generated section MUST join wrapped changelog lines, because GitHub renders single newlines in PR
+bodies as hard breaks.
 
 **Evidence:**
 
 - [`test_pr_body_is_the_only_pull_request_target_write_boundary`](../../tests/test_ci_policy.py) — `tests/test_ci_policy.py::test_pr_body_is_the_only_pull_request_target_write_boundary`
 - [`test_workflow_never_checks_out_or_executes_head_code`](../../tests/test_pr_body.py) — `tests/test_pr_body.py::test_workflow_never_checks_out_or_executes_head_code`
 - [`test_rejects_body_above_github_limit`](../../tests/test_pr_body.py) — `tests/test_pr_body.py::test_rejects_body_above_github_limit`
+- [`test_joins_wrapped_changelog_lines_for_github`](../../tests/test_pr_body.py) — `tests/test_pr_body.py::test_joins_wrapped_changelog_lines_for_github`
 
 ### `CIR-005` — Release version has one human-maintained owner
 
@@ -72,13 +75,14 @@ that candidate version has no Release, and MUST still be greater than the publis
 **Contract:** A version-incrementing direct `master` push MUST pass reusable CI before its sole
 write-enabled publish job creates an exact lightweight tag and published stable Release. Matching
 existing publication MUST be a read-only no-op; conflicting tag/target/title/notes/state MUST fail
-without moving or rewriting it. Release notes MUST use only the matching changelog section and a
-tag-stable full-changelog link.
+without moving or rewriting it. Release notes MUST use only the matching changelog section, with
+wrapped lines joined, and a tag-stable full-changelog link.
 
 **Evidence:**
 
 - [`test_release_reuses_ci_and_writes_only_in_publish_job`](../../tests/test_ci_policy.py) — `tests/test_ci_policy.py::test_release_reuses_ci_and_writes_only_in_publish_job`
 - [`test_release_notes_use_only_matching_section_and_full_link`](../../tests/test_release_version.py) — `tests/test_release_version.py::test_release_notes_use_only_matching_section_and_full_link`
+- [`test_release_notes_join_wrapped_changelog_lines`](../../tests/test_release_version.py) — `tests/test_release_version.py::test_release_notes_join_wrapped_changelog_lines`
 - [`test_repository_metadata_is_release_ready`](../../tests/test_release_version.py) — `tests/test_release_version.py::test_repository_metadata_is_release_ready`
 
 ### `CIR-007` — Dependency submission is a direct-master-only write boundary

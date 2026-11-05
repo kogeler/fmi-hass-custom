@@ -50,6 +50,9 @@ All notable changes to this project are documented in this file.
   current check set, including the license and integration-category checks.
 - Declared the weather entity's device with Home Assistant's `DeviceInfo` type, which newer Home
   Assistant type checking requires. The device and its identifiers are unchanged.
+- Pull-request descriptions and GitHub release notes generated from this changelog now join its
+  wrapped lines, because GitHub showed every wrap as a line break there. The bug-report form's
+  introduction is folded the same way and names the Marketplace as a place to read the version.
 - Removed the archive of completed implementation plans from the repository. The contracts under
   `docs/contracts/` remain the documentation of current behavior.
 

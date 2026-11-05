@@ -12,6 +12,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from markdown_text import unwrap_soft_breaks
+
 REPOSITORY = "kogeler/fmi-hass-custom"
 REPOSITORY_URL = f"https://github.com/{REPOSITORY}"
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
@@ -100,7 +102,7 @@ def _changelog_body(root: Path, version: Version) -> str:
     body = changelog[start:end].strip()
     if not body or not re.search(r"^- ", body, re.MULTILINE):
         raise VersionError(f"CHANGELOG.md section {version} must contain release entries")
-    return body
+    return unwrap_soft_breaks(body)
 
 
 def _validate_current(root: Path) -> Version:

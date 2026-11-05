@@ -10,6 +10,8 @@ import re
 import sys
 from pathlib import Path
 
+from markdown_text import unwrap_soft_breaks
+
 START_MARKER = "<!-- fmi-changelog:start -->"
 END_MARKER = "<!-- fmi-changelog:end -->"
 MAX_CHANGELOG_BYTES = 1_000_000
@@ -42,7 +44,7 @@ def _latest_changelog_section(changelog: str) -> str:
     if not content or re.search(r"^- ", content, re.MULTILINE) is None:
         raise PullRequestBodyError("latest CHANGELOG.md section must contain a bullet entry")
 
-    section = f"## {title}\n\n{content}"
+    section = f"## {title}\n\n{unwrap_soft_breaks(content)}"
     if START_MARKER in section or END_MARKER in section:
         raise PullRequestBodyError("CHANGELOG.md section contains a reserved marker")
     return section
