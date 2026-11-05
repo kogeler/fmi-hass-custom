@@ -4,6 +4,20 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.3.3 - 2026-11-05
+
+### User-facing features
+
+- **FMI Weather** is now in the default catalog. The README and user guide describe installing it
+  by searching for **FMI Weather** in **Settings > Marketplace** on Home Assistant 2026.11 and newer,
+  or in HACS on older releases; adding a custom repository is no longer needed. Existing
+  installations added as a custom repository keep working and keep receiving updates without any
+  change.
+
+### Development and maintenance
+
+- Updated the Python base image to its latest build.
+
 ## 1.3.2 - 2026-11-05
 
 ### User-facing features

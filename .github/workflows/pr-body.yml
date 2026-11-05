@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     container:
-      image: docker.io/library/python@sha256:f1b121a95d6295f7291a0fda8280f747efd657bd055e7c1f156936ed2dc5a112
+      image: docker.io/library/python@sha256:af8a5aa14780025dbfbcfbc81bd8a91ebd87711dd5b0f48ed71090949dd7cb1d
     env:
       EXISTING_BODY: ${{ github.workspace }}/.existing-pr-body.md
       EXPECTED_REPOSITORY: kogeler/fmi-hass-custom

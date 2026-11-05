@@ -15,22 +15,21 @@ support for that location.
 
 ## Install With The Marketplace Or HACS
 
-Starting with Home Assistant 2026.11, HACS is built into Home Assistant as the **Marketplace** under
-**Settings > Marketplace**, and the HACS custom integration can no longer be installed. Older Home
-Assistant releases keep using HACS. Both read the same repository and its published releases. This
-only changes the installation tool; the minimum supported Home Assistant version is still the one
-declared in `hacs.json`.
+The integration is listed in the default catalog as **FMI Weather**. Starting with Home Assistant
+2026.11, HACS is built into Home Assistant as the **Marketplace** under **Settings > Marketplace**,
+and the HACS custom integration can no longer be installed. Older Home Assistant releases keep using
+HACS. Both show the same catalog and install the same published releases. This only changes the
+installation tool; the minimum supported Home Assistant version is still the one declared in
+`hacs.json`.
 
-1. Add this repository as a custom repository of type **Integration**:
+1. Open the **FMI Weather** repository:
    - Open
      [this My Home Assistant link](https://my.home-assistant.io/redirect/hacs_repository/?owner=kogeler&repository=fmi-hass-custom&category=integration).
-     It opens the Marketplace on Home Assistant 2026.11 and newer, and HACS on older releases, and
-     offers to add the repository.
-   - Alternatively, on older releases with HACS installed, open HACS, use the top-right menu, select
-     **Custom repositories**, enter `https://github.com/kogeler/fmi-hass-custom`, and select
-     **Integration**.
-2. Open the **FMI Weather** repository, select **Download**, and choose the newest published
-   version. Confirm it against the
+     It opens the repository in the Marketplace on Home Assistant 2026.11 and newer, and in HACS on
+     older releases.
+   - Alternatively, open **Settings > Marketplace**, or HACS on older releases, and search for
+     **FMI Weather**.
+2. Select **Download** and choose the newest published version. Confirm it against the
    [latest GitHub Release](https://github.com/kogeler/fmi-hass-custom/releases/latest).
 3. Restart Home Assistant when asked. HACS always requires a restart; the Marketplace creates a
    repair with a restart button when one is needed.
@@ -52,20 +51,24 @@ Create and download a Home Assistant backup before changing the repository sourc
 the FMI entry under **Settings > Devices & services**: that entry owns the existing configuration,
 devices, and entity-registry records.
 
-If the previous FMI source was added to HACS or the Marketplace as a custom repository:
+If this repository was added as a custom repository before it joined the default catalog, nothing
+needs to change: it is the same repository, and updates keep arriving.
 
-1. Remove the previous FMI repository from HACS (top-right menu, **Custom repositories**) or from
+If the previous FMI source was another repository added to HACS or the Marketplace as a custom
+repository:
+
+1. Remove that custom repository from HACS (top-right menu, **Custom repositories**) or from
    **Settings > Marketplace**. The Marketplace refuses a second repository that installs the same
    `fmi` domain.
-2. Add `https://github.com/kogeler/fmi-hass-custom` with type **Integration** as described above.
-3. Open the **FMI Weather** repository and select **Download** or **Redownload** for the newest
-   published release.
-4. Restart Home Assistant.
+2. Open **FMI Weather** from the catalog as described above and select **Download** or
+   **Redownload** for the newest published release.
+3. Restart Home Assistant.
 
-This changes the repository from which HACS or the Marketplace installs `custom_components/fmi/`; it does not create a
-new Home Assistant integration. The fork retains the `fmi` domain and migrates existing config and
-registry state in place, including customized entity IDs. If HACS removes the old downloaded files
-during the switch, complete the fork download before restarting Home Assistant.
+This changes the repository from which HACS or the Marketplace installs `custom_components/fmi/`;
+it does not create a new Home Assistant integration. The fork retains the `fmi` domain and
+migrates existing config and registry state in place, including customized entity IDs. If HACS
+removes the old downloaded files during the switch, complete the fork download before restarting
+Home Assistant.
 
 ## Install Manually
 
@@ -464,7 +467,8 @@ external responses.
 1. Open **Settings > Devices & services > Finnish Meteorological Institute**.
 2. Open the entry menu and select **Delete**. This removes its devices and entities from Home
    Assistant.
-3. Remove the repository from the Marketplace or HACS, or delete `custom_components/fmi/` for a manual installation.
+3. Remove the repository from the Marketplace or HACS, or delete `custom_components/fmi/` for a
+   manual installation.
 4. Restart Home Assistant.
 
 ## External Services And Privacy
@@ -476,7 +480,7 @@ processed transiently in memory for local distance/bearing calculation. They are
 second provider and are not exposed in state, attributes, logs, or diagnostics. See the
 [security and privacy contract](contracts/COMPATIBILITY_SECURITY.md).
 
-Documentation references verified 2026-11-03:
+Documentation references verified 2026-11-05:
 
 - [Home Assistant Marketplace and HACS](https://www.hacs.xyz/docs/marketplace/)
 - [HACS custom repositories](https://www.hacs.xyz/docs/faq/custom_repositories/)

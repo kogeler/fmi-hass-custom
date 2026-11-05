@@ -12,8 +12,21 @@ Check the [latest published GitHub Release](https://github.com/kogeler/fmi-hass-
 for the current integration version and its release notes. The minimum Home Assistant version is
 declared in `hacs.json` for each release. Moving compatibility checks exercise the current stable
 and prerelease channels as early warnings, but do not create a blanket support promise for future
-releases. Install it as a custom repository through the Home Assistant Marketplace or HACS,
-whichever your Home Assistant release provides, or copy the released integration manually.
+releases.
+
+**FMI Weather** is listed in the default catalog:
+
+- **Home Assistant 2026.11 and newer:** open **Settings > Marketplace** and search for
+  **FMI Weather**. The Marketplace is built into Home Assistant from 2026.11 and replaces HACS.
+- **Older Home Assistant releases:** install [HACS](https://www.hacs.xyz/docs/use/), open it, and
+  search for **FMI Weather**.
+- **Either release:** use
+  [this My Home Assistant link](https://my.home-assistant.io/redirect/hacs_repository/?owner=kogeler&repository=fmi-hass-custom&category=integration),
+  which opens the repository in the Marketplace or in HACS, or copy the released integration
+  manually.
+
+See the [user guide](docs/USER_GUIDE.md#install-with-the-marketplace-or-hacs) for the full steps.
+
 It is not bundled with Home Assistant Core and does not claim an official Core quality tier.
 
 ## Screenshots
