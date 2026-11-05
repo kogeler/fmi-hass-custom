@@ -3,7 +3,7 @@
 
 # Project source is streamed into a private tmpfs at run time and is never
 # baked into either image stage.
-FROM docker.io/library/python@sha256:f1b121a95d6295f7291a0fda8280f747efd657bd055e7c1f156936ed2dc5a112 AS base
+FROM docker.io/library/python@sha256:af8a5aa14780025dbfbcfbc81bd8a91ebd87711dd5b0f48ed71090949dd7cb1d AS base
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
