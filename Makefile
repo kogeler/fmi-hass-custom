@@ -277,7 +277,7 @@ live: toolbox-image
 		--env FMI_LIVE_BUDGET_DIR=/tmp/fmi-live-budget $(TOOLBOX_TAG) \
 		bash -ceu 'mkdir -m 0700 "$${FMI_LIVE_BUDGET_DIR}"; \
 			status=0; \
-			python -m pytest -o addopts= --strict-config --strict-markers \
+			python -m pytest -o addopts= -p no:respx --strict-config --strict-markers \
 				$(PYTEST_XDIST) -m live -q || status=$$?; \
 			count=0; \
 			if [[ -s "$${FMI_LIVE_BUDGET_DIR}/requests" ]]; then \
