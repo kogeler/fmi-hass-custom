@@ -48,12 +48,14 @@ The owner reviews remote settings before release because they are not stored in 
 - only the dedicated dependency-submission and final release jobs receive contents-write;
 - the separately visible HACS job validates the exact head repository/ref.
 
-A release-branch push cannot publish. HACS consumes the latest published GitHub Release/tag rather
-than treating the moving hidden default branch as an ordinary downloadable version.
+A release-branch push cannot publish. HACS, and the Marketplace that replaces it in Home Assistant
+2026.11 and newer, consume the latest published GitHub Release/tag rather than treating the moving
+hidden default branch as an ordinary downloadable version. Both read the same `hacs.json`.
 
 ## References
 
 - [HACS repository and version rules](https://www.hacs.xyz/docs/publish/start/)
+- [Marketplace publishing guide](https://contributors.home-assistant.io/marketplace/)
 - [HACS integration layout and releases](https://www.hacs.xyz/docs/publish/integration/)
 - [Home Assistant custom integration layout](https://developers.home-assistant.io/docs/creating_integration_file_structure/)
 - [GitHub release API](https://docs.github.com/en/rest/releases/releases#create-a-release)

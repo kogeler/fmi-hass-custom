@@ -31,7 +31,7 @@ from homeassistant.components.weather import (
 )
 from homeassistant.components.weather.const import WeatherEntityFeature
 from homeassistant.const import CONF_NAME
-from homeassistant.helpers.device_registry import DeviceEntryType
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
@@ -115,12 +115,12 @@ class FMIWeatherEntity(CoordinatorEntity[FMIDataUpdateCoordinator], WeatherEntit
         self._attr_has_entity_name = True
         self._attr_name = entity_name
         self._attr_unique_id = "_".join(_attr_unique_id)
-        self._attr_device_info = {
-            "identifiers": {(const.DOMAIN, coordinator.unique_id)},
-            "name": device_name,
-            "manufacturer": const.MANUFACTURER,
-            "entry_type": DeviceEntryType.SERVICE,
-        }
+        self._attr_device_info = DeviceInfo(
+            identifiers={(const.DOMAIN, coordinator.unique_id)},
+            name=device_name,
+            manufacturer=const.MANUFACTURER,
+            entry_type=DeviceEntryType.SERVICE,
+        )
         self._attr_should_poll = False
         self._attr_attribution = const.ATTRIBUTION
         # update initial values

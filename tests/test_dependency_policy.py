@@ -73,7 +73,7 @@ def test_pep621_owns_every_direct_python_dependency() -> None:
         "pytest",
         "pytest-asyncio",
         "pytest-cov",
-        "pytest-homeassistant-custom-component",
+        "pytest-homeassistant",
         "pytest-socket",
         "pytest-xdist",
     }

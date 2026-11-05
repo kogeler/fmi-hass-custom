@@ -12,8 +12,20 @@ Check the [latest published GitHub Release](https://github.com/kogeler/fmi-hass-
 for the current integration version and its release notes. The minimum Home Assistant version is
 declared in `hacs.json` for each release. Moving compatibility checks exercise the current stable
 and prerelease channels as early warnings, but do not create a blanket support promise for future
-releases. Install it through HACS as a custom repository or copy the released integration manually.
+releases. Install it as a custom repository through the Home Assistant Marketplace or HACS,
+whichever your Home Assistant release provides, or copy the released integration manually.
 It is not bundled with Home Assistant Core and does not claim an official Core quality tier.
+
+## Screenshots
+
+<p>
+  <img src="docs/images/sensors.png" width="320" alt="The FMI location device in Home Assistant with its weather entity and sensors: pressure, best time of day, cloud cover, condition, dew point, feels-like temperature, humidity, place, precipitation and thunderstorm probability, rain, sea level, temperature, and wind">
+  <img src="docs/images/detailed-forecast-card.png" width="400" alt="Current conditions with feels-like temperature, rain and thunder probability, a five-day daily forecast, and an hourly forecast with precipitation probability and apparent temperature">
+</p>
+
+The location's sensors (left) and its forecast in the optional
+[Detailed Weather Forecast Card](docs/USER_GUIDE.md#more-detailed-weather-card-optional) (right),
+which is maintained separately from this integration.
 
 ## Main Limitations
 

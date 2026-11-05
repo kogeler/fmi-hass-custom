@@ -3,7 +3,7 @@
 
 # Project source is streamed into a private tmpfs at run time and is never
 # baked into either image stage.
-FROM docker.io/library/python@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170 AS base
+FROM docker.io/library/python@sha256:930e1abba7c4e8f96ed93e8012c35d174d7732752731bbd5e8e757d7ec6f3966 AS base
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -27,7 +27,7 @@ FROM base AS lock
 
 RUN python -m pip install --quiet --only-binary=:all: \
         pip==26.1.2 \
-        setuptools==84.0.0 \
+        setuptools==84.2.1 \
         pip-tools==7.6.0 \
         build==1.6.1 \
         click==8.5.0 \

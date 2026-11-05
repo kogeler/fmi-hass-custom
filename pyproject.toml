@@ -15,7 +15,7 @@ dependencies = [
 # Home Assistant selection is not the minimum release declared by HACS.
 dev = [
   "bandit[toml]==1.9.4",
-  "homeassistant==2026.10.1",
+  "homeassistant==2026.11.0b6",
   "mypy==2.4.0",
   "packaging==26.3",
   "pip-audit==2.10.1",
@@ -24,7 +24,7 @@ dev = [
   "pytest==9.0.3",
   "pytest-asyncio==1.4.0",
   "pytest-cov==7.1.0",
-  "pytest-homeassistant-custom-component==0.13.372",
+  "pytest-homeassistant==2026.11.0b6",
   "pytest-socket==0.8.1",
   "pytest-xdist==3.8.0",
 ]
@@ -37,8 +37,12 @@ addopts = [
   "--allow-unix-socket",
   "-m",
   "not live",
+  # Let Home Assistant install its httpx alias before respx is imported.
+  "-p",
+  "no:respx",
 ]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 python_files = ["test_*.py"]
 testpaths = ["tests"]
 markers = [

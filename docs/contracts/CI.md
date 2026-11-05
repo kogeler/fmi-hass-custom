@@ -96,6 +96,7 @@ validated manifests offline without a token, and submit them with only its job-s
 
 **Contract:** HACS metadata MUST retain the reviewed repository name/country, hidden default
 branch, rendered README, current installation floor, and standard `custom_components/fmi` payload.
+The manifest MUST declare the reviewed Home Assistant integration category.
 Only a published GitHub Release tag MAY represent an offered integration version; distributed code
 MUST import from a clean copied integration tree.
 

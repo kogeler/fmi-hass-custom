@@ -72,6 +72,24 @@ def test_moving_inputs_are_derived_from_project_metadata(tmp_path: Path) -> None
 
     assert homeassistant.read_text(encoding="utf-8") == "homeassistant\n"
     assert direct.read_text(encoding="utf-8").splitlines() == [
-        *(Requirement(item).name for item in runtime),
-        "pytest-homeassistant-custom-component",
+        Requirement(item).name for item in runtime
     ]
+
+
+def test_test_helper_is_pinned_to_the_selected_home_assistant(tmp_path: Path) -> None:
+    """Test each moving release with the helper built from the same Home Assistant release."""
+    pins = COMPATIBILITY._selected_pins(tmp_path, "selected")
+
+    assert pins.read_text(encoding="utf-8").splitlines() == [
+        "homeassistant==selected",
+        "pytest-homeassistant==selected",
+    ]
+
+
+def test_mismatched_test_helper_is_fatal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Never test one Home Assistant release with a helper built for another."""
+    monkeypatch.setattr(COMPATIBILITY, "_distribution_version", lambda *_: "helper")
+
+    COMPATIBILITY._assert_matching_helper("python", "helper")
+    with pytest.raises(COMPATIBILITY.CompatibilityError, match="does not match"):
+        COMPATIBILITY._assert_matching_helper("python", "selected")
