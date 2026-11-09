@@ -36,10 +36,10 @@ Assistant version.
 ### `CSP-003` — Logs exclude private external data
 
 **Contract:** The integration MUST NOT configure the process-wide root logger. Logs MAY contain
-source names, transitions, HTTP status classes, and exception class names, but MUST NOT contain
-configured coordinates, coordinate-derived identity, place-search text, raw response/payload, or
-arbitrary external exception text. The upstream-client privacy filter MUST remain scoped and
-idempotent.
+source names, transitions, HTTP status classes, exception class names, and the name and configured
+value of an expired request timeout, but MUST NOT contain configured coordinates,
+coordinate-derived identity, place-search text, raw response/payload, or arbitrary external
+exception text. The upstream-client privacy filter MUST remain scoped and idempotent.
 
 **Evidence:**
 
@@ -50,6 +50,8 @@ idempotent.
 - [`test_warning_failure_clears_recovers_and_rejects_publication_rollback`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_failure_clears_recovers_and_rejects_publication_rollback`
 - [`test_warning_unexpected_failure_clears_state_and_names_only_the_class`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_unexpected_failure_clears_state_and_names_only_the_class`
 - [`test_warning_initial_failure_is_optional_and_primary_failure_is_not`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_initial_failure_is_optional_and_primary_failure_is_not`
+- [`test_warning_timeout_logs_name_the_expired_limit`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_timeout_logs_name_the_expired_limit`
+- [`test_optional_transport_failure_is_classified`](../../tests/test_auxiliary_payloads.py) — `tests/test_auxiliary_payloads.py::test_optional_transport_failure_is_classified`
 
 ### `CSP-004` — Diagnostics expose only sanitized health metadata
 

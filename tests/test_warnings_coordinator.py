@@ -11,7 +11,12 @@ from typing import cast
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from aiohttp import ClientConnectionError, ClientSession
+from aiohttp import (
+    ClientConnectionError,
+    ClientSession,
+    ConnectionTimeoutError,
+    SocketTimeoutError,
+)
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant.common import async_fire_time_changed
 
@@ -58,8 +63,9 @@ async def test_warning_http_uses_one_bounded_shared_session_request() -> None:
     url, options = session.calls[0]
     assert url == "https://alerts.fmi.fi/cap/feed/atom_sv-FI.xml"
     assert options["allow_redirects"] is False
-    assert options["timeout"].connect == 2
-    assert options["timeout"].sock_read == 3
+    assert options["timeout"].connect == 10
+    assert options["timeout"].sock_connect == 10
+    assert options["timeout"].sock_read == 10
     assert options["timeout"].total == 30
 
 
@@ -102,8 +108,12 @@ async def test_warning_failure_clears_recovers_and_rejects_publication_rollback(
         monkeypatch.setattr(coordinator, "_session", _FakeSession(error=error))
         await coordinator.async_refresh()
         assert not coordinator.last_update_success
-        assert coordinator.data is None
-        assert coordinator._cancel_boundary is None
+        assert len(coordinator.data.active) == 1
+        assert coordinator._cancel_boundary is not None
+    monkeypatch.setattr(coordinator, "_session", _FakeSession(b"<private>"))
+    await coordinator.async_refresh()
+    assert coordinator.source_availability == {"warnings": False}
+    assert coordinator._cancel_boundary is None
     assert "private coordinates" not in caplog.text
     monkeypatch.setattr(coordinator, "_session", _FakeSession(feed()))
     await coordinator.async_refresh()
@@ -116,7 +126,7 @@ async def test_warning_failure_clears_recovers_and_rejects_publication_rollback(
     await coordinator.async_refresh()
     assert coordinator.last_update_success
     assert coordinator.data.updated == datetime(2026, 11, 7, 10, tzinfo=UTC)
-    monkeypatch.setattr(coordinator, "_session", _FakeSession(error=TimeoutError()))
+    monkeypatch.setattr(coordinator, "_session", _FakeSession(b"<private>"))
     await coordinator.async_refresh()
     monkeypatch.setattr(coordinator, "_session", _FakeSession(old))
     await coordinator.async_refresh()
@@ -384,7 +394,7 @@ async def test_warning_older_publication_cannot_flap_or_stick(coordinator, monke
         assert coordinator.data.fetched.isoformat() == f"2026-11-07T{fetched}:00+00:00"
     assert coordinator.last_successful_refresh == "2026-11-07T10:10:00+00:00"
     freezer.move_to("2026-11-07T10:12:00Z")
-    monkeypatch.setattr(coordinator, "_session", _FakeSession(error=ClientConnectionError()))
+    monkeypatch.setattr(coordinator, "_session", _FakeSession(b"<private>"))
     await coordinator.async_refresh()
     freezer.move_to("2026-11-07T10:24:59Z")
     monkeypatch.setattr(coordinator, "_session", _FakeSession(older))
@@ -394,6 +404,60 @@ async def test_warning_older_publication_cannot_flap_or_stick(coordinator, monke
     monkeypatch.setattr(coordinator, "_session", _FakeSession(older))
     await coordinator.async_refresh()
     assert _active_ids(coordinator) == ["older"]
+
+
+@pytest.mark.parametrize(
+    "error,limit",
+    [
+        (ConnectionTimeoutError("private host"), "connect timeout of 10 s"),
+        (SocketTimeoutError("private host"), "read timeout of 10 s"),
+        (TimeoutError("private host"), "total timeout of 30 s"),
+    ],
+)
+async def test_warning_timeout_logs_name_the_expired_limit(
+    coordinator, monkeypatch, caplog, error, limit
+):
+    """A field log must show which configured limit to review."""
+    monkeypatch.setattr(coordinator, "_session", _FakeSession(error=error))
+    await coordinator.async_refresh()
+    assert coordinator.data is None
+    assert f"FMI warnings source unavailable (timeout): exceeded the {limit}" in caplog.text
+    monkeypatch.setattr(coordinator, "_session", _FakeSession(feed(alert())))
+    await coordinator.async_refresh()
+    monkeypatch.setattr(coordinator, "_session", _FakeSession(error=error))
+    await coordinator.async_refresh()
+    assert coordinator.failure_reason == "timeout" and coordinator.data is not None
+    assert f"FMI warnings retrieval failed (timeout): exceeded the {limit}; keeping" in caplog.text
+    assert "private" not in caplog.text
+
+
+async def test_warning_transient_failure_holds_only_a_fresh_snapshot(
+    coordinator, monkeypatch, freezer
+):
+    """Network failures keep a held snapshot only until its freshness deadline."""
+    monkeypatch.setattr(coordinator, "_session", _FakeSession(error=TimeoutError()))
+    await coordinator.async_refresh()
+    assert coordinator.data is None and coordinator.failure_reason == "timeout"
+    newer = _published("newer", "2026-11-07T10:00:00Z")
+    monkeypatch.setattr(coordinator, "_session", _FakeSession(newer))
+    await coordinator.async_refresh()
+    freezer.move_to("2026-11-07T10:05:00Z")
+    monkeypatch.setattr(coordinator, "_session", _FakeSession(status=503))
+    await coordinator.async_refresh()
+    assert not coordinator.last_update_success and coordinator.failure_reason == "http_server"
+    assert _active_ids(coordinator) == ["newer"]
+    assert coordinator.source_availability == {"warnings": True}
+    older = _published("older", "2026-11-07T09:55:00Z")
+    monkeypatch.setattr(coordinator, "_session", _FakeSession(older))
+    await coordinator.async_refresh()
+    assert coordinator.last_update_success and coordinator.failure_reason is None
+    assert _active_ids(coordinator) == ["newer"]
+    assert coordinator.last_successful_refresh == "2026-11-07T10:00:00+00:00"
+    freezer.move_to("2026-11-07T10:15:00Z")
+    monkeypatch.setattr(coordinator, "_session", _FakeSession(error=ClientConnectionError()))
+    await coordinator.async_refresh()
+    assert coordinator.data is None and coordinator.failure_reason == "transport"
+    assert coordinator._cancel_boundary is None
 
 
 @pytest.mark.parametrize(
@@ -432,8 +496,11 @@ async def test_every_classified_warning_failure_reason_is_exposed(
     await coordinator.async_refresh()
     assert coordinator.failure_reason == reason
     assert reason in implementation.FAILURE_REASONS
-    assert coordinator.data is None and coordinator._cancel_boundary is None
-    assert f"FMI warnings source unavailable ({reason})" in caplog.text
+    held = reason in implementation.TRANSIENT_FAILURE_REASONS
+    assert (coordinator.data is not None) is held
+    assert (coordinator._cancel_boundary is not None) is held
+    transition = "retrieval failed" if held else "source unavailable"
+    assert f"FMI warnings {transition} ({reason})" in caplog.text
     assert "private" not in caplog.text and "60.5" not in caplog.text
 
 

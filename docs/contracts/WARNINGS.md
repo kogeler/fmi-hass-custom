@@ -82,10 +82,13 @@ local point membership. Raw XML, geometry, and config identity MUST NOT become p
 **Contract:** Active warnings MUST satisfy `onset <= now < expires`; future warnings MUST remain
 separate. Local onset/expiry callbacks MUST update Home Assistant entities without HTTP or postponing
 network polling. A snapshot MUST become unavailable after 15 minutes without successful retrieval,
-logging that stale transition once; failed retrieval MUST clear it immediately. For 15 minutes after
-the last accepted retrieval, an older publication MUST NOT replace or restore warnings: a held
-snapshot MUST remain unchanged, including its retrieval time, and without one the source MUST fail
-as `publication_rollback`; afterwards the newest retrieved valid publication MUST be accepted.
+logging that stale transition once. A `timeout`, `transport`, or `http_server` retrieval failure
+MUST keep a held snapshot and its entities available until that deadline, while recording the
+classified reason. Any other failure, or one with no held snapshot, MUST clear it immediately.
+A later valid retrieval MUST reset the reason. For 15 minutes after the last accepted retrieval,
+an older publication MUST NOT replace or restore warnings: a held snapshot MUST remain unchanged,
+including its retrieval time, and without one the source MUST fail as `publication_rollback`;
+afterwards the newest retrieved valid publication MUST be accepted.
 Shutdown MUST remove local callbacks and the managed polling schedule. Callbacks MUST project actual
 execution time rather than the scheduled timestamp; obsolete callbacks and in-flight results
 completed after shutdown MUST NOT revive state or timers and MUST NOT be reported as failures.
@@ -101,5 +104,8 @@ publication MAY refresh it.
 - [`test_warning_delayed_boundaries_and_inflight_unload_in_ha`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_delayed_boundaries_and_inflight_unload_in_ha`
 - [`test_warning_failure_clears_recovers_and_rejects_publication_rollback`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_failure_clears_recovers_and_rejects_publication_rollback`
 - [`test_warning_older_publication_cannot_flap_or_stick`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_older_publication_cannot_flap_or_stick`
+- [`test_warning_transient_failure_holds_only_a_fresh_snapshot`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_transient_failure_holds_only_a_fresh_snapshot`
+- [`test_warning_transient_failures_hold_entities_until_the_freshness_deadline`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_transient_failures_hold_entities_until_the_freshness_deadline`
+- [`test_every_classified_warning_failure_reason_is_exposed`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_every_classified_warning_failure_reason_is_exposed`
 - [`test_warning_unchanged_publication_keeps_the_projection_equal`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_unchanged_publication_keeps_the_projection_equal`
 - [`test_warning_onset_expiry_and_replacement_update_ha_without_network`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_onset_expiry_and_replacement_update_ha_without_network`

@@ -4,7 +4,13 @@
 
 """Shared bounded HTTP transport for integration-owned optional FMI sources."""
 
-from aiohttp import ClientError, ClientSession, ClientTimeout
+from aiohttp import (
+    ClientError,
+    ClientSession,
+    ClientTimeout,
+    ConnectionTimeoutError,
+    SocketTimeoutError,
+)
 
 from . import const
 
@@ -12,9 +18,22 @@ from . import const
 class OptionalSourceError(RuntimeError):
     """Report a classified optional-source transport or payload failure."""
 
-    def __init__(self, message: str, *, reason: str = "transport") -> None:
+    def __init__(self, message: str, *, reason: str = "transport", detail: str = "") -> None:
         super().__init__(message)
         self.reason = reason
+        self.detail = detail
+
+
+def _timeout_error(source: str, error: TimeoutError, limits: ClientTimeout) -> OptionalSourceError:
+    """Name the expired limit and its value, never the external exception text."""
+    if isinstance(error, ConnectionTimeoutError):
+        limit = f"connect timeout of {limits.connect} s"
+    elif isinstance(error, SocketTimeoutError):
+        limit = f"read timeout of {limits.sock_read} s"
+    else:
+        limit = f"total timeout of {limits.total} s"
+    detail = f"exceeded the {limit}"
+    return OptionalSourceError(f"{source} request {detail}", reason="timeout", detail=detail)
 
 
 async def async_optional_payload(
@@ -25,20 +44,20 @@ async def async_optional_payload(
     *,
     allow_redirects: bool = True,
     expected_status: int | None = None,
-    total_timeout: int | None = None,
+    client_timeout: ClientTimeout | None = None,
 ) -> bytes:
     """Read decoded bytes without retrying or retaining arbitrary transport details."""
+    if client_timeout is None:
+        client_timeout = ClientTimeout(
+            total=const.AUX_HTTP_TOTAL_TIMEOUT_SECONDS,
+            connect=const.AUX_HTTP_CONNECT_TIMEOUT_SECONDS,
+            sock_connect=const.AUX_HTTP_CONNECT_TIMEOUT_SECONDS,
+            sock_read=const.AUX_HTTP_READ_TIMEOUT_SECONDS,
+        )
     try:
         async with session.get(
             url,
-            timeout=ClientTimeout(
-                total=const.AUX_HTTP_TOTAL_TIMEOUT_SECONDS
-                if total_timeout is None
-                else total_timeout,
-                connect=const.AUX_HTTP_CONNECT_TIMEOUT_SECONDS,
-                sock_connect=const.AUX_HTTP_CONNECT_TIMEOUT_SECONDS,
-                sock_read=const.AUX_HTTP_READ_TIMEOUT_SECONDS,
-            ),
+            timeout=client_timeout,
             allow_redirects=allow_redirects,
         ) as response:
             successful = (
@@ -65,8 +84,8 @@ async def async_optional_payload(
                 chunks.append(chunk)
                 remaining -= len(chunk)
             payload = b"".join(chunks)
-    except TimeoutError:
-        raise OptionalSourceError(f"{source} request timed out", reason="timeout") from None
+    except TimeoutError as error:
+        raise _timeout_error(source, error, client_timeout) from None
     except ClientError as error:
         raise OptionalSourceError(f"{source} transport error: {type(error).__name__}") from None
     if len(payload) > maximum:

@@ -22,6 +22,41 @@ feature coverage gate by [DEP-008](../contracts/DEPENDENCIES.md).
 6. Run `make test-full` and review the feature coverage report as well as the aggregate result.
    Run the complete `make live` suite before release and keep its per-locale structure counts.
 
+## Timeout Review
+
+The feed's four request limits and their values are owned by
+[OPT-001](../contracts/OPTIONAL_SOURCES.md#opt-001--optional-http-is-shared-bounded-and-non-retrying).
+Each limit covers a different failure:
+
+- `connect` and `sock_connect`: slow DNS, routing, or TLS setup before any data arrives. Home
+  Assistant OS VMs behind a local DNS filter are the usual slow case.
+- `sock_read`: the longest pause between received pieces of the multi-megabyte body, such as a
+  stalled Wi-Fi link, a busy VM, or a provider-side hiccup.
+- `total`: a whole download that is too slow even though data keeps arriving.
+
+The first values (2-second connect, 3-second read) were inherited from the small lightning and
+sea-level responses. A Home Assistant OS VM then repeatedly reported `timeout` failures, while the
+same feed downloaded from another host in well under a second. The current values give a
+home network room for one slow step and still fail a dead connection well before the five-minute
+poll.
+
+Review these values again when logs or diagnostics show repeated `timeout` failures, either several
+outage transitions from one installation or the same report from several users. Each failure logs
+the limit that expired, for example `FMI warnings retrieval failed (timeout): exceeded the read
+timeout of 10 s`:
+
+1. Collect the expired-limit names from the log lines and the reporter's network setup. Do not
+   request coordinates or feed bodies.
+2. Raise only the limit that expires, and keep `total` larger than the connect and read limits.
+   A recurring `total` expiry with healthy connect/read usually means a slow link or a much larger
+   publication, so compare it with the feed size before raising the limit.
+3. Update OPT-001, the timeout assertions in `tests/test_warnings_coordinator.py`, the user guide's
+   download allowance, and the changelog together.
+
+A timeout no longer removes held messages before the freshness deadline under WRN-004. Frequent
+timeouts can therefore stay invisible on dashboards until a 15-minute outage, and only the logs
+reveal them.
+
 ## Design Rationale
 
 The national feed is matched locally so configured coordinates never leave Home Assistant.
@@ -30,8 +65,12 @@ cannot geometrically reach it must not make every installation unavailable. Geom
 without a GIS dependency; its work bound is computed before sweeping, so a valid dense ring is not
 rejected because of a fixed sweep axis. Older publications are ignored for one freshness window,
 so a lagging cache cannot restore replaced warnings and a rollback cannot keep the source
-unavailable indefinitely. Conditional HTTP requests are not used: FMI documents no validator or
-polling contract, and entries deliberately share no warning state.
+unavailable indefinitely. A multi-megabyte national feed downloaded every five minutes on a home
+network will occasionally stall. A network failure therefore keeps the held snapshot only until
+the same freshness deadline instead of flapping every warning entity, while an invalid publication
+still fails closed. For the same reason, the feed's connect and read-stall limits are wider than
+those of the small lightning and sea-level responses. Conditional HTTP requests are not used: FMI
+documents no validator or polling contract, and entries deliberately share no warning state.
 
 ## Warning Feed Changes
 

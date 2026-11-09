@@ -7,11 +7,16 @@
 ### `OPT-001` — Optional HTTP is shared, bounded, and non-retrying
 
 **Contract:** Lightning, sea-level, and warning requests MUST use Home Assistant's shared async
-session with 2-second connect and 3-second read timeouts. Lightning and sea-level requests MUST use
-a 5-second total timeout and a 2 MiB response ceiling; the warning feed MUST use a 30-second total
-timeout and a 16 MiB decoded response ceiling. A coordinator update MUST NOT retry an optional
-request; status, transport, timeout, empty, and oversized responses MUST be classified without
-disabling primary weather.
+session and set all four request timeouts: `connect` (connection pool wait plus DNS, TCP, and TLS
+setup), `sock_connect` (one socket connection attempt), `sock_read` (the longest pause between
+received data), and `total` (the whole request, including the body). Lightning and sea-level
+requests MUST use 2-second `connect`, 2-second `sock_connect`, 3-second `sock_read`, and 5-second
+`total` timeouts and a 2 MiB response ceiling. The warning feed MUST use 10-second `connect`,
+10-second `sock_connect`, 10-second `sock_read`, and 30-second `total` timeouts and a 16 MiB
+decoded response ceiling. A coordinator update MUST NOT retry an optional request; status,
+transport, timeout, empty, and oversized responses MUST be classified without disabling primary
+weather. A timeout failure MUST name the expired limit (connect, read, or total) and its configured
+value in its log detail, without external exception text.
 
 **Evidence:**
 
@@ -20,6 +25,7 @@ disabling primary weather.
 - [`test_optional_transport_failure_is_classified`](../../tests/test_auxiliary_payloads.py) — `tests/test_auxiliary_payloads.py::test_optional_transport_failure_is_classified`
 - [`test_warning_http_uses_one_bounded_shared_session_request`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_http_uses_one_bounded_shared_session_request`
 - [`test_warning_response_size_is_bounded`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_response_size_is_bounded`
+- [`test_warning_timeout_logs_name_the_expired_limit`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_timeout_logs_name_the_expired_limit`
 
 ### `OPT-007` — Warning requests disclose no target coordinates
 

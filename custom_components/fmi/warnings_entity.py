@@ -32,4 +32,5 @@ class FMIWarningEntity(CoordinatorEntity[FMIWarningsCoordinator]):
 
     @property
     def available(self) -> bool:
-        return super().available and self.coordinator.data is not None
+        # A transient retrieval failure keeps the held snapshot under WRN-004.
+        return self.coordinator.data is not None

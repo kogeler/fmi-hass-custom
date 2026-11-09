@@ -29,9 +29,10 @@ BOUNDARY_TOLERANCE = 1e-9
 class WarningPayloadError(XMLPayloadError):
     """Classify incomplete CAP without exposing its external text."""
 
-    def __init__(self, message: str, *, reason: str = "invalid_snapshot") -> None:
+    def __init__(self, message: str, *, reason: str = "invalid_snapshot", detail: str = "") -> None:
         super().__init__(message)
         self.reason = reason
+        self.detail = detail
 
 
 @dataclass(frozen=True, slots=True)

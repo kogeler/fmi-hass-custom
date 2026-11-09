@@ -58,11 +58,13 @@ MUST NOT require entity recreation or reload.
 
 ### `AVL-005` — Optional sources fail and recover independently
 
-**Contract:** Lightning, sea-level, and warning failures MUST clear only their owning state and MUST NOT fail
-current weather, observations, or forecasts. A successful empty lightning response MUST remain
-available as `no_strikes`; later valid data MUST restore either optional sensor automatically.
-Warnings MUST distinguish available empty snapshots from unavailable failed snapshots. Warnings
-MUST remain independent of later primary weather outages and recover without entity recreation.
+**Contract:** Lightning, sea-level, and warning failures MUST affect only their owning state and
+MUST NOT fail current weather, observations, or forecasts. Lightning and sea-level failures MUST
+clear that state; warning state MUST follow `WRN-004`. A successful empty lightning response MUST
+remain available as `no_strikes`; later valid data MUST restore either optional sensor
+automatically. Warnings MUST distinguish available empty snapshots from unavailable failed
+snapshots. Warnings MUST remain independent of later primary weather outages and recover without
+entity recreation.
 
 **Evidence:**
 
@@ -71,6 +73,7 @@ MUST remain independent of later primary weather outages and recover without ent
 - [`test_optional_failure_clears_stale_data_and_success_recovers`](../../tests/test_auxiliary_payloads.py) — `tests/test_auxiliary_payloads.py::test_optional_failure_clears_stale_data_and_success_recovers`
 - [`test_warning_public_entities_follow_independent_source_and_recover`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_public_entities_follow_independent_source_and_recover`
 - [`test_warning_initial_failure_is_optional_and_primary_failure_is_not`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_initial_failure_is_optional_and_primary_failure_is_not`
+- [`test_warning_transient_failures_hold_entities_until_the_freshness_deadline`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_transient_failures_hold_entities_until_the_freshness_deadline`
 
 ### `AVL-006` — Lifecycle recovery does not leak listeners or entry state
 

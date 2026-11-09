@@ -61,6 +61,15 @@ def test_hacs_repository_metadata_and_brand() -> None:
         assert icon.width >= 128
 
 
+def test_manifest_alone_declares_the_connection_class() -> None:
+    """Home Assistant reports CONN_CLASS_* as deprecated and announces their removal."""
+    manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["iot_class"] == "cloud_polling"
+    for path in INTEGRATION.rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        assert "CONN_CLASS_" not in source and "CONNECTION_CLASS" not in source, path
+
+
 def test_current_facing_docs_use_the_latest_release_instead_of_version_literals() -> None:
     """Keep mutable project and HA versions out of current-facing documentation."""
     for path in CURRENT_FACING_DOCS:

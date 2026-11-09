@@ -182,20 +182,25 @@ list still includes every known color, ordered red through green after unclassif
 
 Warnings refresh independently every five minutes and change at their start/end times locally.
 Unavailable means warning data could not be checked; it is different from an available count of
-zero. Source failures clear previous message attributes, and a later successful refresh restores
-them without recreating entities. Forecast/current-weather failures do not disable an independently
-working warning source. Large message lists are omitted from Recorder attributes while remaining
-accessible in current state for cards and templates. An unchanged publication does not change the
-entity state, so repeated retrieval adds no history rows and does not trigger state automations.
+zero. A brief network problem, such as a timeout, a dropped connection, or an FMI server error,
+keeps the last accepted messages and their start/end transitions until the 15-minute freshness
+deadline, so a single slow download does not interrupt dashboards or automations. Other source
+failures, such as an invalid publication, clear previous message attributes immediately. A later
+successful refresh restores them without recreating entities. Forecast/current-weather failures do
+not disable an independently working warning source. Large message lists are omitted from Recorder
+attributes while remaining accessible in current state for cards and templates. An unchanged
+publication does not change the entity state, so repeated retrieval adds no history rows and does
+not trigger state automations.
 The 15-minute freshness deadline measures successful retrieval. Repeated successful delivery of an
 unchanged publication refreshes it; it cannot detect a frozen provider publication by itself.
 If FMI briefly serves an older publication, the newer data stays until its freshness deadline
 instead of being replaced by older messages. Sanitized diagnostics include a reason code for source
 failures and the time of the last accepted retrieval. Each refresh downloads the selected national
-feed, which can be several megabytes during widespread warnings; publications larger than 16 MiB,
-downloads that take longer than 30 seconds, and overly complex or invalid polygons that could cover
-the configured location make this source unavailable rather than silently omitting messages. A
-malformed message for an area that cannot reach the location is ignored.
+feed, which can be several megabytes during widespread warnings. A download may take up to 30
+seconds, with up to 10 seconds to connect or between received data. Publications larger than
+16 MiB and overly complex or invalid polygons that could cover the configured location make this
+source unavailable rather than silently omitting messages. A malformed message for an area that
+cannot reach the location is ignored.
 
 Coverage is limited to the supported FMI CAP weather-warning feed, not every emergency notice or
 warning-like product on FMI's website. The official source remains
@@ -564,6 +569,11 @@ entities:
   sensor unavailable. Wait for the next refresh to recover automatically.
 - **Sea level is unavailable:** the configured location may be outside FMI sea-level forecast
   coverage, or the optional response may be empty or unavailable.
+- **Warnings are unavailable or the log reports warning timeouts:** download the entry's
+  diagnostics and check `failure_reason` in the `warnings` section. A single `timeout` keeps the
+  last messages for up to 15 minutes and is harmless. If the log repeatedly shows lines such as
+  `FMI warnings retrieval failed (timeout): exceeded the read timeout of 10 s`, report them in the
+  issue tracker. They name the limit that expired, so its value can be reviewed.
 - **Best time says “No suitable time today”:** FMI forecast data is healthy, but there is no
   complete remaining current-day hour that passes your configured limits. Widen the limits if
   appropriate. `unavailable` instead means the remaining forecast data cannot support a result.

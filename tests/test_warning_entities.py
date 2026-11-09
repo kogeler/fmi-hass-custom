@@ -21,6 +21,7 @@ from pytest_homeassistant.common import async_fire_time_changed
 
 from custom_components.fmi import async_unload_entry, const, warnings_coordinator
 from custom_components.fmi.diagnostics import async_get_config_entry_diagnostics
+from custom_components.fmi.warnings_client import WarningPayloadError
 from tests.helpers.fmi import forecast_from_fixture, weather_from_fixture
 from tests.helpers.warnings import SENDER, UPDATED, alert, feed, info
 from tests.test_config_flow import _map_input, _start_reconfigure
@@ -99,13 +100,19 @@ async def test_warning_public_entities_follow_independent_source_and_recover(
     await hass.async_block_till_done()
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
     assert diagnostics["coordinators"]["warnings"]["failure_reason"] == "transport"
+    assert _state(hass, ids["weather_warnings"]).state == "1"
+    fetch.side_effect = None
+    fetch.return_value = b"<private source payload 60.17,24.94>"
+    await entry.runtime_data.warnings_coordinator.async_refresh()
+    await hass.async_block_till_done()
+    diagnostics = await async_get_config_entry_diagnostics(hass, entry)
+    assert diagnostics["coordinators"]["warnings"]["failure_reason"] == "invalid_snapshot"
     for entity_id in ids.values():
         assert _state(hass, entity_id).state == STATE_UNAVAILABLE
         assert "warnings" not in _state(hass, entity_id).attributes
     for key in ("weather_warnings", "weather_warning_level"):
         entity = hass.data["sensor"].get_entity(ids[key])
         assert entity.native_value is None
-    fetch.side_effect = None
     fetch.return_value = feed()
     await entry.runtime_data.warnings_coordinator.async_refresh()
     await hass.async_block_till_done()
@@ -488,6 +495,52 @@ async def test_warning_delayed_boundaries_and_inflight_unload_in_ha(
     await task
     assert coordinator.data is None and coordinator._cancel_boundary is None
     assert coordinator._source is None and "Error fetching" not in caplog.text
+
+
+async def test_warning_transient_failures_hold_entities_until_the_freshness_deadline(
+    hass, monkeypatch, freezer, caplog
+):
+    freezer.move_to("2026-11-07T10:00:00Z")
+    payload = feed(alert(infos=info(expires="2026-11-07T10:07:00Z")))
+    entry, ids, fetch, _ = await _load(hass, monkeypatch, payload=payload)
+    coordinator = entry.runtime_data.warnings_coordinator
+    assert _state(hass, ids["weather_warnings"]).state == "1"
+    freezer.move_to("2026-11-07T10:05:00Z")
+    fetch.side_effect = TimeoutError("private 60.17,24.94")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    diagnostics = await async_get_config_entry_diagnostics(hass, entry)
+    health = diagnostics["coordinators"]["warnings"]
+    assert health["last_update_success"] is False and health["failure_reason"] == "timeout"
+    assert health["source_availability"] == {"warnings": True}
+    assert _state(hass, ids["weather_warnings"]).state == "1"
+    assert _state(hass, ids["weather_warning"]).state == "on"
+    freezer.move_to("2026-11-07T10:07:00Z")
+    async_fire_time_changed(hass, datetime(2026, 11, 7, 10, 7, tzinfo=UTC))
+    await hass.async_block_till_done()
+    assert _state(hass, ids["weather_warnings"]).state == "0"
+    assert _state(hass, ids["weather_warning"]).state == "off"
+    freezer.move_to("2026-11-07T10:12:00Z")
+    fetch.side_effect = WarningPayloadError("private", reason="http_server")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.failure_reason == "http_server"
+    assert _state(hass, ids["weather_warning_level"]).state == "none"
+    assert caplog.text.count("Error fetching FMI warnings data") == 1
+    freezer.move_to("2026-11-07T10:15:00Z")
+    async_fire_time_changed(hass, datetime(2026, 11, 7, 10, 15, tzinfo=UTC))
+    await hass.async_block_till_done()
+    assert coordinator.failure_reason == "stale_retrieval"
+    for entity_id in ids.values():
+        assert _state(hass, entity_id).state == STATE_UNAVAILABLE
+    assert "FMI warnings source unavailable (stale_retrieval)" in caplog.text
+    assert "private" not in caplog.text and "60.17" not in caplog.text
+    fetch.side_effect = None
+    fetch.return_value = feed()
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.failure_reason is None
+    assert _state(hass, ids["weather_warnings"]).state == "0"
 
 
 async def test_warning_unchanged_publication_writes_no_state_change(hass, monkeypatch, freezer):

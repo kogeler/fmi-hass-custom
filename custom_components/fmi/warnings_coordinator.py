@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from functools import partial
 from typing import Any
 
-from aiohttp import ClientError, ClientSession
+from aiohttp import ClientError, ClientSession, ClientTimeout
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -53,6 +53,7 @@ FAILURE_REASONS = frozenset(
         "unexpected",
     }
 )
+TRANSIENT_FAILURE_REASONS = frozenset({"timeout", "transport", "http_server"})
 
 
 def warning_language(selected: str, configured: str) -> str:
@@ -73,10 +74,17 @@ async def async_fetch_warning_payload(session: ClientSession, language: str) -> 
             const.WARNING_MAX_PAYLOAD_BYTES,
             allow_redirects=False,
             expected_status=200,
-            total_timeout=const.WARNING_HTTP_TOTAL_TIMEOUT_SECONDS,
+            client_timeout=ClientTimeout(
+                total=const.WARNING_HTTP_TOTAL_TIMEOUT_SECONDS,
+                connect=const.WARNING_HTTP_CONNECT_TIMEOUT_SECONDS,
+                sock_connect=const.WARNING_HTTP_CONNECT_TIMEOUT_SECONDS,
+                sock_read=const.WARNING_HTTP_READ_TIMEOUT_SECONDS,
+            ),
         )
     except OptionalSourceError as error:
-        raise WarningPayloadError("warning transport failed", reason=error.reason) from None
+        raise WarningPayloadError(
+            "warning transport failed", reason=error.reason, detail=error.detail
+        ) from None
 
 
 def _rank(warning: FMIWarning) -> int:
@@ -143,7 +151,7 @@ class FMIWarningsCoordinator(DataUpdateCoordinator[WarningState | None]):
     @property
     def source_availability(self) -> dict[str, bool]:
         """Return a detached health-only mapping for diagnostics."""
-        return {"warnings": self.last_update_success and self.data is not None}
+        return {"warnings": self.data is not None}
 
     @property
     def last_successful_refresh(self) -> str | None:
@@ -234,6 +242,7 @@ class FMIWarningsCoordinator(DataUpdateCoordinator[WarningState | None]):
                     "warning publication moved backwards", reason="publication_rollback"
                 )
             self.logger.debug("Keeping the newer FMI warnings publication")
+            self.failure_reason = None
             return self._projection(now, self._source)
         source = (snapshot, now)
         result = self._projection(now, source)
@@ -251,9 +260,23 @@ class FMIWarningsCoordinator(DataUpdateCoordinator[WarningState | None]):
         return result
 
     def _fail(self, reason: str, detail: str = "") -> UpdateFailed:
-        self._clear()
         self.failure_reason = reason if reason in FAILURE_REASONS else "invalid_snapshot"
-        return UpdateFailed(f"FMI warnings source unavailable ({self.failure_reason}){detail}")
+        cause = f"({self.failure_reason}): {detail}" if detail else f"({self.failure_reason})"
+        source = self._source
+        if (
+            self.failure_reason in TRANSIENT_FAILURE_REASONS
+            and source is not None
+            and dt_util.utcnow() < source[1] + WARNING_MAX_AGE
+        ):
+            return UpdateFailed(
+                f"FMI warnings retrieval failed {cause}; "
+                "keeping the last publication until its freshness deadline"
+            )
+        self._clear()
+        if source is not None and not self.last_update_success:
+            # Home Assistant skips listeners between consecutive failed refreshes.
+            self.async_update_listeners()
+        return UpdateFailed(f"FMI warnings source unavailable {cause}")
 
     async def _async_update_data(self) -> WarningState | None:
         try:
@@ -263,13 +286,13 @@ class FMIWarningsCoordinator(DataUpdateCoordinator[WarningState | None]):
             )
             return None if self._closed else self._accept(snapshot)
         except WarningPayloadError as error:
-            raise self._fail(error.reason) from None
+            raise self._fail(error.reason, error.detail) from None
         except TimeoutError:
             raise self._fail("timeout") from None
         except ClientError:
             raise self._fail("transport") from None
         except Exception as error:  # pylint: disable=broad-exception-caught
-            raise self._fail("unexpected", f": {type(error).__name__}") from None
+            raise self._fail("unexpected", type(error).__name__) from None
 
     async def async_shutdown(self) -> None:
         """Remove local callbacks as well as the managed network schedule."""

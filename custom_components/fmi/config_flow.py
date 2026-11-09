@@ -175,7 +175,6 @@ class FMIConfigFlowHandler(config_entries.ConfigFlow, domain=const.DOMAIN):
     """Handle initial setup and location reconfiguration."""
 
     VERSION = const.CONFIG_ENTRY_VERSION
-    CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
     _pending_name: str | None = None
     _place_resolution: fmi.PlaceResolution
 
