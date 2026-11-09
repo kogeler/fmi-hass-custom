@@ -41,6 +41,24 @@ The location's sensors (left) and its forecast in the optional
 [Detailed Weather Forecast Card](docs/USER_GUIDE.md#more-detailed-weather-card-optional) (right),
 which is maintained separately from this integration.
 
+## Official Weather Warnings
+
+Each location can also follow the official FMI weather warnings that cover its map point. They are
+off by default:
+
+1. Open **Settings > Devices & services > Finnish Meteorological Institute**, select the entry, and
+   choose **Configure**.
+2. Turn on **Enable official weather warnings** and choose the original message language: Finnish,
+   Swedish, English, or Home Assistant's language.
+3. Save. The location device gains a warning count sensor, a warning-level sensor, and a warning
+   binary sensor.
+
+A count of `0` with level `none` means that no active warning covers the location, which does not
+mean the weather is safe; `unavailable` means the warning data could not be checked. The count
+sensor carries the official message texts in its attributes. To show them on a dashboard, add the
+Markdown card and the optional notification automation from
+[the user guide](docs/USER_GUIDE.md#official-weather-warnings).
+
 ## Main Limitations
 
 - Data depends on FMI and network availability. Polling cadence and source ownership are defined by

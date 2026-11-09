@@ -201,31 +201,40 @@ Coverage is limited to the supported FMI CAP weather-warning feed, not every eme
 warning-like product on FMI's website. The official source remains
 [FMI's warning service](https://en.ilmatieteenlaitos.fi/warnings).
 
-Use your actual entity IDs in these examples. A standard Markdown card can show current and future
-messages without installing a custom frontend card:
+Use your actual entity IDs in these examples. Only the **Weather warnings** count sensor, such as
+`sensor.helsinki_weather_warnings`, carries the message lists; the warning-level sensor and the
+**Weather warning** binary sensor do not. A standard Markdown card can show every current and
+future message without installing a custom frontend card. This example picks an icon from the FMI
+event code and shows red and orange messages as errors, yellow as warnings, green as success, and
+upcoming or unclassified messages as information. Pointed at an entity without message lists, it
+reports that mistake instead of claiming that no warning is active:
 
 ```yaml
 type: markdown
 title: FMI weather warnings
 content: |
   {% set entity = 'sensor.helsinki_weather_warnings' %}
+  {% set icons = {'wind': 'mdi:weather-windy', 'seaWind': 'mdi:weather-windy-variant',
+     'rain': 'mdi:weather-pouring', 'thunderstorm': 'mdi:weather-lightning',
+     'seaThunderstorm': 'mdi:weather-lightning-rainy', 'trafficWeather': 'mdi:road-variant',
+     'pedestrianSafety': 'mdi:walk', 'forestFireWeather': 'mdi:fire',
+     'hotWeather': 'mdi:thermometer-high', 'coldWeather': 'mdi:snowflake-thermometer',
+     'uvNote': 'mdi:weather-sunny-alert', 'seaIcing': 'mdi:snowflake-alert',
+     'seaWaterHeight': 'mdi:waves-arrow-up', 'seaWaveHeight': 'mdi:waves'} %}
+  {% set types = {'red': 'error', 'orange': 'error', 'yellow': 'warning', 'green': 'success'} %}
+  {% set active = state_attr(entity, 'warnings') %}
   {% if not has_value(entity) %}
-  Warning data is unavailable.
+  <ha-alert alert-type="error">Warning data is unavailable.</ha-alert>
+  {% elif active is none %}
+  <ha-alert alert-type="error">{{ entity }} is not an FMI weather warnings count sensor.</ha-alert>
   {% else %}
-  {% set active = state_attr(entity, 'warnings') or [] %}
-  {% set upcoming = state_attr(entity, 'upcoming_warnings') or [] %}
-  {% if not active %}No active warnings for this location.{% endif %}
-  {% for warning in active %}
-  ### {{ warning.headline | e }}
-  {{ warning.description | e }}
-
-  Ends: {{ as_local(as_datetime(warning.expires)).strftime('%d %b %H:%M') }}
+  {% for w in active %}
+  <ha-alert alert-type="{{ types.get(w.color, 'info') }}" title="{{ w.headline | e }}"><ha-icon icon="{{ icons.get(w.event_code, 'mdi:alert') }}"></ha-icon> {{ w.description | e }}<br>Ends: {{ as_local(as_datetime(w.expires)).strftime('%a %d %b %H:%M') }}</ha-alert>
+  {% else %}
+  No active warnings for this location.
   {% endfor %}
-  {% for warning in upcoming %}
-  ### Upcoming: {{ warning.headline | e }}
-  {{ warning.description | e }}
-
-  Starts: {{ as_local(as_datetime(warning.onset)).strftime('%d %b %H:%M') }}
+  {% for w in state_attr(entity, 'upcoming_warnings') or [] %}
+  <ha-alert alert-type="info" title="Upcoming: {{ w.headline | e }}"><ha-icon icon="{{ icons.get(w.event_code, 'mdi:alert') }}"></ha-icon> {{ w.description | e }}<br>Starts: {{ as_local(as_datetime(w.onset)).strftime('%a %d %b %H:%M') }}</ha-alert>
   {% endfor %}
   {% endif %}
 ```

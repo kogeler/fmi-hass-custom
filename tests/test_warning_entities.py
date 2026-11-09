@@ -414,9 +414,18 @@ async def test_warning_full_documented_dashboard_and_automation(hass, monkeypatc
     section = guide.split("## Official Weather Warnings", 1)[1].split("## Useful Weather", 1)[0]
     examples = [yaml.safe_load(part.split("```", 1)[0]) for part in section.split("```yaml\n")[1:]]
     card, automation = examples
-    content = card["content"].replace("sensor.helsinki_weather_warnings", entity_id)
-    template = Template(content, hass)
-    assert "Invented headline" in template.async_render()
+
+    def render(target: str) -> str:
+        content = card["content"].replace("sensor.helsinki_weather_warnings", target)
+        # The Markdown card renders strictly, so an undefined value would blank it.
+        return Template(content, hass).async_render(parse_result=False, strict=True)
+
+    assert (
+        '<ha-alert alert-type="error" title="Invented headline en-GB">'
+        '<ha-icon icon="mdi:weather-windy"></ha-icon>'
+    ) in render(entity_id)
+    for other in (ids["weather_warning_level"], ids["weather_warning"]):
+        assert "is not an FMI weather warnings count sensor" in render(other)
     automation["triggers"][0]["entity_id"] = entity_id
     assert await async_setup_component(hass, "persistent_notification", {})
     notices = _async_get_or_create_notifications(hass)
@@ -432,8 +441,10 @@ async def test_warning_full_documented_dashboard_and_automation(hass, monkeypatc
     )
     await entry.runtime_data.warnings_coordinator.async_refresh()
     await hass.async_block_till_done()
-    rendered = template.async_render()
-    assert "Upcoming:" in rendered and "Starts:" in rendered
+    rendered = render(entity_id)
+    assert "No active warnings for this location." in rendered
+    assert '<ha-alert alert-type="info" title="Upcoming: Invented headline en-GB">' in rendered
+    assert "Starts:" in rendered
     freezer.move_to("2026-11-07T10:01:00Z")
     async_fire_time_changed(hass, datetime(2026, 11, 7, 10, 1, tzinfo=UTC))
     await hass.async_block_till_done()
@@ -441,7 +452,7 @@ async def test_warning_full_documented_dashboard_and_automation(hass, monkeypatc
     fetch.return_value = b"bad XML"
     await entry.runtime_data.warnings_coordinator.async_refresh()
     await hass.async_block_till_done()
-    assert "Warning data is unavailable" in template.async_render()
+    assert "Warning data is unavailable" in render(entity_id)
     assert len(notices) == 3
 
 
