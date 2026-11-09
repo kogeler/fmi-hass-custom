@@ -6,7 +6,8 @@
 at [github.com/kogeler/fmi-hass-custom](https://github.com/kogeler/fmi-hass-custom) and uses
 [Finnish Meteorological Institute (FMI) Open Data](https://en.ilmatieteenlaitos.fi/open-data)
 to provide current conditions, hourly and daily forecasts, weather sensors, optional station
-observations, lightning data, and sea-level forecasts for a configured location.
+observations, lightning data, sea-level forecasts, and optional official weather warnings for a
+configured location.
 
 Check the [latest published GitHub Release](https://github.com/kogeler/fmi-hass-custom/releases/latest)
 for the current integration version and its release notes. The minimum Home Assistant version is
@@ -56,6 +57,9 @@ which is maintained separately from this integration.
   result on the map.
 - Lightning is opt-in. Its state reports locally calculated distance and direction from that FMI
   entry's configured point to a recent strike group; it does not predict storm movement or safety.
+- Official weather warnings are opt-in and match the entry's coordinates against FMI warning
+  polygons. Original text is available in Finnish, Swedish, or English; see
+  [warning entities and dashboard examples](docs/USER_GUIDE.md#official-weather-warnings).
 - Station observations require a valid FMI station ID. Sea-level and lightning sensors can be
   unavailable when an optional external source fails. A successful lightning response with no
   qualifying strikes remains available and says so explicitly.
@@ -80,6 +84,7 @@ which is maintained separately from this integration.
 - [Runtime change guide](docs/maintenance/RUNTIME.md)
 - [Availability change guide](docs/maintenance/AVAILABILITY.md)
 - [Optional-source change guide](docs/maintenance/OPTIONAL_SOURCES.md)
+- [Weather-warning change guide](docs/maintenance/WARNINGS.md)
 - [Live-test runbook](docs/maintenance/LIVE_TESTS.md)
 - [Forecast-semantics change guide](docs/maintenance/FORECAST_SEMANTICS.md)
 - [Time and missing-data change guide](docs/maintenance/TIME_AND_MISSING_DATA.md)

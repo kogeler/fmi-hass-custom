@@ -6,16 +6,31 @@
 
 ### `OPT-001` — Optional HTTP is shared, bounded, and non-retrying
 
-**Contract:** Lightning and sea-level requests MUST use Home Assistant's shared async session with
-2-second connect, 3-second read, and 5-second total timeouts and a 2 MiB response ceiling. A
-coordinator update MUST NOT retry an optional request; status, transport, timeout, empty, and
-oversized responses MUST be classified without disabling primary weather.
+**Contract:** Lightning, sea-level, and warning requests MUST use Home Assistant's shared async
+session with 2-second connect and 3-second read timeouts. Lightning and sea-level requests MUST use
+a 5-second total timeout and a 2 MiB response ceiling; the warning feed MUST use a 30-second total
+timeout and a 16 MiB decoded response ceiling. A coordinator update MUST NOT retry an optional
+request; status, transport, timeout, empty, and oversized responses MUST be classified without
+disabling primary weather.
 
 **Evidence:**
 
 - [`test_optional_http_uses_ha_session_bounded_timeout_and_executor`](../../tests/test_auxiliary_payloads.py) — `tests/test_auxiliary_payloads.py::test_optional_http_uses_ha_session_bounded_timeout_and_executor`
 - [`test_optional_response_size_is_bounded`](../../tests/test_auxiliary_payloads.py) — `tests/test_auxiliary_payloads.py::test_optional_response_size_is_bounded`
 - [`test_optional_transport_failure_is_classified`](../../tests/test_auxiliary_payloads.py) — `tests/test_auxiliary_payloads.py::test_optional_transport_failure_is_classified`
+- [`test_warning_http_uses_one_bounded_shared_session_request`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_http_uses_one_bounded_shared_session_request`
+- [`test_warning_response_size_is_bounded`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_response_size_is_bounded`
+
+### `OPT-007` — Warning requests disclose no target coordinates
+
+**Contract:** Warning HTTP MUST select one fixed FMI HTTPS locale endpoint without a target point,
+station ID, or user text. Geometry matching MUST follow `WRN-002` locally. Warning redirects and
+embedded resource links MUST NOT initiate additional requests.
+
+**Evidence:**
+
+- [`test_warning_http_uses_one_bounded_shared_session_request`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_http_uses_one_bounded_shared_session_request`
+- [`test_warning_http_status_is_a_failure_without_retry`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_http_status_is_a_failure_without_retry`
 
 ### `OPT-002` — Lightning freshness is configurable and inclusive
 

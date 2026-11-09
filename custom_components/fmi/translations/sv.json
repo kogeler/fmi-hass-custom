@@ -1,0 +1,199 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Den angivna platsen är redan konfigurerad",
+      "reconfigure_successful": "Platsen har uppdaterats"
+    },
+    "error": {
+      "cannot_connect": "Det gick inte att ansluta",
+      "place_not_found": "Meteorologiska institutet hittade inga prognosuppgifter för platsen. Prova ett mer exakt stadsnamn eller ortnamn.",
+      "place_required": "Ange en stad eller plats.",
+      "unknown": "Oväntat fel"
+    },
+    "step": {
+      "user": {
+        "description": "Välj hur prognosplatsen ska anges.",
+        "title": "Meteorologiska institutet",
+        "menu_options": {
+          "map": "Välj på kartan",
+          "place": "Sök efter ortnamn"
+        },
+        "menu_option_descriptions": {
+          "map": "Använd hemmets plats eller välj en annan punkt på kartan.",
+          "place": "Sök en stad eller plats hos Meteorologiska institutet och bekräfta den på kartan."
+        }
+      },
+      "reconfigure": {
+        "description": "Välj hur platsen ska ändras. Befintliga entiteter och anpassade entitets-ID:n bevaras.",
+        "title": "Ändra FMI-plats",
+        "menu_options": {
+          "map": "Välj på kartan",
+          "place": "Sök efter ortnamn"
+        },
+        "menu_option_descriptions": {
+          "map": "Välj en ny punkt på kartan.",
+          "place": "Sök en stad eller plats hos Meteorologiska institutet och bekräfta den på kartan."
+        }
+      },
+      "map": {
+        "data": {
+          "location": "Prognosplats",
+          "name": "Namn"
+        },
+        "description": "Bekräfta punkten eller flytta markören till en annan prognosplats. Punkten kontrolleras innan den sparas.",
+        "title": "Välj prognosplats på kartan"
+      },
+      "place": {
+        "data": {
+          "name": "Namn",
+          "place": "Stad eller plats"
+        },
+        "description": "Söktexten skickas till Meteorologiska institutet för att hitta en prognosplats. Du bekräftar resultatet innan det sparas.",
+        "title": "Sök plats hos Meteorologiska institutet"
+      },
+      "place_confirm": {
+        "data": {
+          "location": "Prognosplats"
+        },
+        "description": "Platsen **{place}** hittades. Bekräfta punkten eller flytta markören. Den slutliga punkten kontrolleras innan den sparas.",
+        "title": "Bekräfta prognosplats"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "place": {
+        "name": "Plats"
+      },
+      "condition": {
+        "name": "Väderförhållanden"
+      },
+      "temperature": {
+        "name": "Temperatur"
+      },
+      "feels_like": {
+        "name": "Känns som"
+      },
+      "dew_point": {
+        "name": "Daggpunkt"
+      },
+      "atmospheric_pressure": {
+        "name": "Lufttryck"
+      },
+      "wind_speed": {
+        "name": "Vindhastighet"
+      },
+      "wind_direction": {
+        "name": "Vindriktning"
+      },
+      "wind_gust": {
+        "name": "Vindby"
+      },
+      "humidity": {
+        "name": "Luftfuktighet"
+      },
+      "cloud_coverage": {
+        "name": "Molnighet"
+      },
+      "low_cloud_cover": {
+        "name": "Låga moln"
+      },
+      "medium_cloud_cover": {
+        "name": "Medelhöga moln"
+      },
+      "high_cloud_cover": {
+        "name": "Höga moln"
+      },
+      "rain": {
+        "name": "Regn"
+      },
+      "precipitation_probability": {
+        "name": "Sannolikhet för nederbörd"
+      },
+      "thunderstorm_probability": {
+        "name": "Sannolikhet för åska"
+      },
+      "forecast_time": {
+        "name": "Tid"
+      },
+      "best_time_of_day": {
+        "name": "Dagens bästa tid",
+        "state": {
+          "no_suitable_time": "Ingen lämplig tid i dag"
+        }
+      },
+      "lightning_strikes": {
+        "name": "Blixtnedslag",
+        "state": {
+          "no_strikes": "Inga blixtnedslag"
+        }
+      },
+      "sea_level": {
+        "name": "Havsvattenstånd"
+      },
+      "weather_warnings": {
+        "name": "Vädervarningar"
+      },
+      "weather_warning_level": {
+        "name": "Varningsnivå",
+        "state": {
+          "none": "Inga aktiva varningar",
+          "green": "Grön",
+          "yellow": "Gul",
+          "orange": "Orange",
+          "red": "Röd",
+          "unclassified": "Oklassificerad"
+        }
+      }
+    },
+    "binary_sensor": {
+      "weather_warning": {
+        "name": "Vädervarning"
+      }
+    }
+  },
+  "options": {
+    "error": {
+      "invalid_range": "Ett minimivärde får inte vara större än motsvarande maximivärde."
+    },
+    "step": {
+      "user": {
+        "data": {
+          "max_precipitation": "Största nederbörd mm",
+          "max_relative_humidity": "Högsta relativa luftfuktighet %",
+          "max_temperature": "Högsta upplevda temperatur °C",
+          "max_wind_speed": "Högsta vindhastighet m/s",
+          "min_precipitation": "Minsta nederbörd mm",
+          "min_relative_humidity": "Lägsta relativa luftfuktighet %",
+          "min_temperature": "Lägsta upplevda temperatur °C",
+          "min_wind_speed": "Lägsta vindhastighet m/s",
+          "offset": "Prognosintervall h",
+          "forecast_days": "Antal prognosdagar",
+          "daily_mode": "Aktivera entitet för dygnsprognos",
+          "lightning_sensor": "Aktivera blixtsensor",
+          "lightning_radius": "Blixtsensorns radie km",
+          "lightning_max_age_minutes": "Blixtnedslagens högsta ålder i minuter",
+          "observation_station_id": "Meteorologiska institutets observationsstations-ID",
+          "weather_warnings": "Aktivera officiella vädervarningar",
+          "warnings_language": "Språk för varningstexter"
+        },
+        "description": "Gränserna används för att hitta dagens återstående bästa tid. Temperaturgränserna avser upplevd temperatur.",
+        "title": "Inställningar för Meteorologiska institutet",
+        "data_description": {
+          "weather_warnings": "Varningarna gäller den valda platsen, oberoende av observationsstationen.",
+          "warnings_language": "Välj språk för Meteorologiska institutets originaltext. Entitetsnamnen följer gränssnittets språk."
+        }
+      }
+    }
+  },
+  "selector": {
+    "warnings_language": {
+      "options": {
+        "auto": "Home Assistants språk",
+        "fi": "Suomi",
+        "sv": "Svenska",
+        "en": "English"
+      }
+    }
+  }
+}

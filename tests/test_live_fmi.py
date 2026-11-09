@@ -5,19 +5,15 @@
 
 from __future__ import annotations
 
-import asyncio
 import math
 import os
-import socket
 from collections import Counter
-from collections.abc import Awaitable, Callable, Generator
+from collections.abc import Generator
 from datetime import UTC, timedelta
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
-import pytest_socket
-from fmi_weather_client.errors import ClientError, ServerError
 from homeassistant.components.weather import DOMAIN as WEATHER_DOMAIN
 from homeassistant.components.weather import SERVICE_GET_FORECASTS
 from homeassistant.config_entries import ConfigEntryState
@@ -34,14 +30,16 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant.common import MockConfigEntry
-from requests.exceptions import RequestException
 
 from custom_components.fmi import FMIDataUpdateCoordinator
 from custom_components.fmi import fmi as fmi_client
+from custom_components.fmi import warnings_coordinator as warning_source
 from custom_components.fmi.const import (
     CONF_ENTITY_IDENTITY,
     CONF_FORECAST_DAYS,
     CONF_OBSERVATION_STATION,
+    CONF_WARNINGS_LANGUAGE,
+    CONF_WEATHER_WARNINGS,
     DOMAIN,
 )
 from tests.helpers.live_budget import LiveRequestBudget
@@ -55,86 +53,26 @@ from tests.helpers.live_fmi import (
     validate_model_weather,
     validate_probabilities,
 )
+from tests.helpers.live_network import live_call, live_network
+from tests.helpers.warning_live import record_live_structure, validate_live_warning_recognition
 
-pytestmark = pytest.mark.live
+pytestmark = [pytest.mark.live, pytest.mark.usefixtures("disable_mock_zeroconf_resolver")]
 
 SOUTHERN_LOCATION = ("Helsinki", 60.17, 24.94)
 NORTHERN_LOCATION = ("Kilpisjarvi", 69.05, 20.79)
 OBSERVATION_STATION_ID = 101004
-_REAL_GETADDRINFO = socket.getaddrinfo
-_REAL_GETHOSTBYNAME = socket.gethostbyname
-_REAL_GETHOSTBYNAME_EX = socket.gethostbyname_ex
-_REAL_SOCKET_CONNECT = socket.socket.connect
-
-
-def _set_socket_connect(connect: Any) -> None:
-    """Set the connect implementation on pytest-socket's mutable socket class."""
-    socket_class = cast(Any, socket.socket)
-    socket_class.connect = connect
 
 
 @pytest.fixture(autouse=True)
 def enable_live_network() -> Generator[None]:
     """Undo the HA test plugin's per-test network guard only for live tests."""
-    guarded_getaddrinfo = socket.getaddrinfo
-    guarded_gethostbyname = socket.gethostbyname
-    guarded_gethostbyname_ex = socket.gethostbyname_ex
-    guarded_connect = socket.socket.connect
-    pytest_socket.enable_socket()
-    _set_socket_connect(_REAL_SOCKET_CONNECT)
-    socket.getaddrinfo = _REAL_GETADDRINFO
-    socket.gethostbyname = _REAL_GETHOSTBYNAME
-    socket.gethostbyname_ex = _REAL_GETHOSTBYNAME_EX
-    yield
-    socket.getaddrinfo = guarded_getaddrinfo
-    socket.gethostbyname = guarded_gethostbyname
-    socket.gethostbyname_ex = guarded_gethostbyname_ex
-    _set_socket_connect(guarded_connect)
-    pytest_socket.disable_socket(allow_unix_socket=True)
+    with live_network():
+        yield
 
 
-async def _live_call[T](label: str, operation: Callable[[], Awaitable[T]]) -> T:
-    """Retry one bounded transport/service failure and classify final output."""
-    for attempt in range(2):
-        try:
-            budget = LiveRequestBudget(
-                Path(os.environ.get("FMI_LIVE_BUDGET_DIR", "/tmp/fmi-live-budget"))
-            )
-            async with budget.request(), asyncio.timeout(15):
-                return await operation()
-        except ClientError as error:
-            pytest.fail(
-                f"FMI request/contract failure for {label}: "
-                f"HTTP {getattr(error, 'status_code', 'unknown')} "
-                f"{getattr(error, 'message', '')}",
-                pytrace=False,
-            )
-        except (TimeoutError, OSError, RequestException, ServerError) as error:
-            if attempt == 0:
-                await asyncio.sleep(1)
-                continue
-            pytest.fail(
-                f"FMI transport/service failure for {label} after 2 attempts: "
-                f"{type(error).__name__}: {error}",
-                pytrace=False,
-            )
-        except (
-            AttributeError,
-            KeyError,
-            SyntaxError,
-            TypeError,
-            ValueError,
-        ) as error:
-            pytest.fail(
-                f"FMI parsing/contract failure for {label}: {type(error).__name__}: {error}",
-                pytrace=False,
-            )
-    raise AssertionError("unreachable live retry state")
-
-
-async def test_dependency_place_resolution_contract() -> None:
-    """Resolve a public name and validate its point through the production boundary."""
-    resolution = await _live_call(
+async def _public_helsinki_resolution() -> fmi_client.PlaceResolution:
+    """Resolve the public point that the HA current-source probe will validate."""
+    resolution = await live_call(
         "Helsinki place resolution",
         lambda: fmi_client.async_resolve_place(SOUTHERN_LOCATION[0]),
     )
@@ -142,30 +80,13 @@ async def test_dependency_place_resolution_contract() -> None:
         raise LiveContractError("Helsinki place resolution returned no forecast point")
     if not 55 <= resolution.latitude <= 75 or not 5 <= resolution.longitude <= 35:
         raise LiveContractError("Helsinki place resolution returned a point outside the region")
-    current_result = await _live_call(
-        "resolved Helsinki coordinate validation",
-        lambda: fmi_client.async_weather_by_coordinates(
-            resolution.latitude,
-            resolution.longitude,
-        ),
-    )
-    if current_result is None:
-        raise LiveContractError("resolved Helsinki coordinate validation returned no data")
-    validate_model_weather(
-        current_result.weather,
-        "resolved Helsinki coordinate validation",
-        max_age=timedelta(hours=2),
-    )
-    validate_probabilities(
-        current_result.probabilities,
-        "resolved Helsinki coordinate validation",
-    )
+    return resolution
 
 
 async def test_dependency_northern_forecast_contract() -> None:
     """Detect installed-client or WFS drift at a northern public point."""
     label, latitude, longitude = NORTHERN_LOCATION
-    forecast_result = await _live_call(
+    forecast_result = await live_call(
         f"{label} forecast",
         lambda: fmi_client.async_forecast_by_coordinates(latitude, longitude, 1, 48),
     )
@@ -174,19 +95,6 @@ async def test_dependency_northern_forecast_contract() -> None:
         samples,
         forecast_result.probabilities_by_time,
         f"{label} forecast",
-    )
-
-
-async def test_dependency_observation_contract() -> None:
-    """Detect station-query drift and reject implausibly stale observations."""
-    observation = await _live_call(
-        "Helsinki Kumpula observation",
-        lambda: fmi_client.async_observation_by_station_id(OBSERVATION_STATION_ID),
-    )
-    validate_model_weather(
-        observation,
-        "Helsinki Kumpula observation",
-        max_age=timedelta(minutes=45),
     )
 
 
@@ -242,6 +150,8 @@ async def test_home_assistant_live_entity_and_forecast_contract(
     original_forecast = fmi_client.async_forecast_by_coordinates
     original_place = fmi_client.async_observation_by_place
     original_station = fmi_client.async_observation_by_station_id
+    original_warnings = warning_source.async_fetch_warning_payload
+    resolution = await _public_helsinki_resolution()
 
     async def traced_weather(latitude: float, longitude: float):
         request_counts["current"] += 1
@@ -284,10 +194,22 @@ async def test_home_assistant_live_entity_and_forecast_contract(
     async def skip_unrelated_sea_level(self: FMIDataUpdateCoordinator) -> None:
         self.mareo_data = None
 
+    async def traced_warnings(session, language):
+        request_counts["warnings"] += 1
+        root = Path(os.environ["FMI_LIVE_BUDGET_DIR"])
+        async with LiveRequestBudget(root).request():
+            payload = await original_warnings(session, language)
+        structure = await hass.async_add_executor_job(
+            validate_live_warning_recognition, payload, language
+        )
+        await hass.async_add_executor_job(record_live_structure, root, language, structure)
+        return payload
+
     monkeypatch.setattr(fmi_client, "async_weather_by_coordinates", traced_weather)
     monkeypatch.setattr(fmi_client, "async_forecast_by_coordinates", traced_forecast)
     monkeypatch.setattr(fmi_client, "async_observation_by_place", traced_place)
     monkeypatch.setattr(fmi_client, "async_observation_by_station_id", traced_station)
+    monkeypatch.setattr(warning_source, "async_fetch_warning_payload", traced_warnings)
     monkeypatch.setattr(
         FMIDataUpdateCoordinator,
         "_FMIDataUpdateCoordinator__async_update_mareo_data",
@@ -300,13 +222,15 @@ async def test_home_assistant_live_entity_and_forecast_contract(
         unique_id="fmi:live-public-helsinki",
         data={
             CONF_NAME: "FMI",
-            CONF_LATITUDE: SOUTHERN_LOCATION[1],
-            CONF_LONGITUDE: SOUTHERN_LOCATION[2],
+            CONF_LATITUDE: resolution.latitude,
+            CONF_LONGITUDE: resolution.longitude,
             CONF_ENTITY_IDENTITY: "live:public-helsinki",
         },
         options={
             CONF_FORECAST_DAYS: 2,
             CONF_OBSERVATION_STATION: OBSERVATION_STATION_ID,
+            CONF_WEATHER_WARNINGS: True,
+            CONF_WARNINGS_LANGUAGE: "en",
         },
         version=2,
     )
@@ -326,7 +250,8 @@ async def test_home_assistant_live_entity_and_forecast_contract(
     assert request_counts["current"] == 1
     assert request_counts["forecast"] == 1
     assert request_counts["station"] == 1
-    assert sum(request_counts.values()) <= 4
+    assert request_counts["warnings"] == 1
+    assert sum(request_counts.values()) <= 5
 
     weather_states = hass.states.async_all(WEATHER_DOMAIN)
     main = next(
@@ -374,6 +299,29 @@ async def test_home_assistant_live_entity_and_forecast_contract(
         "Home Assistant station source",
         max_age=timedelta(minutes=45),
     )
+    validate_probabilities(coordinator.get_current_probabilities(), "resolved Helsinki current")
+    warnings = entry.runtime_data.warnings_coordinator
+    assert warnings is not None and warnings.last_update_success and warnings.data is not None
+    registry = er.async_get(hass)
+    count_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{coordinator.unique_id}_weather_warnings"
+    )
+    presence_id = registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{coordinator.unique_id}_weather_warning"
+    )
+    assert count_id is not None and presence_id is not None
+    count = hass.states.get(count_id)
+    presence = hass.states.get(presence_id)
+    assert count is not None and presence is not None
+    assert count.state == str(len(warnings.data.active))
+    assert presence.state == ("on" if warnings.data.active else "off")
+    assert count.attributes["requested_language"] == "en"
+    assert count.attributes["warnings"] == warnings.data.attributes()["warnings"]
+    level_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{coordinator.unique_id}_weather_warning_level"
+    )
+    level = hass.states.get(level_id) if level_id else None
+    assert level is not None and level.state == warnings.data.level
     assert current_temperature == pytest.approx(float(current_sample.temperature.value), abs=0.1)
     assert current_apparent_temperature == pytest.approx(
         float(current_sample.feels_like.value), abs=0.6

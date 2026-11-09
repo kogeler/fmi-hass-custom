@@ -17,8 +17,7 @@ from xml.parsers.expat import ExpatError
 
 import fmi_weather_client.errors as fmi_erros
 import fmi_weather_client.models as fmi_models
-from aiohttp import ClientError as AiohttpClientError
-from aiohttp import ClientSession, ClientTimeout
+from aiohttp import ClientSession
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_OFFSET
 from homeassistant.core import HomeAssistant
@@ -33,6 +32,8 @@ from requests.exceptions import RequestException
 from . import best_time, const, utils
 from . import fmi_client as fmi
 from .lightning import lightning_geometry
+from .optional_http import OptionalSourceError, async_optional_payload
+from .warnings_coordinator import FMIWarningsCoordinator, warning_language
 from .xml_parser import (
     XMLDocument,
     XMLPayloadError,
@@ -43,7 +44,7 @@ from .xml_parser import (
 )
 
 LOGGER = const.LOGGER
-PLATFORMS = ["sensor", "weather"]
+PLATFORMS = ["sensor", "weather", "binary_sensor"]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(const.DOMAIN)  # pylint: disable=invalid-name
 _FMI_SOURCE_ERRORS = (
     fmi_erros.ClientError,
@@ -66,17 +67,13 @@ def _empty_probability_map() -> Mapping[datetime, fmi.ForecastProbabilities]:
     return MappingProxyType({})
 
 
-class OptionalSourceError(RuntimeError):
-    """Report a classified optional-source transport or payload failure."""
-
-
 @dataclass(slots=True)
 class FMIEntryRuntimeData:
     """Runtime state owned by one FMI config entry."""
 
     coordinator: FMIDataUpdateCoordinator
     observation_coordinator: FMIObservationUpdateCoordinator | None
-    undo_update_listener: Callable[[], None]
+    warnings_coordinator: FMIWarningsCoordinator | None = None
 
 
 type FMIConfigEntry = ConfigEntry[FMIEntryRuntimeData]
@@ -195,12 +192,28 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: FMIConfigEntry) -
         )
         raise ConfigEntryNotReady("FMI current conditions are unavailable") from last_exception
 
-    undo_listener = config_entry.add_update_listener(update_listener)
+    config_entry.async_on_unload(config_entry.add_update_listener(update_listener))
+
+    warnings = None
+    if config_entry.options.get(const.CONF_WEATHER_WARNINGS, False):
+        language = warning_language(
+            config_entry.options.get(const.CONF_WARNINGS_LANGUAGE, "auto"),
+            hass.config.language,
+        )
+        warnings = FMIWarningsCoordinator(
+            hass,
+            config_entry,
+            config_entry.data[CONF_LATITUDE],
+            config_entry.data[CONF_LONGITUDE],
+            language,
+        )
+        if not await _async_first_refresh(warnings):
+            warnings.logger.warning("FMI warnings source unavailable (%s)", warnings.failure_reason)
 
     config_entry.runtime_data = FMIEntryRuntimeData(
         coordinator=coordinator,
         observation_coordinator=coordinator_observation,
-        undo_update_listener=undo_listener,
+        warnings_coordinator=warnings,
     )
 
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
@@ -214,12 +227,10 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: FMIConfigEntry) 
     if not unload_ok:
         return False
 
-    config_entry.runtime_data.undo_update_listener()
-
     return True
 
 
-async def _async_first_refresh(coordinator: DataUpdateCoordinator) -> bool:
+async def _async_first_refresh[T](coordinator: DataUpdateCoordinator[T]) -> bool:
     """Refresh one source without making another source all-or-nothing."""
     try:
         await coordinator.async_config_entry_first_refresh()
@@ -665,42 +676,9 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def __fetch_optional_payload(self, source: str, url: str) -> bytes:
         """Fetch one optional payload with bounded HA-managed HTTP I/O."""
-        request_timeout = ClientTimeout(
-            total=const.AUX_HTTP_TOTAL_TIMEOUT_SECONDS,
-            connect=const.AUX_HTTP_CONNECT_TIMEOUT_SECONDS,
-            sock_connect=const.AUX_HTTP_CONNECT_TIMEOUT_SECONDS,
-            sock_read=const.AUX_HTTP_READ_TIMEOUT_SECONDS,
+        return await async_optional_payload(
+            self._session, source, url, const.AUX_HTTP_MAX_PAYLOAD_BYTES
         )
-        try:
-            async with self._session.get(url, timeout=request_timeout) as response:
-                if not 200 <= response.status < 300:
-                    category = "server" if response.status >= 500 else "client"
-                    raise OptionalSourceError(f"{source} {category} error HTTP {response.status}")
-                if (
-                    response.content_length is not None
-                    and response.content_length > const.AUX_HTTP_MAX_PAYLOAD_BYTES
-                ):
-                    raise OptionalSourceError(f"{source} response exceeds size limit")
-                chunks: list[bytes] = []
-                remaining = const.AUX_HTTP_MAX_PAYLOAD_BYTES + 1
-                while remaining:
-                    chunk = await response.content.read(min(64 * 1024, remaining))
-                    if not chunk:
-                        break
-                    chunks.append(chunk)
-                    remaining -= len(chunk)
-                payload = b"".join(chunks)
-        except TimeoutError as error:
-            raise OptionalSourceError(f"{source} request timed out") from error
-        except AiohttpClientError as error:
-            raise OptionalSourceError(
-                f"{source} transport error: {type(error).__name__}"
-            ) from error
-        if len(payload) > const.AUX_HTTP_MAX_PAYLOAD_BYTES:
-            raise OptionalSourceError(f"{source} response exceeds size limit")
-        if not payload.strip():
-            raise OptionalSourceError(f"{source} empty response")
-        return payload
 
     async def __async_update_lightning_strikes(self) -> None:
         """Fetch and parse bounded lightning data without blocking the event loop."""

@@ -51,6 +51,7 @@ runbooks and implementation modules link to them instead of restating them.
 | `RUNTIME.md` | Coordinator ownership, lifecycle, executor/I/O boundaries, request cadence, timeout policy, logs, or diagnostics |
 | `SENSORS.md` | Sensor metadata, gust-source adapter, device/entity naming, native units, or conservative ID migration |
 | `TIME_AND_MISSING_DATA.md` | Home Assistant timezone use, sun events, calendar/DST boundaries, timestamps, or malformed FMI values |
+| `WARNINGS.md` | FMI CAP snapshots, local polygon matching, original message languages, or warning lifecycle |
 
 Paths in this table are relative to `docs/contracts/`. Use the same-named file under
 `docs/maintenance/` for change procedures/rationale; use `DEVELOPMENT.md`, `HACS_RELEASES.md`, and

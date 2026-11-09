@@ -9,12 +9,15 @@
 **Contract:** Initial setup MUST succeed when either the primary current path (including place
 fallback) or a configured station returns usable data; it MUST enter `setup_retry` when neither
 does. A failure in one path MUST NOT disable a working independent path.
+Optional warning success MUST NOT satisfy the current-source prerequisite; warning failure MUST
+NOT prevent otherwise successful setup.
 
 **Evidence:**
 
 - [`test_observation_by_place_loads_when_forecast_wfs_fails`](../../tests/test_availability.py) — `tests/test_availability.py::test_observation_by_place_loads_when_forecast_wfs_fails`
 - [`test_station_observation_loads_when_all_forecast_sources_fail`](../../tests/test_availability.py) — `tests/test_availability.py::test_station_observation_loads_when_all_forecast_sources_fail`
 - [`test_both_current_sources_fail_initial_setup`](../../tests/test_availability.py) — `tests/test_availability.py::test_both_current_sources_fail_initial_setup`
+- [`test_warning_initial_failure_is_optional_and_primary_failure_is_not`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_initial_failure_is_optional_and_primary_failure_is_not`
 
 ### `AVL-002` — Current fallback and stale clearing are atomic
 
@@ -55,15 +58,19 @@ MUST NOT require entity recreation or reload.
 
 ### `AVL-005` — Optional sources fail and recover independently
 
-**Contract:** Lightning and sea-level failures MUST clear only their owning state and MUST NOT fail
+**Contract:** Lightning, sea-level, and warning failures MUST clear only their owning state and MUST NOT fail
 current weather, observations, or forecasts. A successful empty lightning response MUST remain
 available as `no_strikes`; later valid data MUST restore either optional sensor automatically.
+Warnings MUST distinguish available empty snapshots from unavailable failed snapshots. Warnings
+MUST remain independent of later primary weather outages and recover without entity recreation.
 
 **Evidence:**
 
 - [`test_optional_source_failure_does_not_disable_current_weather`](../../tests/test_availability.py) — `tests/test_availability.py::test_optional_source_failure_does_not_disable_current_weather`
 - [`test_lightning_empty_failure_and_recovery_transitions`](../../tests/test_lifecycle.py) — `tests/test_lifecycle.py::test_lightning_empty_failure_and_recovery_transitions`
 - [`test_optional_failure_clears_stale_data_and_success_recovers`](../../tests/test_auxiliary_payloads.py) — `tests/test_auxiliary_payloads.py::test_optional_failure_clears_stale_data_and_success_recovers`
+- [`test_warning_public_entities_follow_independent_source_and_recover`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_public_entities_follow_independent_source_and_recover`
+- [`test_warning_initial_failure_is_optional_and_primary_failure_is_not`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_initial_failure_is_optional_and_primary_failure_is_not`
 
 ### `AVL-006` — Lifecycle recovery does not leak listeners or entry state
 
@@ -77,3 +84,6 @@ warning per poll.
 - [`test_partial_outage_unload_reload_cleans_coordinator_listeners`](../../tests/test_availability.py) — `tests/test_availability.py::test_partial_outage_unload_reload_cleans_coordinator_listeners`
 - [`test_reload_unload_and_remove_do_not_duplicate_lifecycle_state`](../../tests/test_lifecycle.py) — `tests/test_lifecycle.py::test_reload_unload_and_remove_do_not_duplicate_lifecycle_state`
 - [`test_two_locations_fail_and_recover_independently`](../../tests/test_lifecycle.py) — `tests/test_lifecycle.py::test_two_locations_fail_and_recover_independently`
+- [`test_warning_toggle_and_language_reload_preserve_customized_registry`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_toggle_and_language_reload_preserve_customized_registry`
+- [`test_warning_failed_platform_unload_keeps_live_runtime`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_failed_platform_unload_keeps_live_runtime`
+- [`test_warning_setup_cancel_and_platform_failure_clean_listener`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_setup_cancel_and_platform_failure_clean_listener`

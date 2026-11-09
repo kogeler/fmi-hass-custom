@@ -33,6 +33,22 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util import slugify
 
 from . import FMIConfigEntry, FMIDataUpdateCoordinator, const, utils
+from .warnings_client import WARNING_LEVELS
+from .warnings_coordinator import FMIWarningsCoordinator
+from .warnings_entity import FMIWarningEntity
+
+WARNING_SENSOR_DESCRIPTIONS = (
+    SensorEntityDescription(
+        key="weather_warnings", translation_key="weather_warnings", icon="mdi:weather-lightning"
+    ),
+    SensorEntityDescription(
+        key="weather_warning_level",
+        translation_key="weather_warning_level",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(WARNING_LEVELS),
+        icon="mdi:alert",
+    ),
+)
 
 
 class SensorType(enum.IntEnum):
@@ -337,6 +353,48 @@ async def async_setup_entry(
         entity_list.append(FMILightningStrikesSensor(name, coordinator, LIGHTNING_DESCRIPTION))
     entity_list.append(FMIMareoSensor(name, coordinator, SEA_LEVEL_DESCRIPTION))
     async_add_entities(entity_list, False)
+    warnings = config_entry.runtime_data.warnings_coordinator
+    if warnings is not None:
+        async_add_entities(
+            [
+                FMIWeatherWarningSensor(
+                    warnings,
+                    coordinator.unique_id,
+                    coordinator.get_current_place() or name,
+                    description,
+                )
+                for description in WARNING_SENSOR_DESCRIPTIONS
+            ]
+        )
+
+
+class FMIWeatherWarningSensor(FMIWarningEntity, SensorEntity):
+    """Expose a complete warning count or severity enum on the location device."""
+
+    def __init__(
+        self,
+        coordinator: FMIWarningsCoordinator,
+        identity: str,
+        device_name: str,
+        description: SensorEntityDescription,
+    ) -> None:
+        self.entity_description = description
+        super().__init__(coordinator, identity, device_name, description.key)
+
+    @property
+    def native_value(self) -> int | str | None:
+        data = self.coordinator.data
+        if data is None:
+            return None
+        if self.entity_description.key == "weather_warnings":
+            return len(data.active)
+        return data.level
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        if self.entity_description.key == "weather_warnings" and self.coordinator.data is not None:
+            return self.coordinator.data.attributes()
+        return None
 
 
 class _BaseSensorClass(CoordinatorEntity[FMIDataUpdateCoordinator], SensorEntity):

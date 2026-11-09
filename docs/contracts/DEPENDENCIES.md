@@ -89,3 +89,18 @@ scope without network or credentials. Generated snapshot JSON MUST remain ignore
 - [`test_snapshot_contains_all_three_exact_lock_graphs`](../../tests/test_dependency_snapshot.py) — `tests/test_dependency_snapshot.py::test_snapshot_contains_all_three_exact_lock_graphs`
 - [`test_snapshot_rejects_unrecognized_lock_content`](../../tests/test_dependency_snapshot.py) — `tests/test_dependency_snapshot.py::test_snapshot_rejects_unrecognized_lock_content`
 - [`test_snapshot_rejects_missing_direct_dependency`](../../tests/test_dependency_snapshot.py) — `tests/test_dependency_snapshot.py::test_snapshot_rejects_missing_direct_dependency`
+
+### `DEP-008` — Warning feature coverage is a separate complete gate
+
+**Contract:** The full offline Make test target MUST enforce 100% statement and branch coverage for
+warning runtime modules, the binary sensor platform, and shared optional HTTP transport, while
+retaining the existing 95% repository-wide floor. The feature report MUST be exported as ignored
+evidence and a feature coverage failure MUST propagate as target failure.
+Whole owning setup/unload/refresh functions, options flow, warning sensor class, and diagnostics
+functions in existing modules MUST also have complete statement and branch coverage, as checked
+against AST function/class scopes from the same full-run coverage JSON.
+
+**Evidence:**
+
+- [`test_warning_coverage_is_complete_and_separate_from_global_floor`](../../tests/test_dependency_policy.py) — `tests/test_dependency_policy.py::test_warning_coverage_is_complete_and_separate_from_global_floor`
+- [`test_warning_coverage_rejects_missing_lines_branches_and_renamed_scopes`](../../tests/test_warning_coverage.py) — `tests/test_warning_coverage.py::test_warning_coverage_rejects_missing_lines_branches_and_renamed_scopes`

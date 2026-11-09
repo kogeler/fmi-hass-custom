@@ -2,10 +2,12 @@
 
 # Optional-Source Maintenance
 
-Normative lightning and sea-level transport, freshness, parsing, geometry, presentation, and
+Normative optional-source transport, freshness, parsing, geometry, presentation, and
 coordinate-disclosure requirements are owned by
 [the optional-source contract](../contracts/OPTIONAL_SOURCES.md). Shared XML/privacy rules are in
 [the compatibility, security, and privacy contract](../contracts/COMPATIBILITY_SECURITY.md).
+Weather warnings share the bounded transport; their parsing, geometry, and lifecycle changes follow
+[the weather-warning maintenance guide](WARNINGS.md).
 
 ## Change Checklist
 

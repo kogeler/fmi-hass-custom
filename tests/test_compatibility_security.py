@@ -196,7 +196,6 @@ async def test_diagnostics_redact_location_and_stable_identity(
     entry.runtime_data = FMIEntryRuntimeData(
         coordinator=cast(Any, primary),
         observation_coordinator=None,
-        undo_update_listener=lambda: None,
     )
 
     result = await async_get_config_entry_diagnostics(hass, cast(Any, entry))

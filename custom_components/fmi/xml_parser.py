@@ -29,11 +29,11 @@ def ensure_safe_expat() -> None:
         raise XMLPayloadError(f"Expat {installed} is older than required {required}")
 
 
-def parse_xml_document(payload: str | bytes) -> XMLDocument:
+def parse_xml_document(payload: str | bytes, *, maximum: int | None = None) -> XMLDocument:
     """Parse bounded XML without enabling entity expansion or external resources."""
     ensure_safe_expat()
     payload_size = len(payload) if isinstance(payload, bytes) else len(payload.encode("utf-8"))
-    if payload_size > XML_MAX_PAYLOAD_BYTES:
+    if payload_size > (XML_MAX_PAYLOAD_BYTES if maximum is None else maximum):
         raise XMLPayloadError("XML payload exceeds size limit")
 
     try:

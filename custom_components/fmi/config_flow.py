@@ -18,7 +18,12 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_LATITUDE, CONF_LOCATION, CONF_LONGITUDE, CONF_NAME, CONF_OFFSET
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.selector import LocationSelector, TextSelector
+from homeassistant.helpers.selector import (
+    LocationSelector,
+    SelectSelector,
+    SelectSelectorConfig,
+    TextSelector,
+)
 from requests.exceptions import RequestException
 
 from . import const
@@ -492,6 +497,18 @@ class FMIOptionsFlowHandler(config_entries.OptionsFlow):
                         const.CONF_OBSERVATION_STATION,
                         default=values.get(const.CONF_OBSERVATION_STATION, 0),
                     ): cv.positive_int,
+                    vol.Optional(
+                        const.CONF_WEATHER_WARNINGS,
+                        default=values.get(const.CONF_WEATHER_WARNINGS, False),
+                    ): cv.boolean,
+                    vol.Optional(
+                        const.CONF_WARNINGS_LANGUAGE,
+                        default=values.get(const.CONF_WARNINGS_LANGUAGE, "auto"),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=["auto", "fi", "sv", "en"], translation_key="warnings_language"
+                        )
+                    ),
                 }
             ),
             errors=errors,

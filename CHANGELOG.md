@@ -4,6 +4,44 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.4.0 - 2026-11-09
+
+### User-facing features
+
+- Added opt-in official FMI weather warnings for the configured location, with active warning
+  count, severity, and presence entities plus original message text and upcoming warnings for
+  dashboards and automations. Messages are available in Finnish, Swedish, and English.
+- Added a complete Swedish interface translation. Existing entities, customized entity IDs,
+  settings, and the minimum supported Home Assistant release are preserved.
+
+### Runtime operation
+
+- Enabled warnings refresh independently every five minutes, with local onset/expiry updates
+  and explicit unavailable state after source failures. CAP matching uses local polygons and
+  sends no configured coordinates. The bounded HTTP reader is shared with the existing optional
+  sources without adding dependencies or changing their request cadence.
+- Validated CAP replacement controls, coherent classifications, and simple polygon geometry
+  for every message that could reach the configured location; a malformed message for a distant
+  area cannot make warnings unavailable elsewhere, and dense valid polygons are checked within
+  a bounded amount of work. A briefly served older publication never replaces newer warnings.
+- Warning publications up to 16 MiB, about ten times the size of today's six-message feed, are
+  accepted with a 30-second download allowance, leaving room for storm-time publications.
+  Lightning and sea-level keep their existing limits.
+- Delayed callbacks use actual current time, and teardown discards late results without an error.
+  Unchanged publications write no state change. Sanitized diagnostic reason codes and logs cover
+  every transport, payload, geometry, rollback, freshness, and unexpected failure.
+
+### Development and maintenance
+
+- Added deterministic CAP, geometry, lifecycle, registry, privacy, and language regressions,
+  mandatory real FMI locale/HA probes within the existing shared live budget, and a 100% coverage
+  gate for warning runtime modules.
+- Enforced complete coverage of warning paths in existing setup/options/platform modules and
+  tested actual Recorder exclusions and the documented dashboard/notification examples.
+- Live CAP probes check every current source warning at its own polygon boundary and report
+  public structure counts. Updated the container base image and resolver bootstrap packages to
+  their latest releases.
+
 ## 1.3.3 - 2026-11-05
 
 ### User-facing features

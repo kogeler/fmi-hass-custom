@@ -13,6 +13,7 @@ from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME
 from homeassistant.core import HomeAssistant
 
 from . import FMIConfigEntry, FMIDataUpdateCoordinator, const
+from .warnings_coordinator import FMIWarningsCoordinator
 
 TO_REDACT = {
     CONF_LATITUDE,
@@ -23,7 +24,9 @@ TO_REDACT = {
 }
 
 
-def _coordinator_diagnostics(coordinator: FMIDataUpdateCoordinator) -> dict[str, Any]:
+def _coordinator_diagnostics(
+    coordinator: FMIDataUpdateCoordinator | FMIWarningsCoordinator,
+) -> dict[str, Any]:
     """Return source health and cadence without locations or weather payloads."""
     interval = coordinator.update_interval
     return {
@@ -40,7 +43,7 @@ async def async_get_config_entry_diagnostics(
     """Return diagnostics for one config entry with private location data redacted."""
     _ = hass
     observation = entry.runtime_data.observation_coordinator
-    return {
+    result: dict[str, Any] = {
         "entry": {
             "data": async_redact_data(entry.data, TO_REDACT),
             "options": async_redact_data(dict(entry.options), TO_REDACT),
@@ -54,3 +57,11 @@ async def async_get_config_entry_diagnostics(
             ),
         },
     }
+    warnings = entry.runtime_data.warnings_coordinator
+    if warnings is not None:
+        result["coordinators"]["warnings"] = {
+            **_coordinator_diagnostics(warnings),
+            "failure_reason": warnings.failure_reason,
+            "last_successful_refresh": warnings.last_successful_refresh,
+        }
+    return result

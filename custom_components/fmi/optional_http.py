@@ -1,0 +1,78 @@
+# Copyright (c) 2026 kogeler
+# SPDX-License-Identifier: MIT
+# Contracts: docs/contracts/OPTIONAL_SOURCES.md, docs/contracts/COMPATIBILITY_SECURITY.md
+
+"""Shared bounded HTTP transport for integration-owned optional FMI sources."""
+
+from aiohttp import ClientError, ClientSession, ClientTimeout
+
+from . import const
+
+
+class OptionalSourceError(RuntimeError):
+    """Report a classified optional-source transport or payload failure."""
+
+    def __init__(self, message: str, *, reason: str = "transport") -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
+async def async_optional_payload(
+    session: ClientSession,
+    source: str,
+    url: str,
+    maximum: int,
+    *,
+    allow_redirects: bool = True,
+    expected_status: int | None = None,
+    total_timeout: int | None = None,
+) -> bytes:
+    """Read decoded bytes without retrying or retaining arbitrary transport details."""
+    try:
+        async with session.get(
+            url,
+            timeout=ClientTimeout(
+                total=const.AUX_HTTP_TOTAL_TIMEOUT_SECONDS
+                if total_timeout is None
+                else total_timeout,
+                connect=const.AUX_HTTP_CONNECT_TIMEOUT_SECONDS,
+                sock_connect=const.AUX_HTTP_CONNECT_TIMEOUT_SECONDS,
+                sock_read=const.AUX_HTTP_READ_TIMEOUT_SECONDS,
+            ),
+            allow_redirects=allow_redirects,
+        ) as response:
+            successful = (
+                response.status == expected_status
+                if expected_status is not None
+                else 200 <= response.status < 300
+            )
+            if not successful:
+                category = "server" if response.status >= 500 else "client"
+                raise OptionalSourceError(
+                    f"{source} {category} error HTTP {response.status}",
+                    reason="redirect" if 300 <= response.status < 400 else f"http_{category}",
+                )
+            if response.content_length is not None and response.content_length > maximum:
+                raise OptionalSourceError(
+                    f"{source} response exceeds size limit", reason="response_too_large"
+                )
+            chunks: list[bytes] = []
+            remaining = maximum + 1
+            while remaining:
+                chunk = await response.content.read(min(64 * 1024, remaining))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            payload = b"".join(chunks)
+    except TimeoutError:
+        raise OptionalSourceError(f"{source} request timed out", reason="timeout") from None
+    except ClientError as error:
+        raise OptionalSourceError(f"{source} transport error: {type(error).__name__}") from None
+    if len(payload) > maximum:
+        raise OptionalSourceError(
+            f"{source} response exceeds size limit", reason="response_too_large"
+        )
+    if not payload.strip():
+        raise OptionalSourceError(f"{source} empty response", reason="empty_response")
+    return payload

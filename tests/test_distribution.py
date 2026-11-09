@@ -21,6 +21,7 @@ from custom_components.fmi.sensor import (
     LIGHTNING_DESCRIPTION,
     SEA_LEVEL_DESCRIPTION,
     SENSOR_DESCRIPTIONS,
+    WARNING_SENSOR_DESCRIPTIONS,
 )
 
 ROOT = Path(__file__).parents[1]
@@ -102,11 +103,11 @@ def test_public_support_contract_is_usable_and_privacy_safe() -> None:
 
 
 def test_shipped_translation_keys_match_runtime_surfaces() -> None:
-    """Keep source strings and both shipped languages complete for current entities/options."""
+    """Keep source strings and all shipped languages complete for current entities/options."""
     strings = json.loads((INTEGRATION / "strings.json").read_text(encoding="utf-8"))
     translations = [
         json.loads((INTEGRATION / "translations" / f"{language}.json").read_text(encoding="utf-8"))
-        for language in ("en", "fi")
+        for language in ("en", "fi", "sv")
     ]
     source_tree = _json_key_tree(strings)
     for translation_tree in map(_json_key_tree, translations):
@@ -114,7 +115,12 @@ def test_shipped_translation_keys_match_runtime_surfaces() -> None:
     assert strings["entity"] == translations[0]["entity"]
     assert strings["options"] == translations[0]["options"]
 
-    descriptions = (*SENSOR_DESCRIPTIONS, LIGHTNING_DESCRIPTION, SEA_LEVEL_DESCRIPTION)
+    descriptions = (
+        *SENSOR_DESCRIPTIONS,
+        LIGHTNING_DESCRIPTION,
+        SEA_LEVEL_DESCRIPTION,
+        *WARNING_SENSOR_DESCRIPTIONS,
+    )
     translation_keys = {description.translation_key for description in descriptions}
     assert None not in translation_keys
     assert set(strings["entity"]["sensor"]) == translation_keys
@@ -135,7 +141,11 @@ def test_shipped_translation_keys_match_runtime_surfaces() -> None:
         const.CONF_LIGHTNING_DISTANCE,
         const.CONF_LIGHTNING_MAX_AGE,
         const.CONF_OBSERVATION_STATION,
+        const.CONF_WEATHER_WARNINGS,
+        const.CONF_WARNINGS_LANGUAGE,
     }
+    assert set(strings["entity"]["binary_sensor"]) == {"weather_warning"}
+    assert set(strings["selector"]["warnings_language"]["options"]) == {"auto", "fi", "sv", "en"}
 
 
 def test_copied_distribution_imports_from_empty_config(tmp_path: Path) -> None:

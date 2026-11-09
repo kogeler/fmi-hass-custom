@@ -28,6 +28,7 @@ PYTHON_SOURCES := custom_components/fmi tests .github/scripts
 SHELL_FILES := containers/toolbox/entrypoint.sh
 COVERAGE_REPORT := coverage-report.md
 COVERAGE_TOTAL := coverage-total.txt
+WARNING_COVERAGE_REPORT := warning-coverage.txt
 DEPENDENCY_SNAPSHOT := dependency-snapshot.json
 RUFF_OUTPUT_FORMAT ?=
 RUFF_OUTPUT := $(if $(RUFF_OUTPUT_FORMAT),--output-format=$(RUFF_OUTPUT_FORMAT))
@@ -161,12 +162,17 @@ test-fast: toolbox-image
 test-full: toolbox-image
 	@mkdir -p $(ARTIFACTS)
 	@$(BOX_ARCHIVE) | $(PODMAN) run $(BOX_CONFINE) \
-		--env BOX_EXPORT="coverage.xml $(COVERAGE_REPORT) $(COVERAGE_TOTAL)" \
+		--env BOX_EXPORT="coverage.xml coverage.json $(COVERAGE_REPORT) $(COVERAGE_TOTAL) $(WARNING_COVERAGE_REPORT)" \
 		$(TOOLBOX_TAG) sh -ceu 'status=0; \
 			python -m pytest $(PYTEST_XDIST) --cov=custom_components.fmi \
 				--cov-report=term-missing --cov-report=xml:coverage.xml || status=$$?; \
 			python -m coverage report --format=markdown > $(COVERAGE_REPORT); \
 			python -m coverage report --format=total > $(COVERAGE_TOTAL); \
+			python -m coverage report --precision=2 --fail-under=100 \
+				--include="custom_components/fmi/warning*.py,custom_components/fmi/binary_sensor.py,custom_components/fmi/optional_http.py" \
+				> $(WARNING_COVERAGE_REPORT) || status=$$?; \
+			python -m coverage json -o coverage.json; \
+			python .github/scripts/warning_coverage.py >> $(WARNING_COVERAGE_REPORT) || status=$$?; \
 			exit $$status' \
 		| tar --extract --file=- --directory=$(ARTIFACTS) --no-same-owner
 
@@ -290,6 +296,9 @@ live: toolbox-image
 				printf "live FMI request budget exceeded: %s > 12\\n" "$$count" >&2; exit 1; \
 			}; \
 			printf "live FMI request attempts: %s/12\\n" "$$count"; \
+			for summary in "$${FMI_LIVE_BUDGET_DIR}"/cap-*.txt; do \
+				if [[ -f "$$summary" ]]; then cat "$$summary"; fi; \
+			done; \
 			exit $$status'
 
 compatibility-stable: lock-image
@@ -353,9 +362,10 @@ clean:
 	@for path in .pytest_cache .ruff_cache .mypy_cache __pycache__; do \
 		if [[ -d "$$path" ]]; then find "$$path" -depth -delete; fi; \
 	 done
-	@for path in .coverage coverage.xml $(COVERAGE_REPORT) $(COVERAGE_TOTAL) \
-		$(ARTIFACTS)/coverage.xml $(ARTIFACTS)/$(COVERAGE_REPORT) \
+	@for path in .coverage coverage.xml coverage.json $(COVERAGE_REPORT) $(COVERAGE_TOTAL) \
+		$(ARTIFACTS)/coverage.xml $(ARTIFACTS)/coverage.json $(ARTIFACTS)/$(COVERAGE_REPORT) \
 		$(ARTIFACTS)/$(COVERAGE_TOTAL) $(ARTIFACTS)/$(DEPENDENCY_SNAPSHOT) \
+		$(ARTIFACTS)/$(WARNING_COVERAGE_REPORT) \
 		$(ARTIFACTS)/release-notes.md; do \
 		if [[ -f "$$path" ]]; then unlink "$$path"; fi; \
 	done

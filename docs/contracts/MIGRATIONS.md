@@ -47,11 +47,14 @@ internal registry IDs and unique IDs MUST remain unchanged.
 **Contract:** New sensor descriptions MUST attach through the established unique-ID/device
 construction and MUST NOT introduce a parallel migration path. Setup/reload MUST add missing
 descriptions once while preserving customized IDs and user-disabled registry state.
+Additive warning entities MUST instead use immutable location identity plus a fixed warning suffix
+without mutable display names, preserving the existing device and every legacy unique-ID formula.
 
 **Evidence:**
 
 - [`test_combined_setup_preserves_registry_history_and_is_idempotent`](../../tests/test_migrations.py) — `tests/test_migrations.py::test_combined_setup_preserves_registry_history_and_is_idempotent`
 - [`test_current_registry_customization_and_disabled_state_survive_reload`](../../tests/test_migrations.py) — `tests/test_migrations.py::test_current_registry_customization_and_disabled_state_survive_reload`
+- [`test_warning_toggle_and_language_reload_preserve_customized_registry`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_toggle_and_language_reload_preserve_customized_registry`
 
 ### `MIG-005` — Legacy optional entities survive option changes
 
