@@ -7,7 +7,8 @@
 ### `RUN-001` — Runtime ownership is per config entry
 
 **Contract:** Each loaded config entry MUST own one typed runtime-data value containing its main
-coordinator and, only when a station ID is configured, a separate observation coordinator.
+coordinator, a separate observation coordinator only when a station ID is configured, and an
+independent warnings coordinator only when warnings are enabled.
 Lightning and sea-level state MUST remain owned by that entry's main coordinator. Reload, options
 updates, reconfiguration, failure, and simultaneous entries MUST NOT share callbacks, identity,
 cached data, or availability state.
@@ -17,11 +18,14 @@ cached data, or availability state.
 - [`test_reload_unload_and_remove_do_not_duplicate_lifecycle_state`](../../tests/test_lifecycle.py) — `tests/test_lifecycle.py::test_reload_unload_and_remove_do_not_duplicate_lifecycle_state`
 - [`test_failed_platform_unload_retains_loaded_entry_data`](../../tests/test_lifecycle.py) — `tests/test_lifecycle.py::test_failed_platform_unload_retains_loaded_entry_data`
 - [`test_two_entries_select_best_time_from_their_own_forecasts_and_options`](../../tests/test_lifecycle.py) — `tests/test_lifecycle.py::test_two_entries_select_best_time_from_their_own_forecasts_and_options`
+- [`test_warning_entries_filter_independently_and_diagnostics_are_health_only`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_entries_filter_independently_and_diagnostics_are_health_only`
+- [`test_warning_toggle_and_language_reload_preserve_customized_registry`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_toggle_and_language_reload_preserve_customized_registry`
 
 ### `RUN-002` — Polling cadence and platform concurrency are fixed
 
 **Contract:** The main coordinator MUST use a 30-minute update interval, a configured station MUST
-use a separate 10-minute interval, and both read-only entity platforms MUST declare
+use a separate 10-minute interval, and enabled warnings MUST use a separate 5-minute interval.
+All three read-only entity platforms MUST declare
 `PARALLEL_UPDATES = 0` so coordinator polling owns refresh concurrency.
 
 **Evidence:**
@@ -32,13 +36,15 @@ use a separate 10-minute interval, and both read-only entity platforms MUST decl
 ### `RUN-003` — Blocking and integration-owned I/O stays off the event loop
 
 **Contract:** Synchronous FMI client requests/parsing MUST run through an executor boundary.
-Integration-owned lightning and sea-level HTTP MUST use Home Assistant's shared async session, and
+Integration-owned lightning, sea-level, and warning HTTP MUST use Home Assistant's shared async session, and
 their parsing MUST run in the executor. Entity state/property access MUST NOT initiate network I/O.
 
 **Evidence:**
 
 - [`test_selected_client_place_lookup_uses_executor_and_weather_model`](../../tests/test_fmi_contract.py) — `tests/test_fmi_contract.py::test_selected_client_place_lookup_uses_executor_and_weather_model`
 - [`test_optional_http_uses_ha_session_bounded_timeout_and_executor`](../../tests/test_auxiliary_payloads.py) — `tests/test_auxiliary_payloads.py::test_optional_http_uses_ha_session_bounded_timeout_and_executor`
+- [`test_warning_http_uses_one_bounded_shared_session_request`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_http_uses_one_bounded_shared_session_request`
+- [`test_warning_parser_runs_in_executor_and_unknown_level_remains_visible`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_parser_runs_in_executor_and_unknown_level_remains_visible`
 - [`test_public_entity_and_forecast_contracts`](../../tests/test_lifecycle.py) — `tests/test_lifecycle.py::test_public_entity_and_forecast_contracts`
 
 ### `RUN-004` — Cancellation and failure boundaries remain explicit
@@ -50,6 +56,8 @@ isolate an ordinary exception but MUST NOT consume cancellation or disable prima
 **Evidence:**
 
 - [`test_optional_source_cancellation_propagates`](../../tests/test_auxiliary_payloads.py) — `tests/test_auxiliary_payloads.py::test_optional_source_cancellation_propagates`
+- [`test_warning_cancellation_is_not_consumed`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_cancellation_is_not_consumed`
+- [`test_warning_unexpected_failure_clears_state_and_names_only_the_class`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_unexpected_failure_clears_state_and_names_only_the_class`
 - [`test_primary_source_timeout_clears_stale_data_and_recovers`](../../tests/test_availability.py) — `tests/test_availability.py::test_primary_source_timeout_clears_stale_data_and_recovers`
 - [`test_optional_source_failure_does_not_disable_current_weather`](../../tests/test_availability.py) — `tests/test_availability.py::test_optional_source_failure_does_not_disable_current_weather`
 
@@ -59,6 +67,8 @@ isolate an ordinary exception but MUST NOT consume cancellation or disable prima
 request, and one sea-level request with no internal retry loop. Place observation MAY add one
 request only after current failure; a station and enabled lightning each own one independent
 request. Probability and gust supplements MUST NOT add a second forecast request.
+Enabled warnings MUST own one separate fixed-locale CAP request per warning refresh and MUST NOT
+add requests when disabled or during a local onset/expiry transition.
 
 **Evidence:**
 
@@ -66,6 +76,8 @@ request. Probability and gust supplements MUST NOT add a second forecast request
 - [`test_client_adapter_preserves_weather_and_forecast_timesteps`](../../tests/test_fmi_contract.py) — `tests/test_fmi_contract.py::test_client_adapter_preserves_weather_and_forecast_timesteps`
 - [`test_normal_refresh_request_topology_and_deadlines_are_bounded`](../../tests/test_availability.py) — `tests/test_availability.py::test_normal_refresh_request_topology_and_deadlines_are_bounded`
 - [`test_live_budget_is_shared_and_hard_bounded`](../../tests/test_live_contract.py) — `tests/test_live_contract.py::test_live_budget_is_shared_and_hard_bounded`
+- [`test_warning_temporal_callbacks_do_not_postpone_polling`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_temporal_callbacks_do_not_postpone_polling`
+- [`test_warning_initial_failure_is_optional_and_primary_failure_is_not`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_initial_failure_is_optional_and_primary_failure_is_not`
 
 ### `RUN-006` — Coordinator deadlines are explicit
 

@@ -90,7 +90,22 @@
                     "no_strikes": "Ei salamaniskuja"
                 }
             },
-            "sea_level": {"name": "Merenpinnan korkeus"}
+            "sea_level": {"name": "Merenpinnan korkeus"},
+            "weather_warnings": {"name": "Säävaroitukset"},
+            "weather_warning_level": {
+                "name": "Säävaroituksen taso",
+                "state": {
+                    "none": "Ei voimassa olevia varoituksia",
+                    "green": "Vihreä",
+                    "yellow": "Keltainen",
+                    "orange": "Oranssi",
+                    "red": "Punainen",
+                    "unclassified": "Luokittelematon"
+                }
+            }
+        },
+        "binary_sensor": {
+            "weather_warning": {"name": "Säävaroitus"}
         }
     },
     "options": {
@@ -114,10 +129,26 @@
                     "lightning_sensor": "Aktivoi ukkostutka",
                     "lightning_radius": "Ukkostutkan säde km",
                     "lightning_max_age_minutes": "Salamaniskun enimmäisikä minuutteina",
-                    "observation_station_id": "FMI:n havaintoaseman ID"
+                    "observation_station_id": "FMI:n havaintoaseman ID",
+                    "weather_warnings": "Ota viralliset säävaroitukset käyttöön",
+                    "warnings_language": "Varoitusten kieli"
+                },
+                "data_description": {
+                    "weather_warnings": "Varoitukset koskevat määritettyä sijaintia havaintoasemasta riippumatta.",
+                    "warnings_language": "Valitse FMI:n alkuperäisen tekstin kieli. Entiteettien nimet noudattavat käyttöliittymän kieltä."
                 },
                 "description": "Raja-arvoja käytetään päivän jäljellä olevan parhaan ajan määrittämiseen. Lämpötilarajat koskevat koettua lämpötilaa.",
                 "title": "Ilmatieteen laitos asetukset"
+            }
+        }
+    },
+    "selector": {
+        "warnings_language": {
+            "options": {
+                "auto": "Home Assistantin kieli",
+                "fi": "Suomi",
+                "sv": "Svenska",
+                "en": "English"
             }
         }
     }

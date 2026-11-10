@@ -47,6 +47,7 @@ but never replace repository test evidence.
 | [Forecast semantics](FORECAST_SEMANTICS.md) | `FCS` | Hourly/daily normalization, aggregation, and API shape |
 | [Time and missing data](TIME_AND_MISSING_DATA.md) | `TIM` | Timezones, symbols, invalid values, and Best time |
 | [Optional sources](OPTIONAL_SOURCES.md) | `OPT` | Lightning and sea-level transport, geometry, freshness, and state |
+| [Weather warnings](WARNINGS.md) | `WRN` | CAP snapshots, local polygon matching, and original message languages |
 | [Migrations](MIGRATIONS.md) | `MIG` | Config/device/entity registry upgrade guarantees |
 | [Reconfiguration](RECONFIGURATION.md) | `RCF` | Mutable location, immutable identity, duplicates, and atomic failure |
 | [Compatibility, security, and privacy](COMPATIBILITY_SECURITY.md) | `CSP` | Support boundaries, XML, logs, diagnostics, and data disclosure |

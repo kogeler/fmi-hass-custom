@@ -90,7 +90,22 @@
           "no_strikes": "No lightning strikes"
         }
       },
-      "sea_level": {"name": "Sea level"}
+      "sea_level": {"name": "Sea level"},
+      "weather_warnings": {"name": "Weather warnings"},
+      "weather_warning_level": {
+        "name": "Weather warning level",
+        "state": {
+          "none": "No active warnings",
+          "green": "Green",
+          "yellow": "Yellow",
+          "orange": "Orange",
+          "red": "Red",
+          "unclassified": "Unclassified"
+        }
+      }
+    },
+    "binary_sensor": {
+      "weather_warning": {"name": "Weather warning"}
     }
   },
   "options": {
@@ -116,8 +131,24 @@
           "lightning_sensor": "Activate Lightning sensor",
           "lightning_radius": "Lightning sensor radius km",
           "lightning_max_age_minutes": "Lightning maximum age in minutes",
-          "observation_station_id": "FMI's Observation Station ID"
+          "observation_station_id": "FMI's Observation Station ID",
+          "weather_warnings": "Enable official weather warnings",
+          "warnings_language": "Warning message language"
+        },
+        "data_description": {
+          "weather_warnings": "Warning messages use the configured location, independently of the observation station.",
+          "warnings_language": "Select the original FMI text language. Entity names follow your interface language."
         }
+      }
+    }
+  },
+  "selector": {
+    "warnings_language": {
+      "options": {
+        "auto": "Home Assistant language",
+        "fi": "Suomi",
+        "sv": "Svenska",
+        "en": "English"
       }
     }
   }

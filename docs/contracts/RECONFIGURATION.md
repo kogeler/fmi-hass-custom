@@ -64,3 +64,4 @@ MUST retain customized entity identity and load data for the new place.
 
 - [`test_loaded_reconfigure_preserves_custom_entity_and_loads_new_place`](../../tests/test_config_flow.py) — `tests/test_config_flow.py::test_loaded_reconfigure_preserves_custom_entity_and_loads_new_place`
 - [`test_loaded_place_reconfigure_reloads_only_selected_entry`](../../tests/test_config_flow.py) — `tests/test_config_flow.py::test_loaded_place_reconfigure_reloads_only_selected_entry`
+- [`test_warning_move_preserves_identity_and_other_loaded_location`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_move_preserves_identity_and_other_loaded_location`

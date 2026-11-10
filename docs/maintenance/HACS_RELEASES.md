@@ -19,6 +19,34 @@ requirements are owned by [the CI and release contract](../contracts/CI.md), esp
 6. Do not create a tag or Release manually. Verify the trusted direct-`master` workflow and its
    exact resulting publication.
 
+## Testing An Unreleased Commit On Home Assistant
+
+A pushed pull-request head can be tried on a real Home Assistant instance before release without
+copying files or publishing a pre-release. This is manual acceptance only; it does not replace any
+repository gate.
+
+1. Push the commit and let its CI finish. Take the full 40-character head SHA, for example from
+   `gh pr view <number> --json headRefOid`. A local-only commit cannot be installed, and a branch
+   name keeps moving, so use the SHA.
+2. Create and download a Home Assistant backup.
+3. In **Developer tools > Actions**, switch to YAML mode and perform:
+
+   ```yaml
+   action: update.install
+   target:
+     entity_id: update.fmi_update
+   data:
+     version: <full head SHA>
+   ```
+
+   Use the FMI update entity of the installation if its ID differs.
+4. Restart Home Assistant and confirm that `custom_components/fmi/manifest.json` contains the
+   candidate `.version`. While testing, do not accept an offered update back to the published
+   release.
+5. Return with the same action and `version: <latest release tag>`, then restart. If the candidate
+   migrated config-entry or registry state, restore the backup instead of downgrading. Entities
+   that only the candidate created remain in the registry as unavailable and can be removed.
+
 ## Changelog Classes
 
 The changelog section becomes the published Release body, so classify each entry by its effect on

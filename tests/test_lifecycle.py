@@ -442,38 +442,44 @@ async def test_partial_metric_failure_preserves_independent_sources_and_recovers
 async def test_entity_state_and_metric_name_translations_load_from_integration(
     hass: HomeAssistant,
 ) -> None:
-    """Expose the finite empty token in both shipped frontend languages."""
+    """Expose the finite empty token in every shipped frontend language."""
     key = "component.fmi.entity.sensor.lightning_strikes.state.no_strikes"
 
     english = await translation.async_get_translations(hass, "en", "entity", {DOMAIN})
     finnish = await translation.async_get_translations(hass, "fi", "entity", {DOMAIN})
+    swedish = await translation.async_get_translations(hass, "sv", "entity", {DOMAIN})
 
     assert english[key] == "No lightning strikes"
     assert finnish[key] == "Ei salamaniskuja"
+    assert swedish[key] == "Inga blixtnedslag"
     best_time_key = "component.fmi.entity.sensor.best_time_of_day.state.no_suitable_time"
     assert english[best_time_key] == "No suitable time today"
     assert finnish[best_time_key] == "Ei sopivaa aikaa tänään"
+    assert swedish[best_time_key] == "Ingen lämplig tid i dag"
 
     sensor_names = {
-        "feels_like": ("Feels like", "Tuntuu kuin"),
-        "dew_point": ("Dew point", "Kastepiste"),
-        "atmospheric_pressure": ("Atmospheric pressure", "Ilmanpaine"),
-        "low_cloud_cover": ("Low cloud cover", "Alapilvisyys"),
-        "medium_cloud_cover": ("Medium cloud cover", "Keskipilvisyys"),
-        "high_cloud_cover": ("High cloud cover", "Yläpilvisyys"),
+        "feels_like": ("Feels like", "Tuntuu kuin", "Känns som"),
+        "dew_point": ("Dew point", "Kastepiste", "Daggpunkt"),
+        "atmospheric_pressure": ("Atmospheric pressure", "Ilmanpaine", "Lufttryck"),
+        "low_cloud_cover": ("Low cloud cover", "Alapilvisyys", "Låga moln"),
+        "medium_cloud_cover": ("Medium cloud cover", "Keskipilvisyys", "Medelhöga moln"),
+        "high_cloud_cover": ("High cloud cover", "Yläpilvisyys", "Höga moln"),
         "precipitation_probability": (
             "Precipitation probability",
             "Sateen todennäköisyys",
+            "Sannolikhet för nederbörd",
         ),
         "thunderstorm_probability": (
             "Thunderstorm probability",
             "Ukkosen todennäköisyys",
+            "Sannolikhet för åska",
         ),
     }
-    for sensor_key, (english_name, finnish_name) in sensor_names.items():
+    for sensor_key, (english_name, finnish_name, swedish_name) in sensor_names.items():
         name_key = f"component.fmi.entity.sensor.{sensor_key}.name"
         assert english[name_key] == english_name
         assert finnish[name_key] == finnish_name
+        assert swedish[name_key] == swedish_name
 
 
 async def test_lightning_empty_failure_and_recovery_transitions(

@@ -323,6 +323,19 @@ def test_make_failure_exports_and_coverage_reports_are_unambiguous() -> None:
     assert "rm -rf" not in container
 
 
+def test_warning_coverage_is_complete_and_separate_from_global_floor() -> None:
+    """Require the feature gate to measure every shipped warning module, including branches."""
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert project["tool"]["coverage"]["run"]["branch"] is True
+    assert project["tool"]["coverage"]["report"]["fail_under"] == 95
+    assert "--fail-under=100" in makefile
+    assert "custom_components/fmi/warning*.py" in makefile
+    assert "custom_components/fmi/binary_sensor.py" in makefile
+    assert "custom_components/fmi/optional_http.py" in makefile
+    assert "$(WARNING_COVERAGE_REPORT) || status=$$?" in makefile
+
+
 def test_image_archives_are_content_addressed_atomic_and_verified() -> None:
     """Do not reuse, publish, or accept a partial or incorrectly tagged OCI cache."""
     container = (ROOT / "make/container.mk").read_text(encoding="utf-8")

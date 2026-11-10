@@ -36,10 +36,10 @@ Assistant version.
 ### `CSP-003` — Logs exclude private external data
 
 **Contract:** The integration MUST NOT configure the process-wide root logger. Logs MAY contain
-source names, transitions, HTTP status classes, and exception class names, but MUST NOT contain
-configured coordinates, coordinate-derived identity, place-search text, raw response/payload, or
-arbitrary external exception text. The upstream-client privacy filter MUST remain scoped and
-idempotent.
+source names, transitions, HTTP status classes, exception class names, and the name and configured
+value of an expired request timeout, but MUST NOT contain configured coordinates,
+coordinate-derived identity, place-search text, raw response/payload, or arbitrary external
+exception text. The upstream-client privacy filter MUST remain scoped and idempotent.
 
 **Evidence:**
 
@@ -47,6 +47,11 @@ idempotent.
 - [`test_external_error_details_do_not_include_payload_or_coordinates`](../../tests/test_compatibility_security.py) — `tests/test_compatibility_security.py::test_external_error_details_do_not_include_payload_or_coordinates`
 - [`test_place_flow_does_not_log_query_or_malformed_result`](../../tests/test_compatibility_security.py) — `tests/test_compatibility_security.py::test_place_flow_does_not_log_query_or_malformed_result`
 - [`test_upstream_privacy_filter_is_scoped_and_idempotent`](../../tests/test_compatibility_security.py) — `tests/test_compatibility_security.py::test_upstream_privacy_filter_is_scoped_and_idempotent`
+- [`test_warning_failure_clears_recovers_and_rejects_publication_rollback`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_failure_clears_recovers_and_rejects_publication_rollback`
+- [`test_warning_unexpected_failure_clears_state_and_names_only_the_class`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_unexpected_failure_clears_state_and_names_only_the_class`
+- [`test_warning_initial_failure_is_optional_and_primary_failure_is_not`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_initial_failure_is_optional_and_primary_failure_is_not`
+- [`test_warning_timeout_logs_name_the_expired_limit`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_timeout_logs_name_the_expired_limit`
+- [`test_optional_transport_failure_is_classified`](../../tests/test_auxiliary_payloads.py) — `tests/test_auxiliary_payloads.py::test_optional_transport_failure_is_classified`
 
 ### `CSP-004` — Diagnostics expose only sanitized health metadata
 
@@ -55,18 +60,26 @@ version, polling cadence, coordinator success, and source availability. They MUS
 coordinates, the configured display name, the observation station ID, place/weather values,
 entry/entity/legacy identity, or external payloads; exported
 availability mappings MUST NOT mutate coordinator state.
+Warning diagnostics MUST expose health/cadence only, without message counts, text, or area labels.
+Warnings MAY additionally expose a bounded classified failure reason (or null after recovery) and
+the last accepted retrieval time, without arbitrary external exception text.
 
 **Evidence:**
 
 - [`test_diagnostics_redact_location_and_stable_identity`](../../tests/test_compatibility_security.py) — `tests/test_compatibility_security.py::test_diagnostics_redact_location_and_stable_identity`
 - [`test_source_availability_snapshot_cannot_mutate_coordinator_state`](../../tests/test_compatibility_security.py) — `tests/test_compatibility_security.py::test_source_availability_snapshot_cannot_mutate_coordinator_state`
+- [`test_warning_entries_filter_independently_and_diagnostics_are_health_only`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_entries_filter_independently_and_diagnostics_are_health_only`
+- [`test_warning_failure_reasons_are_bounded_and_private`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_warning_failure_reasons_are_bounded_and_private`
+- [`test_every_classified_warning_failure_reason_is_exposed`](../../tests/test_warnings_coordinator.py) — `tests/test_warnings_coordinator.py::test_every_classified_warning_failure_reason_is_exposed`
+- [`test_warning_public_entities_follow_independent_source_and_recover`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_public_entities_follow_independent_source_and_recover`
 
 ### `CSP-005` — External FMI XML is bounded and entity-disabled
 
 **Contract:** All integration-owned FMI XML parsing MUST reject Expat older than 2.7.2, enforce a
-2 MiB input ceiling, disable/reject internal and external entity declarations, and never resolve an
-external resource. A bare external DTD MAY remain inert. Malformed/empty XML and unexpected parser
-shapes MUST be classified rather than passed into runtime state.
+2 MiB input ceiling (16 MiB for the CAP warning feed and its embedded CAP), disable/reject internal
+and external entity declarations, and never resolve an external resource. A bare external DTD MAY
+remain inert. Malformed/empty XML and unexpected parser shapes MUST be classified rather than
+passed into runtime state.
 
 **Evidence:**
 
@@ -74,6 +87,9 @@ shapes MUST be classified rather than passed into runtime state.
 - [`test_external_dtd_is_not_resolved`](../../tests/test_xml_parser.py) — `tests/test_xml_parser.py::test_external_dtd_is_not_resolved`
 - [`test_xml_payload_byte_size_is_bounded`](../../tests/test_xml_parser.py) — `tests/test_xml_parser.py::test_xml_payload_byte_size_is_bounded`
 - [`test_unsupported_expat_runtime_is_rejected`](../../tests/test_xml_parser.py) — `tests/test_xml_parser.py::test_unsupported_expat_runtime_is_rejected`
+- [`test_warning_feed_ceiling_is_separate_from_the_shared_xml_limit`](../../tests/test_warnings_client.py) — `tests/test_warnings_client.py::test_warning_feed_ceiling_is_separate_from_the_shared_xml_limit`
+- [`test_warning_large_valid_ring_and_exact_xml_boundary`](../../tests/test_warnings_client.py) — `tests/test_warnings_client.py::test_warning_large_valid_ring_and_exact_xml_boundary`
+- [`test_warning_storm_sized_publication_stays_within_bounded_resources`](../../tests/test_warnings_client.py) — `tests/test_warnings_client.py::test_warning_storm_sized_publication_stays_within_bounded_resources`
 
 ### `CSP-006` — User state and transient external disclosure are explicit
 
@@ -81,12 +97,15 @@ shapes MUST be classified rather than passed into runtime state.
 the selected FMI request. Search text MUST NOT persist in config/logs/diagnostics. Entity state MAY
 expose the configured place and weather factors to the Home Assistant user, but MUST NOT expose raw
 external payloads, strike coordinates, immutable identity, or an opaque Best-time score.
+Validated official localized warning fields MAY be presented according to `SNS-007`, without raw
+CAP, source polygons, or configured coordinates in the warning representation.
 
 **Evidence:**
 
 - [`test_place_adapter_returns_only_validated_location_fields`](../../tests/test_fmi_contract.py) — `tests/test_fmi_contract.py::test_place_adapter_returns_only_validated_location_fields`
 - [`test_best_time_selected_state_preserves_and_extends_attributes`](../../tests/test_lifecycle.py) — `tests/test_lifecycle.py::test_best_time_selected_state_preserves_and_extends_attributes`
 - [`test_public_entity_and_forecast_contracts`](../../tests/test_lifecycle.py) — `tests/test_lifecycle.py::test_public_entity_and_forecast_contracts`
+- [`test_warning_public_entities_follow_independent_source_and_recover`](../../tests/test_warning_entities.py) — `tests/test_warning_entities.py::test_warning_public_entities_follow_independent_source_and_recover`
 
 ### `CSP-007` — Stored test data is synthetic and sanitized
 

@@ -122,7 +122,9 @@ Institute**, select an entry, and choose **Configure** to change these options:
 - legacy daily weather entity, which is optional because the main weather entity already supplies
   both hourly and daily forecasts;
 - lightning sensor, search radius, and inclusive maximum age from 1 to 1440 minutes;
-- numeric FMI observation station ID (`0` disables the station observation entity).
+- numeric FMI observation station ID (`0` disables the station observation entity);
+- official weather warnings and their original text language (Finnish, Swedish, English, or
+  automatic selection from Home Assistant's configured language, with English fallback).
 
 The sea-level sensor does not have an enable switch. It becomes available only when FMI provides
 a valid forecast for the configured coordinates.
@@ -150,6 +152,122 @@ forecast time, best time of day, and sea level. Enabling lightning adds a lightn
 configured station creates a separate observation device and weather entity; it does not duplicate
 the main forecast-backed metric sensors. Enabling legacy daily mode adds another weather entity,
 but it is not needed to request daily forecasts from the main entity.
+
+## Official Weather Warnings
+
+Enable **Official weather warnings** in the entry's options. Warnings use the location selected
+on the map, independently of the observation station. The location device gains a warning count
+sensor, a warning-level sensor, and a binary sensor showing whether any warning is active.
+They use the same device and keep their identity when the location or language changes.
+
+Choose Finnish, Swedish, or English for the original FMI messages. Automatic selection uses the
+language configured for Home Assistant, falling back to English for other languages. The message's
+`language` field identifies the actual original language if FMI does not include the requested one.
+Entity labels follow Home Assistant's interface translation; message text has one language per
+entry. No translation service receives the data.
+
+The count includes warnings active now. Its `warnings` attribute contains those messages and
+`upcoming_warnings` contains published future warnings; `upcoming_count` counts the latter.
+Messages include official headlines, descriptions, severity, area names, language, and UTC
+publication/start/end times. Optional instructions or typical impacts appear only when FMI supplies
+them. Warning polygons are checked locally and are not copied into entity attributes.
+
+Level values are `none`, `green`, `yellow`, `orange`, `red`, and `unclassified`. The interface
+translates these labels. FMI's current warning profile does not use green; the value remains for
+the official Minor severity. An unknown severity remains visible as unclassified. The binary sensor
+is off when there is no matching active message; this does not mean the weather is safe. A future
+warning does not turn it on before its start time.
+When known and unclassified warnings coexist, the level is unclassified; the individual warning
+list still includes every known color, ordered red through green after unclassified messages.
+
+Warnings refresh independently every five minutes and change at their start/end times locally.
+Unavailable means warning data could not be checked; it is different from an available count of
+zero. A brief network problem, such as a timeout, a dropped connection, or an FMI server error,
+keeps the last accepted messages and their start/end transitions until the 15-minute freshness
+deadline, so a single slow download does not interrupt dashboards or automations. Other source
+failures, such as an invalid publication, clear previous message attributes immediately. A later
+successful refresh restores them without recreating entities. Forecast/current-weather failures do
+not disable an independently working warning source. Large message lists are omitted from Recorder
+attributes while remaining accessible in current state for cards and templates. An unchanged
+publication does not change the entity state, so repeated retrieval adds no history rows and does
+not trigger state automations.
+The 15-minute freshness deadline measures successful retrieval. Repeated successful delivery of an
+unchanged publication refreshes it; it cannot detect a frozen provider publication by itself.
+If FMI briefly serves an older publication, the newer data stays until its freshness deadline
+instead of being replaced by older messages. Sanitized diagnostics include a reason code for source
+failures and the time of the last accepted retrieval. Each refresh downloads the selected national
+feed, which can be several megabytes during widespread warnings. A download may take up to 30
+seconds, with up to 10 seconds to connect or between received data. Publications larger than
+16 MiB and overly complex or invalid polygons that could cover the configured location make this
+source unavailable rather than silently omitting messages. A malformed message for an area that
+cannot reach the location is ignored.
+
+Coverage is limited to the supported FMI CAP weather-warning feed, not every emergency notice or
+warning-like product on FMI's website. The official source remains
+[FMI's warning service](https://en.ilmatieteenlaitos.fi/warnings).
+
+Use your actual entity IDs in these examples. Only the **Weather warnings** count sensor, such as
+`sensor.helsinki_weather_warnings`, carries the message lists; the warning-level sensor and the
+**Weather warning** binary sensor do not. A standard Markdown card can show every current and
+future message without installing a custom frontend card. This example picks an icon from the FMI
+event code and shows red and orange messages as errors, yellow as warnings, green as success, and
+upcoming or unclassified messages as information. Pointed at an entity without message lists, it
+reports that mistake instead of claiming that no warning is active:
+
+```yaml
+type: markdown
+title: FMI weather warnings
+content: |
+  {% set entity = 'sensor.helsinki_weather_warnings' %}
+  {% set icons = {'wind': 'mdi:weather-windy', 'seaWind': 'mdi:weather-windy-variant',
+     'rain': 'mdi:weather-pouring', 'thunderstorm': 'mdi:weather-lightning',
+     'seaThunderstorm': 'mdi:weather-lightning-rainy', 'trafficWeather': 'mdi:road-variant',
+     'pedestrianSafety': 'mdi:walk', 'forestFireWeather': 'mdi:fire',
+     'hotWeather': 'mdi:thermometer-high', 'coldWeather': 'mdi:snowflake-thermometer',
+     'uvNote': 'mdi:weather-sunny-alert', 'seaIcing': 'mdi:snowflake-alert',
+     'seaWaterHeight': 'mdi:waves-arrow-up', 'seaWaveHeight': 'mdi:waves'} %}
+  {% set types = {'red': 'error', 'orange': 'error', 'yellow': 'warning', 'green': 'success'} %}
+  {% set active = state_attr(entity, 'warnings') %}
+  {% if not has_value(entity) %}
+  <ha-alert alert-type="error">Warning data is unavailable.</ha-alert>
+  {% elif active is none %}
+  <ha-alert alert-type="error">{{ entity }} is not an FMI weather warnings count sensor.</ha-alert>
+  {% else %}
+  {% for w in active %}
+  <ha-alert alert-type="{{ types.get(w.color, 'info') }}" title="{{ w.headline | e }}"><ha-icon icon="{{ icons.get(w.event_code, 'mdi:alert') }}"></ha-icon> {{ w.description | e }}<br>Ends: {{ as_local(as_datetime(w.expires)).strftime('%a %d %b %H:%M') }}</ha-alert>
+  {% else %}
+  No active warnings for this location.
+  {% endfor %}
+  {% for w in state_attr(entity, 'upcoming_warnings') or [] %}
+  <ha-alert alert-type="info" title="Upcoming: {{ w.headline | e }}"><ha-icon icon="{{ icons.get(w.event_code, 'mdi:alert') }}"></ha-icon> {{ w.description | e }}<br>Starts: {{ as_local(as_datetime(w.onset)).strftime('%a %d %b %H:%M') }}</ha-alert>
+  {% endfor %}
+  {% endif %}
+```
+
+An automation can notify on a changed active message list, including replacement warnings when
+the count stays the same. Comparing the list avoids repeating a notification for each retrieval:
+
+```yaml
+alias: FMI active warning changed
+triggers:
+  - trigger: state
+    entity_id: sensor.helsinki_weather_warnings
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.from_state is not none and trigger.to_state is not none
+         and trigger.to_state.state not in ['unknown', 'unavailable']
+         and trigger.to_state.state | int(0) > 0
+         and trigger.from_state.attributes.get('warnings', [])
+             != trigger.to_state.attributes.get('warnings', []) }}
+actions:
+  - action: persistent_notification.create
+    data:
+      title: FMI weather warnings
+      message: >-
+        {{ trigger.to_state.attributes.warnings
+           | map(attribute='headline') | join('; ') | e }}
+```
 
 ## Useful Weather Metrics
 
@@ -451,6 +569,11 @@ entities:
   sensor unavailable. Wait for the next refresh to recover automatically.
 - **Sea level is unavailable:** the configured location may be outside FMI sea-level forecast
   coverage, or the optional response may be empty or unavailable.
+- **Warnings are unavailable or the log reports warning timeouts:** download the entry's
+  diagnostics and check `failure_reason` in the `warnings` section. A single `timeout` keeps the
+  last messages for up to 15 minutes and is harmless. If the log repeatedly shows lines such as
+  `FMI warnings retrieval failed (timeout): exceeded the read timeout of 10 s`, report them in the
+  issue tracker. They name the limit that expired, so its value can be reviewed.
 - **Best time says “No suitable time today”:** FMI forecast data is healthy, but there is no
   complete remaining current-day hour that passes your configured limits. Widen the limits if
   appropriate. `unavailable` instead means the remaining forecast data cannot support a result.
@@ -479,6 +602,9 @@ it is not stored in the config entry, logs, or diagnostics. FMI lightning strike
 processed transiently in memory for local distance/bearing calculation. They are not sent to a
 second provider and are not exposed in state, attributes, logs, or diagnostics. See the
 [security and privacy contract](contracts/COMPATIBILITY_SECURITY.md).
+Warning requests fetch a fixed national-language feed without sending configured coordinates;
+point-in-polygon filtering happens locally. Diagnostics contain warning-source health and cadence,
+without warning texts, area names, message IDs, or warning counts.
 
 Documentation references verified 2026-11-05:
 

@@ -21,6 +21,29 @@ from tests.helpers.live_fmi import (
     validate_model_forecast,
     validate_probabilities,
 )
+from tests.helpers.live_network import live_call
+
+
+async def test_live_warning_allocation_includes_retries_and_all_locales(tmp_path, monkeypatch):
+    """Exercise actual retry accounting before reserving every remaining HA/CAP request."""
+    monkeypatch.setenv("FMI_LIVE_BUDGET_DIR", str(tmp_path))
+    calls: dict[str, int] = {}
+    for label in ("resolution", "northern forecast"):
+
+        async def operation(current=label):
+            calls[current] = calls.get(current, 0) + 1
+            if calls[current] == 1:
+                raise TimeoutError
+            return True
+
+        assert await live_call(label, operation)
+    budget = LiveRequestBudget(tmp_path)
+    for label in ("current", "forecast", "station", "fallback", "CAP en", "CAP fi", "CAP sv"):
+        async with budget.request():
+            calls[label] = calls.get(label, 0) + 1
+    assert calls["resolution"] == calls["northern forecast"] == 2
+    assert all(calls[f"CAP {locale}"] == 1 for locale in ("en", "fi", "sv"))
+    assert int((tmp_path / "requests").read_text()) == 11
 
 
 @pytest.fixture
@@ -182,3 +205,13 @@ async def test_live_budget_limits_parallel_requests(tmp_path: Path) -> None:
 
     await asyncio.gather(*(exercise() for _ in range(6)))
     assert peak == 2
+
+
+def test_live_target_reports_cap_structure_after_the_request_counter() -> None:
+    """The live gate prints public CAP structure counts and accepts no ad hoc pytest arguments."""
+    makefile = (Path(__file__).parents[1] / "Makefile").read_text(encoding="utf-8")
+    live = makefile.split("\nlive:", 1)[1].split("\n\n", 1)[0]
+    counter = live.index('printf "live FMI request attempts')
+    summaries = live.index('"$${FMI_LIVE_BUDGET_DIR}"/cap-*.txt')
+    assert counter < summaries < live.index("exit $$status")
+    assert "-m live -q ||" in live and "LIVE_TEST_ARGS" not in makefile

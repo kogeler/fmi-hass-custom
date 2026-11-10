@@ -4,6 +4,29 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.4.0 - 2026-11-09
+
+### User-facing features
+
+- Added opt-in official FMI weather warnings for the configured location, with active warning
+  count, severity, and presence entities plus original message text and upcoming warnings for
+  dashboards and automations. Messages are available in Finnish, Swedish, and English.
+- Added a complete Swedish interface translation. Existing entities, customized entity IDs,
+  settings, and the minimum supported Home Assistant release are preserved.
+
+### Runtime operation
+
+- Lightning and sea-level timeout log lines now name the expired connect, read, or total limit and
+  its value.
+- Removed the setup flow's obsolete connection-class constant, which Home Assistant reports as
+  deprecated and will remove. The manifest's cloud-polling classification is unchanged, and the
+  startup deprecation warning no longer appears.
+
+### Development and maintenance
+
+- Added offline and live tests for weather warnings. Updated the container base image and
+  resolver bootstrap packages to their latest releases.
+
 ## 1.3.3 - 2026-11-05
 
 ### User-facing features

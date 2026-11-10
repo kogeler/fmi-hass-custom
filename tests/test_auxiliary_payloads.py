@@ -12,7 +12,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
 import pytest
-from aiohttp import ClientConnectionError, ClientTimeout
+from aiohttp import (
+    ClientConnectionError,
+    ClientTimeout,
+    ConnectionTimeoutError,
+    SocketTimeoutError,
+)
 
 from custom_components import fmi as integration
 from custom_components.fmi import FMIDataUpdateCoordinator, OptionalSourceError
@@ -475,7 +480,9 @@ async def test_optional_http_status_is_classified(status: int, message: str) -> 
 @pytest.mark.parametrize(
     ("error", "message"),
     [
-        (TimeoutError(), "request timed out"),
+        (ConnectionTimeoutError("private host"), "exceeded the connect timeout of 2 s$"),
+        (SocketTimeoutError("private host"), "exceeded the read timeout of 3 s$"),
+        (TimeoutError("private host"), "exceeded the total timeout of 5 s$"),
         (ClientConnectionError("synthetic disconnect"), "transport error"),
     ],
 )
@@ -486,8 +493,9 @@ async def test_optional_transport_failure_is_classified(
     coordinator = _coordinator(session=_FakeSession(error=error))
     coordinator_private = cast(Any, coordinator)
 
-    with pytest.raises(OptionalSourceError, match=message):
+    with pytest.raises(OptionalSourceError, match=message) as raised:
         await coordinator_private._FMIDataUpdateCoordinator__async_update_mareo_data()
+    assert "private" not in str(raised.value)
 
 
 @pytest.mark.parametrize(
@@ -532,6 +540,7 @@ async def test_optional_http_uses_ha_session_bounded_timeout_and_executor() -> N
     assert isinstance(request_timeout, ClientTimeout)
     assert request_timeout.total == 5
     assert request_timeout.connect == 2
+    assert request_timeout.sock_connect == 2
     assert request_timeout.sock_read == 3
 
 

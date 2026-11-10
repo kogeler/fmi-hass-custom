@@ -9,9 +9,11 @@ import re
 from datetime import timedelta
 from pathlib import Path
 
+from custom_components.fmi import binary_sensor as binary_sensor_platform
 from custom_components.fmi import const
 from custom_components.fmi import sensor as sensor_platform
 from custom_components.fmi import weather as weather_platform
+from custom_components.fmi.warnings_coordinator import WARNING_INTERVAL
 
 ROOT = Path(__file__).parents[1]
 CONTRACTS = ROOT / "docs" / "contracts"
@@ -34,9 +36,11 @@ EXPECTED_CONTRACTS = {
     "RUNTIME.md": "RUN",
     "SENSORS.md": "SNS",
     "TIME_AND_MISSING_DATA.md": "TIM",
+    "WARNINGS.md": "WRN",
 }
 
 IMPLEMENTATION_OWNERS = {
+    "custom_components/fmi/warning_geometry.py": {"docs/contracts/WARNINGS.md"},
     "custom_components/fmi/__init__.py": {
         "docs/contracts/AVAILABILITY.md",
         "docs/contracts/OPTIONAL_SOURCES.md",
@@ -76,6 +80,28 @@ IMPLEMENTATION_OWNERS = {
         "docs/contracts/TIME_AND_MISSING_DATA.md",
     },
     "custom_components/fmi/xml_parser.py": {"docs/contracts/COMPATIBILITY_SECURITY.md"},
+    "custom_components/fmi/warnings_client.py": {
+        "docs/contracts/WARNINGS.md",
+        "docs/contracts/COMPATIBILITY_SECURITY.md",
+    },
+    "custom_components/fmi/warnings_coordinator.py": {
+        "docs/contracts/WARNINGS.md",
+        "docs/contracts/RUNTIME.md",
+        "docs/contracts/AVAILABILITY.md",
+        "docs/contracts/OPTIONAL_SOURCES.md",
+    },
+    "custom_components/fmi/warnings_entity.py": {
+        "docs/contracts/MIGRATIONS.md",
+        "docs/contracts/SENSORS.md",
+    },
+    "custom_components/fmi/binary_sensor.py": {
+        "docs/contracts/SENSORS.md",
+        "docs/contracts/WARNINGS.md",
+    },
+    "custom_components/fmi/optional_http.py": {
+        "docs/contracts/OPTIONAL_SOURCES.md",
+        "docs/contracts/COMPATIBILITY_SECURITY.md",
+    },
 }
 
 MAINTENANCE_OWNERS = {
@@ -94,6 +120,7 @@ MAINTENANCE_OWNERS = {
     "RUNTIME.md": "RUNTIME.md",
     "SENSORS.md": "SENSORS.md",
     "TIME_AND_MISSING_DATA.md": "TIME_AND_MISSING_DATA.md",
+    "WARNINGS.md": "WARNINGS.md",
 }
 
 ASSERTION_HEADING = re.compile(r"^### `(?P<id>[A-Z]{3}-[0-9]{3})` — .+$", re.MULTILINE)
@@ -208,5 +235,7 @@ def test_runtime_cadence_and_platform_parallelism_match_contract() -> None:
     """Pin previously documented but untested coordinator/platform timing invariants."""
     assert const.FORECAST_UPDATE_INTERVAL == timedelta(minutes=30)
     assert const.OBSERVATION_UPDATE_INTERVAL == timedelta(minutes=10)
+    assert WARNING_INTERVAL == timedelta(minutes=5)
+    assert binary_sensor_platform.PARALLEL_UPDATES == 0
     assert sensor_platform.PARALLEL_UPDATES == 0
     assert weather_platform.PARALLEL_UPDATES == 0
